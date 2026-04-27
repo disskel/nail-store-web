@@ -1,0 +1,413 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+from supabase import create_client, Client
+import os
+from dotenv import load_dotenv
+
+# -----------------------------------------------------------------------------
+# 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
+# -----------------------------------------------------------------------------
+# Se cargan las variables de entorno para la conexión segura con Supabase
+load_dotenv()
+
+app = FastAPI(
+    title="Nail-Store API",
+    description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
+    version="1.0.7"
+)
+
+# Configuración de CORS para permitir la comunicación con el Frontend en Next.js
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Inicialización del cliente de Supabase con validación de entorno
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("CRÍTICO: No se detectaron las credenciales de Supabase en el sistema")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# -----------------------------------------------------------------------------
+# 2. MODELOS DE DATOS (PYDANTIC)
+# Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB
+# -----------------------------------------------------------------------------
+
+class ItemVenta(BaseModel):
+    id_producto: str
+    cantidad: int
+    precio_unitario: float
+
+class VentaRequest(BaseModel):
+    items: List[ItemVenta]
+    tipo_documento: str  # "NOTA_VENTA" o "PROFORMA"
+    id_sesion_caja: str
+    medio_pago: Optional[str] = "EFECTIVO"
+    observaciones: Optional[str] = None
+
+class IngresoRequest(BaseModel):
+    """Modelo para el registro de entrada de mercancía de proveedores"""
+    id_producto: str
+    cantidad: int
+    costo_nuevo: float
+    precio_menor_nuevo: float
+    precio_mayor_nuevo: float
+    documento_referencia: Optional[str] = None
+
+class ProveedorRequest(BaseModel):
+    nombre: str
+    contacto: Optional[str] = None
+
+class AperturaCajaRequest(BaseModel):
+    monto_inicial: float = 0.0 
+    observaciones: Optional[str] = None
+
+class CierreCajaRequest(BaseModel):
+    id_sesion: str
+    monto_fisico: float
+
+class UpdatePrecioRequest(BaseModel):
+    costo_unidad: float
+    precio_menor: float
+    precio_mayor: float
+
+class ProductoCreateRequest(BaseModel):
+    """Contrato para la creación de nuevos productos en el catálogo"""
+    sku: str
+    nombre: str
+    id_proveedor: str
+    id_categoria: str
+    costo_unidad: float
+    precio_menor: float
+    precio_mayor: float
+    stock_actual: int
+
+# -----------------------------------------------------------------------------
+# 3. ENDPOINTS DE SISTEMA Y SALUD
+# -----------------------------------------------------------------------------
+
+@app.get("/api/health")
+def health_check():
+    """Verifica la disponibilidad del servidor y el estado de la conexión DB."""
+    return {
+        "status": "online", 
+        "business": "Nail-Store", 
+        "database_connected": supabase is not None
+    }
+
+# -----------------------------------------------------------------------------
+# 4. MÓDULO DE PRODUCTOS E INVENTARIO
+# -----------------------------------------------------------------------------
+
+@app.get("/api/productos/margenes")
+def obtener_margenes():
+    """
+    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
+    """
+    try:
+        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
+        response = supabase.table("productos").select(
+            "id, nombre, costo_unidad, precio_menor, stock_actual, "
+            "categorias(nombre), proveedores(nombre)"
+        ).execute()
+        
+        resultado = []
+        for p in response.data:
+            costo = p.get("costo_unidad")
+            precio = p.get("precio_menor")
+            stock = p.get("stock_actual") or 0
+            
+            # Navegación segura por los objetos de la relación (Joins)
+            cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
+            prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
+            
+            if costo is not None and precio is not None and precio > 0:
+                margen_porcentaje = ((precio - costo) / precio) * 100
+                resultado.append({
+                    "id": p["id"],
+                    "nombre": p["nombre"],
+                    "categoria": cat_nombre,
+                    "proveedor": prov_nombre,
+                    "costo": float(costo),
+                    "precio": float(precio),
+                    "stock": stock,
+                    "margen_porcentaje": round(float(margen_porcentaje), 2)
+                })
+            else:
+                resultado.append({
+                    "id": p["id"],
+                    "nombre": p["nombre"],
+                    "categoria": cat_nombre,
+                    "stock": stock,
+                    "margen_porcentaje": "Pendiente"
+                })
+        return resultado
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en márgenes: {str(e)}")
+
+@app.post("/api/productos")
+def crear_producto(req: ProductoCreateRequest):
+    """Registra un nuevo producto vinculándolo a su categoría y proveedor."""
+    try:
+        data = {
+            "sku": req.sku,
+            "nombre": req.nombre,
+            "id_proveedor": req.id_proveedor,
+            "id_categoria": req.id_categoria,
+            "costo_unidad": req.costo_unidad,
+            "precio_menor": req.precio_menor,
+            "precio_mayor": req.precio_mayor,
+            "stock_actual": req.stock_actual
+        }
+        res = supabase.table("productos").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
+
+@app.put("/api/productos/{producto_id}/precios")
+def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
+    """Ajusta precios y registra la trazabilidad en historial_precios."""
+    try:
+        prod_actual = supabase.table("productos").select("costo_unidad, nombre").eq("id", producto_id).single().execute()
+        if not prod_actual.data:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+        update_data = {
+            "costo_unidad": req.costo_unidad,
+            "precio_menor": req.precio_menor,
+            "precio_mayor": req.precio_mayor
+        }
+        supabase.table("productos").update(update_data).eq("id", producto_id).execute()
+
+        costo_ant = prod_actual.data.get('costo_unidad')
+        if costo_ant is not None and float(costo_ant) != float(req.costo_unidad):
+            supabase.table("historial_precios").insert({
+                "id_producto": producto_id,
+                "costo_anterior": costo_ant,
+                "costo_nuevo": req.costo_unidad,
+                "precio_nuevo_menor": req.precio_menor
+            }).execute()
+
+        return {"status": "success", "message": f"Precios actualizados para {prod_actual.data['nombre']}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/categorias")
+def listar_categorias():
+    """Obtiene el catálogo de categorías para los selectores del frontend."""
+    try:
+        res = supabase.table("categorias").select("*").execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# -----------------------------------------------------------------------------
+# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/dashboard/resumen")
+def obtener_resumen_dashboard():
+    """
+    Calcula indicadores clave de valor de inventario y stock crítico.
+    Ideal para el panel principal de la demostración.
+    """
+    try:
+        res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
+        
+        valor_total = 0
+        agotados = 0
+        stock_bajo = 0
+        
+        for p in res.data:
+            costo = float(p.get("costo_unidad") or 0)
+            stock = int(p.get("stock_actual") or 0)
+            
+            valor_total += (costo * stock)
+            if stock <= 0:
+                agotados += 1
+            elif stock < 10:
+                stock_bajo += 1
+                
+        return {
+            "valor_total_inventario": round(valor_total, 2),
+            "productos_agotados": agotados,
+            "productos_stock_bajo": stock_bajo,
+            "total_items": len(res.data)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 6. MÓDULO DE PROVEEDORES
+# -----------------------------------------------------------------------------
+
+@app.get("/api/proveedores")
+def listar_proveedores():
+    """Lista todas las empresas proveedoras registradas."""
+    try:
+        response = supabase.table("proveedores").select("*").execute()
+        return response.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al listar proveedores: {str(e)}")
+
+@app.post("/api/proveedores")
+def crear_proveedor(prov: ProveedorRequest):
+    """Registra un nuevo proveedor en el sistema."""
+    try:
+        data = {"nombre": prov.nombre, "contacto": prov.contacto}
+        response = supabase.table("proveedores").insert(data).execute()
+        return {"status": "success", "data": response.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 7. MÓDULO DE CAJA (Arqueo Diario)
+# -----------------------------------------------------------------------------
+
+@app.post("/api/caja/abrir")
+def abrir_caja(req: AperturaCajaRequest):
+    """Inicia sesión de caja. Bloquea aperturas si ya hay una activa."""
+    try:
+        caja_abierta = supabase.table("sesiones_caja").select("*").eq("estado", "ABIERTA").execute()
+        if caja_abierta.data:
+            return {
+                "status": "error", 
+                "message": "La caja ya se encuentra abierta", 
+                "id_sesion": caja_abierta.data[0]['id']
+            }
+
+        data = {
+            "monto_inicial": req.monto_inicial,
+            "estado": "ABIERTA",
+            "observaciones": req.observaciones
+        }
+        res = supabase.table("sesiones_caja").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fallo en apertura: {str(e)}")
+
+@app.post("/api/caja/cerrar")
+def cerrar_caja(req: CierreCajaRequest):
+    """Calcula diferencias entre sistema y físico para el arqueo."""
+    try:
+        ventas_res = supabase.table("movimientos_inventario").select("cantidad, precio_momento")\
+            .eq("id_sesion_caja", req.id_sesion)\
+            .eq("tipo_movimiento", "SALIDA")\
+            .eq("medio_pago", "EFECTIVO")\
+            .execute()
+        
+        sesion_res = supabase.table("sesiones_caja").select("monto_inicial").eq("id", req.id_sesion).single().execute()
+        
+        if not sesion_res.data:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+        monto_ini = float(sesion_res.data['monto_inicial'])
+        total_efectivo = sum(float(v['cantidad']) * float(v.get('precio_momento') or 0) for v in ventas_res.data)
+        
+        monto_esperado = monto_ini + total_efectivo
+        diferencia = req.monto_fisico - monto_esperado
+
+        supabase.table("sesiones_caja").update({
+            "estado": "CERRADA",
+            "monto_final_sistema": monto_esperado,
+            "monto_final_contado": req.monto_fisico
+        }).eq("id", req.id_sesion).execute()
+
+        return {
+            "status": "success",
+            "cuadre": {
+                "sistema": monto_esperado,
+                "contado": req.monto_fisico,
+                "diferencia": diferencia
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 8. MÓDULO DE VENTAS (SALIDAS)
+# -----------------------------------------------------------------------------
+
+@app.post("/api/ventas/procesar")
+def procesar_venta(venta: VentaRequest):
+    """Registra ventas y descuenta stock si es Nota de Venta."""
+    try:
+        for item in venta.items:
+            prod_res = supabase.table("productos").select("nombre, stock_actual").eq("id", item.id_producto).single().execute()
+            if not prod_res.data: continue
+
+            if venta.tipo_documento == "NOTA_VENTA":
+                stock_act = prod_res.data['stock_actual'] or 0
+                if stock_act < item.cantidad:
+                    raise HTTPException(status_code=400, detail=f"Stock insuficiente para {prod_res.data['nombre']}")
+                
+                nuevo_stock = stock_act - item.cantidad
+                supabase.table("productos").update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
+
+            supabase.table("movimientos_inventario").insert({
+                "id_producto": item.id_producto,
+                "tipo_movimiento": "SALIDA",
+                "cantidad": item.cantidad,
+                "precio_momento": item.precio_unitario,
+                "referencia": f"Venta: {venta.tipo_documento}",
+                "id_sesion_caja": venta.id_sesion_caja,
+                "medio_pago": venta.medio_pago
+            }).execute()
+
+        return {"status": "success", "message": "Venta registrada con éxito"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
+# -----------------------------------------------------------------------------
+
+@app.post("/api/inventario/ingreso")
+def registrar_ingreso(req: IngresoRequest):
+    """Aumenta stock y actualiza costos maestros tras compra."""
+    try:
+        prod_res = supabase.table("productos").select("nombre, stock_actual, costo_unidad").eq("id", req.id_producto).single().execute()
+        
+        if not prod_res.data:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+        stock_act = prod_res.data['stock_actual'] or 0
+        costo_ant = prod_res.data['costo_unidad']
+        
+        nuevo_stock = stock_act + req.cantidad
+
+        supabase.table("productos").update({
+            "stock_actual": nuevo_stock,
+            "costo_unidad": req.costo_nuevo,
+            "precio_menor": req.precio_menor_nuevo,
+            "precio_mayor": req.precio_mayor_nuevo
+        }).eq("id", req.id_producto).execute()
+
+        supabase.table("movimientos_inventario").insert({
+            "id_producto": req.id_producto,
+            "tipo_movimiento": "ENTRADA",
+            "cantidad": req.cantidad,
+            "precio_momento": req.costo_nuevo,
+            "referencia": f"Documento: {req.documento_referencia}" if req.documento_referencia else "Ingreso Manual",
+            "medio_pago": "EFECTIVO" 
+        }).execute()
+
+        if costo_ant is not None and float(costo_ant) != float(req.costo_nuevo):
+            supabase.table("historial_precios").insert({
+                "id_producto": req.id_producto,
+                "costo_anterior": costo_ant,
+                "costo_nuevo": req.costo_nuevo,
+                "precio_nuevo_menor": req.precio_menor_nuevo
+            }).execute()
+
+        return {"status": "success", "stock_final": nuevo_stock}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en registro de ingreso: {str(e)}")
