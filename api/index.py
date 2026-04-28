@@ -130,8 +130,11 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
+    """
+    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
+    """
     try:
+        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -143,6 +146,7 @@ def obtener_margenes():
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
+            # Navegación segura por los objetos de la relación (Joins)
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
@@ -254,7 +258,10 @@ def crear_categoria(req: CategoriaRequest):
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
-    """Calcula indicadores clave de valor de inventario y stock crítico."""
+    """
+    Calcula indicadores clave de valor de inventario y stock crítico.
+    Ideal para el panel principal de la demostración.
+    """
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
         
@@ -306,7 +313,8 @@ def crear_proveedor(prov: ProveedorRequest):
         result_data = response.data[0] if response.data and len(response.data) > 0 else data
         return {"status": "success", "data": result_data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
+        # Mejora de reporte: Devolvemos el error real de la base de datos
+        raise HTTPException(status_code=500, detail=f"Error DB Supabase: {str(e)}")
 
 # -----------------------------------------------------------------------------
 # 7. MÓDULO DE CAJA (Arqueo Diario)

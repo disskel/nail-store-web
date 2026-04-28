@@ -29,7 +29,11 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, contacto }),
     });
-    if (!res.ok) throw new Error('Fallo al crear proveedor');
+    if (!res.ok) {
+        const errData = await res.json();
+        // Esto lanzará el error exacto de Supabase en el alert
+        throw new Error(errData.detail || 'Fallo al crear proveedor'); 
+    }
     return res.json();
   },
 
