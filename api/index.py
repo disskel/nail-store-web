@@ -533,8 +533,8 @@ def obtener_reporte_completo():
         for p in response.data:
             prov_nombre = p.get("proveedores", {}).get("nombre", "SIN PROVEEDOR") if p.get("proveedores") else "SIN PROVEEDOR"
             resultado.append({
-                "PRODUCTO": p["nombre"].toUpperCase() if p["nombre"] else "SIN NOMBRE",
-                "PROVEEDOR": prov_nombre.toUpperCase(),
+                "PRODUCTO": p["nombre"]..upper() if p["nombre"] else "SIN NOMBRE",
+                "PROVEEDOR": prov_nombre..upper(),
                 "COSTO (S/)": float(p.get("costo_unitario") or 0),
                 "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
                 "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),

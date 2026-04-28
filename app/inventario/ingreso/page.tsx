@@ -106,7 +106,7 @@ export default function RegistrarIngreso() {
     setMensaje({ texto: '', tipo: '' });
     try {
       // Llamada al endpoint de reporte completo
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/reporte-completo`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/productos/reporte-completo`);
       if (!response.ok) throw new Error("Fallo al obtener datos del servidor");
       const data = await response.json();
 
