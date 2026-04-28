@@ -187,7 +187,7 @@ def crear_producto(req: ProductoCreateRequest):
             "nombre": req.nombre,
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria,
-            "costo_unitario:costo_unidad": clean_num(req.costo_unidad),
+            "costo_unidad": clean_num(req.costo_unidad), # CORRECCIÓN 500: Eliminado el alias incorrecto
             "precio_menor": clean_num(req.precio_menor),
             "precio_mayor": clean_num(req.precio_mayor),
             "stock_actual": clean_num(req.stock_actual, True)
@@ -525,6 +525,10 @@ def obtener_historial_producto(producto_id: str):
     Obtiene la hoja de vida del producto: entradas, salidas y ajustes.
     """
     try:
+        res = supabase.table("productos").select("id").eq("id", producto_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+            
         res = supabase.table("movimientos_inventario")\
             .select("fecha, tipo_movimiento, cantidad, precio_momento, referencia, medio_pago")\
             .eq("id_producto", producto_id)\
