@@ -99,30 +99,28 @@ export default function RegistrarIngreso() {
   };
 
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // 4. LÓGICA DE DESCARGA EXCEL (NUEVO)
   // -------------------------------------------------------------------------
   const descargarReporteExcel = async () => {
     setExportando(true);
     setMensaje({ texto: '', tipo: '' });
     try {
-      // Llamada al endpoint de reporte completo
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/productos/reporte-completo`);
+      // Limpiamos la URL para evitar /api/api[cite: 15]
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') 
+        ? process.env.NEXT_PUBLIC_API_URL 
+        : `${process.env.NEXT_PUBLIC_API_URL}/api`;
+
+      const response = await fetch(`${baseUrl}/productos/reporte-completo`);
       if (!response.ok) throw new Error("Fallo al obtener datos del servidor");
       const data = await response.json();
 
-      // Generación del archivo
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Nail-Store");
 
-      // Ajuste de columnas para Trujillo
       worksheet['!cols'] = [
-        {wch: 40}, // Producto
-        {wch: 25}, // Proveedor
-        {wch: 15}, // Costo
-        {wch: 18}, // Precio Menor
-        {wch: 18}, // Precio Mayor
-        {wch: 12}, // Stock
+        {wch: 40}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 12},
       ];
 
       const fecha = new Date().toLocaleDateString().replace(/\//g, '-');
