@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
 # Se cargan las variables de entorno para la conexión segura con Supabase
-#load_dotenv()
+# load_dotenv() # Comentado para producción en Vercel
 
 app = FastAPI(
     title="Nail-Store API",
@@ -94,7 +94,7 @@ class ProductoCreateRequest(BaseModel):
 # 3. ENDPOINTS DE SISTEMA Y SALUD
 # -----------------------------------------------------------------------------
 
-@app.get("/api/health")
+@app.get("/health")
 def health_check():
     """Verifica la disponibilidad del servidor y el estado de la conexión DB."""
     return {
@@ -107,7 +107,7 @@ def health_check():
 # 4. MÓDULO DE PRODUCTOS E INVENTARIO
 # -----------------------------------------------------------------------------
 
-@app.get("/api/productos/margenes")
+@app.get("/productos/margenes")
 def obtener_margenes():
     """
     Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
@@ -153,7 +153,7 @@ def obtener_margenes():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en márgenes: {str(e)}")
 
-@app.post("/api/productos")
+@app.post("/productos")
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto vinculándolo a su categoría y proveedor."""
     try:
@@ -172,7 +172,7 @@ def crear_producto(req: ProductoCreateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
-@app.put("/api/productos/{producto_id}/precios")
+@app.put("/productos/{producto_id}/precios")
 def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
     """Ajusta precios y registra la trazabilidad en historial_precios."""
     try:
@@ -200,7 +200,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/categorias")
+@app.get("/categorias")
 def listar_categorias():
     """Obtiene el catálogo de categorías para los selectores del frontend."""
     try:
@@ -213,7 +213,7 @@ def listar_categorias():
 # 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
 # -----------------------------------------------------------------------------
 
-@app.get("/api/dashboard/resumen")
+@app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
     """
     Calcula indicadores clave de valor de inventario y stock crítico.
@@ -249,7 +249,7 @@ def obtener_resumen_dashboard():
 # 6. MÓDULO DE PROVEEDORES
 # -----------------------------------------------------------------------------
 
-@app.get("/api/proveedores")
+@app.get("/proveedores")
 def listar_proveedores():
     """Lista todas las empresas proveedoras registradas."""
     try:
@@ -258,7 +258,7 @@ def listar_proveedores():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al listar proveedores: {str(e)}")
 
-@app.post("/api/proveedores")
+@app.post("/proveedores")
 def crear_proveedor(prov: ProveedorRequest):
     """Registra un nuevo proveedor en el sistema."""
     try:
@@ -272,7 +272,7 @@ def crear_proveedor(prov: ProveedorRequest):
 # 7. MÓDULO DE CAJA (Arqueo Diario)
 # -----------------------------------------------------------------------------
 
-@app.post("/api/caja/abrir")
+@app.post("/caja/abrir")
 def abrir_caja(req: AperturaCajaRequest):
     """Inicia sesión de caja. Bloquea aperturas si ya hay una activa."""
     try:
@@ -294,7 +294,7 @@ def abrir_caja(req: AperturaCajaRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fallo en apertura: {str(e)}")
 
-@app.post("/api/caja/cerrar")
+@app.post("/caja/cerrar")
 def cerrar_caja(req: CierreCajaRequest):
     """Calcula diferencias entre sistema y físico para el arqueo."""
     try:
@@ -336,7 +336,7 @@ def cerrar_caja(req: CierreCajaRequest):
 # 8. MÓDULO DE VENTAS (SALIDAS)
 # -----------------------------------------------------------------------------
 
-@app.post("/api/ventas/procesar")
+@app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
     """Registra ventas y descuenta stock si es Nota de Venta."""
     try:
@@ -370,7 +370,7 @@ def procesar_venta(venta: VentaRequest):
 # 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
 # -----------------------------------------------------------------------------
 
-@app.post("/api/inventario/ingreso")
+@app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
     """Aumenta stock y actualiza costos maestros tras compra."""
     try:
