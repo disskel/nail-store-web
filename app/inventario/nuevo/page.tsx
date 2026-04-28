@@ -4,28 +4,20 @@ import { useEffect, useState } from 'react';
 import { apiService } from '@/services/apiService';
 
 export default function NuevoProducto() {
-  // -------------------------------------------------------------------------
-  // 1. ESTADOS DEL COMPONENTE
-  // -------------------------------------------------------------------------
   const [categorias, setCategorias] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
   const [cargando, setCargando] = useState(false);
 
-  // Control de Modales y Modo (Creación vs Edición)
   const [showModal, setShowModal] = useState({ open: false, tipo: '', modo: 'create' });
-  const [selectedId, setSelectedId] = useState(''); // ID para editar/borrar
+  const [selectedId, setSelectedId] = useState('');
   const [modalData, setModalData] = useState({ name: '', info: '' });
 
-  // Estado del Formulario de Producto
   const [formData, setFormData] = useState({
     sku: '', nombre: '', id_proveedor: '', id_categoria: '',
     costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0
   });
 
-  // -------------------------------------------------------------------------
-  // 2. CARGA DE DATOS MAESTROS
-  // -------------------------------------------------------------------------
   async function cargarMaestros() {
     try {
       const [cats, provs] = await Promise.all([
@@ -41,11 +33,6 @@ export default function NuevoProducto() {
 
   useEffect(() => { cargarMaestros(); }, []);
 
-  // -------------------------------------------------------------------------
-  // 3. LÓGICA DE MANTENEDORES (EDITAR / ELIMINAR / CREAR)
-  // -------------------------------------------------------------------------
-  
-  // Abre el modal para crear o editar
   const openMaestroModal = (tipo: 'cat' | 'prov', modo: 'create' | 'edit') => {
     if (modo === 'edit') {
       const item: any = tipo === 'cat' 
@@ -75,14 +62,14 @@ export default function NuevoProducto() {
           : await apiService.updateProveedor(selectedId, modalData.name, modalData.info);
       }
 
-      setMensaje({ texto: `✅ ${res.message}`, tipo: 'success' });
+      setMensaje({ texto: `✅ ${res.message || 'Operación exitosa'}`, tipo: 'success' });
       await cargarMaestros();
       setShowModal({ open: false, tipo: '', modo: 'create' });
+      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
     } catch (err: any) {
       setMensaje({ texto: `❌ ${err.message}`, tipo: 'error' });
     } finally {
       setCargando(false);
-      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
     }
   };
 
@@ -94,13 +81,11 @@ export default function NuevoProducto() {
     setCargando(true);
     try {
       tipo === 'cat' ? await apiService.deleteCategoria(id) : await apiService.deleteProveedor(id);
-      setMensaje({ texto: '✅ Eliminado correctamente', tipo: 'success' });
-      
-      // Limpiar selección tras borrar
+      setMensaje({ texto: '✅ Registro deshabilitado correctamente', tipo: 'success' });
       if (tipo === 'cat') setFormData({...formData, id_categoria: ''});
       else setFormData({...formData, id_proveedor: ''});
-      
       await cargarMaestros();
+      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
     } catch (err: any) {
       setMensaje({ texto: '❌ Error al eliminar', tipo: 'error' });
     } finally {
@@ -108,18 +93,18 @@ export default function NuevoProducto() {
     }
   };
 
-  // -------------------------------------------------------------------------
-  // 4. ENVÍO DE PRODUCTO FINAL
-  // -------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
+    setMensaje({ texto: '', tipo: '' });
     try {
       await apiService.registrarProducto(formData);
-      setMensaje({ texto: '✅ Registro de Producto exitoso', tipo: 'success' });
+      setMensaje({ texto: '✅ REGISTRO DE PRODUCTO EXITOSO EN NAIL-STORE', tipo: 'success' });
       setFormData({ sku: '', nombre: '', id_proveedor: '', id_categoria: '', costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0 });
+      // Limpiar mensaje tras 5 segundos
+      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 5000);
     } catch (err: any) {
-      setMensaje({ texto: `❌ ${err.message}`, tipo: 'error' });
+      setMensaje({ texto: `❌ ERROR AL GUARDAR: ${err.message}`, tipo: 'error' });
     } finally {
       setCargando(false);
     }
@@ -128,7 +113,6 @@ export default function NuevoProducto() {
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-500 relative">
       
-      {/* MODAL UNIFICADO (CREAR / EDITAR) */}
       {showModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl">
@@ -162,25 +146,21 @@ export default function NuevoProducto() {
         </div>
       )}
 
-      {/* CABECERA */}
-      <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <a href="/inventario" className="text-zinc-500 hover:text-indigo-400 mb-4 inline-flex items-center gap-2 transition-colors font-bold text-sm">
-            <span>←</span> VOLVER AL INVENTARIO
-          </a>
-          <div className="flex items-center gap-5">
-            <div className="w-14 h-14 bg-indigo-600 rounded-[1.25rem] flex items-center justify-center text-3xl shadow-xl shadow-indigo-600/20">✨</div>
-            <div>
-              <h1 className="text-5xl font-black text-white tracking-tighter">Nuevo Producto</h1>
-              <p className="text-zinc-500 font-bold mt-1 uppercase text-xs tracking-widest">Gestión Profesional de Catálogo</p>
-            </div>
+      <header className="mb-12">
+        <a href="/inventario" className="text-zinc-500 hover:text-indigo-400 mb-4 inline-flex items-center gap-2 transition-colors font-bold text-sm">
+          <span>←</span> VOLVER AL INVENTARIO
+        </a>
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 bg-indigo-600 rounded-[1.25rem] flex items-center justify-center text-3xl shadow-xl shadow-indigo-600/20">✨</div>
+          <div>
+            <h1 className="text-5xl font-black text-white tracking-tighter">Nuevo Producto</h1>
+            <p className="text-zinc-500 font-bold mt-1 uppercase text-xs tracking-widest">Catálogo Maestro de Trujillo</p>
           </div>
         </div>
       </header>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
-        {/* COLUMNA IZQUIERDA: LÓGICA DE NEGOCIO */}
         <div className="lg:col-span-2 space-y-10">
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-indigo-400 mb-8 flex items-center gap-3">
@@ -205,28 +185,26 @@ export default function NuevoProducto() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">Costo (S/)</label>
-                <input required type="number" step="0.01" placeholder="0.00" onChange={e => setFormData({...formData, costo_unidad: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.costo_unidad} onChange={e => setFormData({...formData, costo_unidad: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Menor (S/)</label>
-                <input required type="number" step="0.01" placeholder="0.00" onChange={e => setFormData({...formData, precio_menor: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.precio_menor} onChange={e => setFormData({...formData, precio_menor: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Mayor (S/)</label>
-                <input required type="number" step="0.01" placeholder="0.00" onChange={e => setFormData({...formData, precio_mayor: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.precio_mayor} onChange={e => setFormData({...formData, precio_mayor: parseFloat(e.target.value)})} className="w-full p-5 bg-black/40 border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-bold text-emerald-400" />
               </div>
             </div>
           </section>
         </div>
 
-        {/* COLUMNA DERECHA: CLASIFICACIÓN DINÁMICA */}
         <div className="space-y-10">
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-zinc-300 rounded-full"></span> Clasificación
             </h3>
             <div className="space-y-8">
-              {/* Proveedor con CRUD contextual */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-black text-zinc-500 uppercase">Proveedor</label>
@@ -246,7 +224,6 @@ export default function NuevoProducto() {
                 </select>
               </div>
 
-              {/* Categoría con CRUD contextual */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-black text-zinc-500 uppercase">Categoría</label>
@@ -272,27 +249,15 @@ export default function NuevoProducto() {
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-zinc-300 rounded-full"></span> Stock Inicial
             </h3>
-            <input required type="number" placeholder="0" onChange={e => setFormData({...formData, stock_actual: parseInt(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-black text-2xl text-center" />
+            <input required type="number" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: parseInt(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-black text-2xl text-center" />
           </section>
 
-          <button 
-            type="submit" 
-            disabled={cargando}
-            className={`w-full py-7 rounded-[2rem] font-black text-xl tracking-tight shadow-2xl transition-all active:scale-95 ${
-              cargando 
-                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'
-            }`}
-          >
-            {cargando ? 'SINCRONIZANDO...' : '💾 GUARDAR PRODUCTO'}
+          <button type="submit" disabled={cargando} className={`w-full py-7 rounded-[2rem] font-black text-xl tracking-tight shadow-2xl transition-all active:scale-95 ${cargando ? 'bg-zinc-800 text-zinc-500' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}>
+            {cargando ? 'GUARDANDO...' : '💾 GUARDAR PRODUCTO'}
           </button>
 
           {mensaje.texto && (
-            <div className={`p-6 rounded-2xl text-center font-black text-sm border animate-in zoom-in duration-300 ${
-              mensaje.tipo === 'success' 
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                : 'bg-red-500/10 border-red-500/20 text-red-400'
-            }`}>
+            <div className={`p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-xl ${mensaje.tipo === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
               {mensaje.texto.toUpperCase()}
             </div>
           )}

@@ -495,3 +495,23 @@ def registrar_ingreso(req: IngresoRequest):
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en registro de ingreso: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 11. MÓDULO DE TRAZABILIDAD (NUEVO)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/productos/{producto_id}/historial")
+@app.get("/productos/{producto_id}/historial")
+def obtener_historial_producto(producto_id: str):
+    """
+    Obtiene la hoja de vida del producto: entradas, salidas y ajustes.
+    """
+    try:
+        res = supabase.table("movimientos_inventario")\
+            .select("fecha, tipo_movimiento, cantidad, precio_momento, referencia, medio_pago")\
+            .eq("id_producto", producto_id)\
+            .order("fecha", desc=True)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener historial: {str(e)}")
