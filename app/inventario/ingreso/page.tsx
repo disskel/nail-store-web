@@ -27,7 +27,7 @@ export default function RegistrarIngreso() {
   useEffect(() => {
     async function cargarCatalogo() {
       try {
-        // Se usa el servicio actualizado que ya tenemos en memoria[cite: 21]
+        // Se usa el servicio actualizado que ya tenemos en memoria
         const data = await apiService.getProductosParaIngreso();
         setProductos(data);
       } catch (error) {
