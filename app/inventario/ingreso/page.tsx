@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
-import * as XLSX from 'xlsx'; // Importación de la librería recién instalada
+import * as XLSX from 'xlsx';
 
 export default function RegistrarIngreso() {
   // -------------------------------------------------------------------------
@@ -12,20 +12,14 @@ export default function RegistrarIngreso() {
   const [proveedorFiltro, setProveedorFiltro] = useState('');
   const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null);
   const [cargando, setCargando] = useState(false);
-  const [exportando, setExportando] = useState(false); // Estado para feedback de Excel
+  const [exportando, setExportando] = useState(false);
   const [preciosConfirmados, setPreciosConfirmados] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
   const [formData, setFormData] = useState({
-    id_producto: '',
-    cantidad: 1,
-    costo_nuevo: 0,
-    costo_total_lote: 0, 
-    margen_menor: 30,
-    margen_mayor: 15,
-    precio_menor_nuevo: 0,
-    precio_mayor_nuevo: 0,
-    documento_referencia: ''
+    id_producto: '', cantidad: 1, costo_nuevo: 0, costo_total_lote: 0, 
+    margen_menor: 30, margen_mayor: 15, precio_menor_nuevo: 0, 
+    precio_mayor_nuevo: 0, documento_referencia: ''
   });
 
   // -------------------------------------------------------------------------
@@ -79,11 +73,7 @@ export default function RegistrarIngreso() {
   const recalcarMargenDesdePrecio = (tipo: 'menor' | 'mayor', nuevoPrecio: number) => {
     const costo = formData.costo_nuevo || 1;
     const nuevoMargen = Number((((nuevoPrecio / costo) - 1) * 100).toFixed(2));
-    setFormData(prev => ({
-      ...prev,
-      [tipo === 'menor' ? 'precio_menor_nuevo' : 'precio_mayor_nuevo']: nuevoPrecio,
-      [tipo === 'menor' ? 'margen_menor' : 'margen_mayor']: nuevoMargen
-    }));
+    setFormData(prev => ({ ...prev, [tipo === 'menor' ? 'precio_menor_nuevo' : 'precio_mayor_nuevo']: nuevoPrecio, [tipo === 'menor' ? 'margen_menor' : 'margen_mayor']: nuevoMargen }));
     setPreciosConfirmados(false);
   };
 
@@ -99,71 +89,46 @@ export default function RegistrarIngreso() {
   };
 
   // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // 4. LÓGICA DE DESCARGA EXCEL (NUEVO)
+  // 4. LÓGICA DE DESCARGA EXCEL
   // -------------------------------------------------------------------------
   const descargarReporteExcel = async () => {
     setExportando(true);
     setMensaje({ texto: '', tipo: '' });
     try {
-      // Limpiamos la URL para evitar /api/api[cite: 15]
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') 
-        ? process.env.NEXT_PUBLIC_API_URL 
-        : `${process.env.NEXT_PUBLIC_API_URL}/api`;
-
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? process.env.NEXT_PUBLIC_API_URL : `${process.env.NEXT_PUBLIC_API_URL}/api`;
       const response = await fetch(`${baseUrl}/productos/reporte-completo`);
       if (!response.ok) throw new Error("Fallo al obtener datos del servidor");
       const data = await response.json();
-
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Nail-Store");
-
-      worksheet['!cols'] = [
-        {wch: 40}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 12},
-      ];
-
+      worksheet['!cols'] = [{wch: 40}, {wch: 25}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 12}];
       const fecha = new Date().toLocaleDateString().replace(/\//g, '-');
       XLSX.writeFile(workbook, `Inventario_NailStore_${fecha}.xlsx`);
       setMensaje({ texto: '✅ REPORTE EXCEL GENERADO CON ÉXITO', tipo: 'success' });
     } catch (error: any) {
       setMensaje({ texto: `❌ ERROR AL EXPORTAR: ${error.message}`, tipo: 'error' });
-    } finally {
-      setExportando(false);
-    }
+    } finally { setExportando(false); }
   };
 
   // -------------------------------------------------------------------------
-  // 5. LÓGICA DE ENVÍO (LIMPIEZA DE PAYLOAD)
+  // 5. LÓGICA DE ENVÍO
   // -------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!preciosConfirmados) return;
-    
     setCargando(true);
     setMensaje({ texto: '', tipo: '' });
-
     try {
-      const payloadLimpio = {
-        id_producto: formData.id_producto,
-        cantidad: formData.cantidad,
-        costo_nuevo: formData.costo_nuevo,
-        precio_menor_nuevo: formData.precio_menor_nuevo,
-        precio_mayor_nuevo: formData.precio_mayor_nuevo,
-        documento_referencia: formData.documento_referencia
-      };
-
+      const payloadLimpio = { id_producto: formData.id_producto, cantidad: formData.cantidad, costo_nuevo: formData.costo_nuevo, precio_menor_nuevo: formData.precio_menor_nuevo, precio_mayor_nuevo: formData.precio_mayor_nuevo, documento_referencia: formData.documento_referencia };
       await apiService.registrarIngreso(payloadLimpio);
-      
       setMensaje({ texto: `✅ STOCK ACTUALIZADO CORRECTAMENTE`, tipo: 'success' });
       setFormData({ ...formData, id_producto: '', cantidad: 1, documento_referencia: '', costo_nuevo: 0, costo_total_lote: 0 });
       setProductoSeleccionado(null);
       setPreciosConfirmados(false);
     } catch (err: any) {
       setMensaje({ texto: `❌ ERROR SERVIDOR: ${err.message || 'Verificar Backend'}`, tipo: 'error' });
-    } finally {
-      setCargando(false);
-    }
+    } finally { setCargando(false); }
   };
 
   return (
@@ -173,20 +138,13 @@ export default function RegistrarIngreso() {
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Registrar Ingreso</h1>
           <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic text-emerald-500/80">Calculadora Mayorista Activa</p>
         </div>
-        
-        <button 
-          type="button"
-          onClick={descargarReporteExcel}
-          disabled={exportando}
-          className="flex items-center gap-3 px-6 py-4 bg-emerald-600/10 border border-emerald-500/30 rounded-2xl text-emerald-500 font-black text-xs uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all shadow-xl shadow-emerald-500/10 disabled:opacity-50"
-        >
+        <button type="button" onClick={descargarReporteExcel} disabled={exportando} className="flex items-center gap-3 px-6 py-4 bg-emerald-600/10 border border-emerald-500/30 rounded-2xl text-emerald-500 font-black text-xs uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all shadow-xl disabled:opacity-50">
           {exportando ? 'Generando...' : '📊 Descargar Reporte Excel'}
         </button>
       </header>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl shadow-2xl">
             <h3 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-6 flex items-center gap-3">
               <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span> 1. Localización del Producto
@@ -217,7 +175,6 @@ export default function RegistrarIngreso() {
                 </h3>
                 <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-tighter">Sincronización Automática</span>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-widest">Unidades</label>
@@ -273,12 +230,7 @@ export default function RegistrarIngreso() {
           <button type="submit" disabled={cargando || !preciosConfirmados || !formData.id_producto} className={`w-full py-8 rounded-[2.25rem] font-black text-xl tracking-tighter shadow-2xl transition-all active:scale-95 uppercase ${cargando || !preciosConfirmados || !formData.id_producto ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}>
             {cargando ? 'SINCRONIZANDO...' : '🚀 ACTUALIZAR STOCK'}
           </button>
-          
-          {mensaje.texto && (
-            <div className={`p-4 rounded-xl text-center font-bold text-xs uppercase ${mensaje.tipo === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-              {mensaje.texto}
-            </div>
-          )}
+          {mensaje.texto && <div className={`p-4 rounded-xl text-center font-bold text-xs uppercase ${mensaje.tipo === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{mensaje.texto}</div>}
         </div>
       </form>
     </div>

@@ -133,13 +133,13 @@ def obtener_margenes():
     """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
     try:
         response = supabase.table("productos").select(
-            "id, nombre, costo_unidad, precio_menor, stock_actual, "
+            "id, nombre, costo_unitario:costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
         ).execute()
         
         resultado = []
         for p in response.data:
-            costo = p.get("costo_unidad")
+            costo = p.get("costo_unitario")
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
@@ -180,7 +180,7 @@ def crear_producto(req: ProductoCreateRequest):
             "nombre": req.nombre,
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria,
-            "costo_unidad": req.costo_unidad,
+            "costo_unitario:costo_unidad": req.costo_unidad,
             "precio_menor": req.precio_menor,
             "precio_mayor": req.precio_mayor,
             "stock_actual": req.stock_actual
@@ -533,8 +533,8 @@ def obtener_reporte_completo():
         for p in response.data:
             prov_nombre = p.get("proveedores", {}).get("nombre", "SIN PROVEEDOR") if p.get("proveedores") else "SIN PROVEEDOR"
             resultado.append({
-                "PRODUCTO": p["nombre"].upper() if p["nombre"] else "SIN NOMBRE", # Corregido: .upper() y un solo punto
-                "PROVEEDOR": prov_nombre.upper(), # Corregido: .upper()[cite: 16]
+                "PRODUCTO": p["nombre"].upper() if p["nombre"] else "SIN NOMBRE", 
+                "PROVEEDOR": prov_nombre.upper(),
                 "COSTO (S/)": float(p.get("costo_unitario") or 0),
                 "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
                 "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),
