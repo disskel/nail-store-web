@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 # -----------------------------------------------------------------------------
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
-# Se cargan las variables de entorno para la conexión segura con Supabase
 # load_dotenv() # Comentado para producción en Vercel
 
 app = FastAPI(
@@ -20,7 +19,6 @@ app = FastAPI(
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
-# Este bloque ayudará a identificar si las rutas llegan con o sin el prefijo /api
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -132,11 +130,8 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """
-    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
-    """
+    """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
     try:
-        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -148,7 +143,6 @@ def obtener_margenes():
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
-            # Navegación segura por los objetos de la relación (Joins)
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
@@ -192,7 +186,9 @@ def crear_producto(req: ProductoCreateRequest):
             "stock_actual": req.stock_actual
         }
         res = supabase.table("productos").insert(data).execute()
-        return {"status": "success", "data": res.data[0]}
+        # FIX: Validación de seguridad para evitar 500 si res.data está vacío
+        result_data = res.data[0] if res.data and len(res.data) > 0 else data
+        return {"status": "success", "data": result_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
@@ -245,7 +241,9 @@ def crear_categoria(req: CategoriaRequest):
             "descripcion": req.descripcion
         }
         res = supabase.table("categorias").insert(data).execute()
-        return {"status": "success", "data": res.data[0]}
+        # FIX: Validación de seguridad para evitar 500
+        result_data = res.data[0] if res.data and len(res.data) > 0 else data
+        return {"status": "success", "data": result_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
 
@@ -256,10 +254,7 @@ def crear_categoria(req: CategoriaRequest):
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
-    """
-    Calcula indicadores clave de valor de inventario y stock crítico.
-    Ideal para el panel principal de la demostración.
-    """
+    """Calcula indicadores clave de valor de inventario y stock crítico."""
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
         
@@ -307,7 +302,9 @@ def crear_proveedor(prov: ProveedorRequest):
     try:
         data = {"nombre": prov.nombre, "contacto": prov.contacto}
         response = supabase.table("proveedores").insert(data).execute()
-        return {"status": "success", "data": response.data[0]}
+        # FIX: Validación de seguridad crucial para evitar el error 500
+        result_data = response.data[0] if response.data and len(response.data) > 0 else data
+        return {"status": "success", "data": result_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
 
