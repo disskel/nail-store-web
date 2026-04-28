@@ -458,6 +458,7 @@ def procesar_venta(venta: VentaRequest):
 def registrar_ingreso(req: IngresoRequest):
     """Aumenta stock y actualiza costos maestros tras compra."""
     try:
+        # 1. Verificar existencia del producto
         prod_res = supabase.table("productos").select("nombre, stock_actual, costo_unidad").eq("id", req.id_producto).single().execute()
         
         if not prod_res.data:
@@ -465,9 +466,9 @@ def registrar_ingreso(req: IngresoRequest):
 
         stock_act = prod_res.data['stock_actual'] or 0
         costo_ant = prod_res.data['costo_unidad']
-        
         nuevo_stock = stock_act + req.cantidad
 
+        # 2. Actualización de tabla maestra de productos
         supabase.table("productos").update({
             "stock_actual": nuevo_stock,
             "costo_unidad": req.costo_nuevo,
@@ -475,6 +476,7 @@ def registrar_ingreso(req: IngresoRequest):
             "precio_mayor": req.precio_mayor_nuevo
         }).eq("id", req.id_producto).execute()
 
+        # 3. Registro del movimiento de inventario
         supabase.table("movimientos_inventario").insert({
             "id_producto": req.id_producto,
             "tipo_movimiento": "ENTRADA",
@@ -484,16 +486,23 @@ def registrar_ingreso(req: IngresoRequest):
             "medio_pago": "EFECTIVO" 
         }).execute()
 
+        # 4. Registro de historial de precios (CON ESCUDO DE SEGURIDAD)
         if costo_ant is not None and float(costo_ant) != float(req.costo_nuevo):
-            supabase.table("historial_precios").insert({
-                "id_producto": req.id_producto,
-                "costo_anterior": costo_ant,
-                "costo_nuevo": req.costo_nuevo,
-                "precio_nuevo_menor": req.precio_menor_nuevo
-            }).execute()
+            try:
+                # Intentamos registrar el historial, pero si falla por RLS, no matamos el proceso principal
+                supabase.table("historial_precios").insert({
+                    "id_producto": req.id_producto,
+                    "costo_anterior": costo_ant,
+                    "costo_nuevo": req.costo_nuevo,
+                    "precio_nuevo_menor": req.precio_menor_nuevo
+                }).execute()
+            except Exception as history_error:
+                print(f"AVISO: No se pudo grabar el historial (RLS), pero el stock se actualizó: {history_error}")
+                # El proceso continúa para devolver el stock_final exitoso
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
+        # Solo fallará con 500 si los pasos 1, 2 o 3 fallan
         raise HTTPException(status_code=500, detail=f"Error en registro de ingreso: {str(e)}")
 
 # -----------------------------------------------------------------------------
