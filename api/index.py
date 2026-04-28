@@ -18,13 +18,13 @@ app = FastAPI(
     version="1.0.8"
 )
 
-# MIDDLEWARE DE DIAGNÓSTICO (Pista del error para Vercel)
+# MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
     path = request.url.path
     method = request.method
-    # Este print aparecerá en la pestaña "Functions" de los logs de Vercel
+    # Este mensaje aparecerá en la pestaña "Functions" -> Logs de Vercel
     print(f"DIAGNÓSTICO: Recibida petición {method} en la ruta: {path}")
     
     response = await call_next(request)
@@ -42,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicialización del cliente de Supabase con validación de entorno[cite: 21]
+# Inicialización del cliente de Supabase con validación de entorno
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
@@ -52,7 +52,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
-# 2. MODELOS DE DATOS (PYDANTIC) - Validación estricta de tipos[cite: 21]
+# 2. MODELOS DE DATOS (PYDANTIC) - Validación estricta de tipos
 # -----------------------------------------------------------------------------
 
 class ItemVenta(BaseModel):
@@ -105,7 +105,7 @@ class ProductoCreateRequest(BaseModel):
     stock_actual: int
 
 # -----------------------------------------------------------------------------
-# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas Duales para evitar 404)[cite: 21]
+# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas Duales para evitar 404)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -120,7 +120,7 @@ def health_check():
     }
 
 # -----------------------------------------------------------------------------
-# 4. MÓDULO DE PRODUCTOS E INVENTARIO[cite: 21]
+# 4. MÓDULO DE PRODUCTOS E INVENTARIO
 # -----------------------------------------------------------------------------
 
 @app.get("/api/productos/margenes")
@@ -226,7 +226,7 @@ def listar_categorias():
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)[cite: 21]
+# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/dashboard/resumen")
@@ -250,7 +250,7 @@ def obtener_resumen_dashboard():
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO DE PROVEEDORES[cite: 21]
+# 6. MÓDULO DE PROVEEDORES
 # -----------------------------------------------------------------------------
 
 @app.get("/api/proveedores")
@@ -275,7 +275,7 @@ def crear_proveedor(prov: ProveedorRequest):
         raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 7. MÓDULO DE CAJA (Arqueo Diario)[cite: 21]
+# 7. MÓDULO DE CAJA (Arqueo Diario)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/caja/abrir")
@@ -341,7 +341,7 @@ def cerrar_caja(req: CierreCajaRequest):
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE VENTAS (SALIDAS)[cite: 21]
+# 8. MÓDULO DE VENTAS (SALIDAS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
@@ -376,7 +376,7 @@ def procesar_venta(venta: VentaRequest):
         raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE INVENTARIO :D(ENTRADAS / COMPRAS)[cite: 21]
+# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/inventario/ingreso")
