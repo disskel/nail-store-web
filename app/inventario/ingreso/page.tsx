@@ -2,13 +2,17 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
+import * as XLSX from 'xlsx'; // Importación de la librería recién instalada
 
 export default function RegistrarIngreso() {
-  // ... (Estados permanecen iguales hasta el handleSubmit)
+  // -------------------------------------------------------------------------
+  // 1. ESTADOS DEL SISTEMA
+  // -------------------------------------------------------------------------
   const [productosFull, setProductosFull] = useState<any[]>([]);
   const [proveedorFiltro, setProveedorFiltro] = useState('');
   const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null);
   const [cargando, setCargando] = useState(false);
+  const [exportando, setExportando] = useState(false); // Estado para feedback de Excel
   const [preciosConfirmados, setPreciosConfirmados] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
@@ -24,7 +28,9 @@ export default function RegistrarIngreso() {
     documento_referencia: ''
   });
 
-  // --- (Lógica de filtros y sincronización bidireccional igual a la versión anterior) ---
+  // -------------------------------------------------------------------------
+  // 2. LÓGICA DE FILTROS CRUZADOS
+  // -------------------------------------------------------------------------
   const proveedoresUnicos = useMemo(() => {
     const provs = productosFull.map(p => p.proveedor?.toUpperCase() || 'SIN PROVEEDOR');
     return Array.from(new Set(provs)).sort();
@@ -45,6 +51,9 @@ export default function RegistrarIngreso() {
     cargarCatalogo();
   }, []);
 
+  // -------------------------------------------------------------------------
+  // 3. SINCRONIZACIÓN FINANCIERA (Unidad <-> Lote <-> Margen <-> Precio)
+  // -------------------------------------------------------------------------
   const syncMargenAPrecio = (costoUnit: number, mMenor: number, mMayor: number) => {
     return {
       precio_menor_nuevo: Number((costoUnit * (1 + mMenor / 100)).toFixed(2)),
@@ -90,7 +99,44 @@ export default function RegistrarIngreso() {
   };
 
   // -------------------------------------------------------------------------
-  // 4. LÓGICA DE ENVÍO CORREGIDA (LIMPIEZA DE PAYLOAD)
+  // 4. LÓGICA DE DESCARGA EXCEL (NUEVO)
+  // -------------------------------------------------------------------------
+  const descargarReporteExcel = async () => {
+    setExportando(true);
+    setMensaje({ texto: '', tipo: '' });
+    try {
+      // Llamada al endpoint de reporte completo
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/productos/reporte-completo`);
+      if (!response.ok) throw new Error("Fallo al obtener datos del servidor");
+      const data = await response.json();
+
+      // Generación del archivo
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Nail-Store");
+
+      // Ajuste de columnas para Trujillo
+      worksheet['!cols'] = [
+        {wch: 40}, // Producto
+        {wch: 25}, // Proveedor
+        {wch: 15}, // Costo
+        {wch: 18}, // Precio Menor
+        {wch: 18}, // Precio Mayor
+        {wch: 12}, // Stock
+      ];
+
+      const fecha = new Date().toLocaleDateString().replace(/\//g, '-');
+      XLSX.writeFile(workbook, `Inventario_NailStore_${fecha}.xlsx`);
+      setMensaje({ texto: '✅ REPORTE EXCEL GENERADO CON ÉXITO', tipo: 'success' });
+    } catch (error: any) {
+      setMensaje({ texto: `❌ ERROR AL EXPORTAR: ${error.message}`, tipo: 'error' });
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 5. LÓGICA DE ENVÍO (LIMPIEZA DE PAYLOAD)
   // -------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,11 +146,10 @@ export default function RegistrarIngreso() {
     setMensaje({ texto: '', tipo: '' });
 
     try {
-      // CRÍTICO: Enviamos solo lo que el servidor espera recibir
       const payloadLimpio = {
         id_producto: formData.id_producto,
         cantidad: formData.cantidad,
-        costo_nuevo: formData.costo_nuevo, // El backend debe mapear esto a costo_unidad
+        costo_nuevo: formData.costo_nuevo,
         precio_menor_nuevo: formData.precio_menor_nuevo,
         precio_mayor_nuevo: formData.precio_mayor_nuevo,
         documento_referencia: formData.documento_referencia
@@ -117,19 +162,28 @@ export default function RegistrarIngreso() {
       setProductoSeleccionado(null);
       setPreciosConfirmados(false);
     } catch (err: any) {
-      // Capturamos el error 500 y mostramos el detalle si es posible
       setMensaje({ texto: `❌ ERROR SERVIDOR: ${err.message || 'Verificar Backend'}`, tipo: 'error' });
     } finally {
       setCargando(false);
     }
   };
 
-  // ... (El resto del JSX permanece igual)
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-700">
-      <header className="mb-10">
-        <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Registrar Ingreso</h1>
-        <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic text-emerald-500/80">Calculadora Mayorista Activa</p>
+      <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Registrar Ingreso</h1>
+          <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic text-emerald-500/80">Calculadora Mayorista Activa</p>
+        </div>
+        
+        <button 
+          type="button"
+          onClick={descargarReporteExcel}
+          disabled={exportando}
+          className="flex items-center gap-3 px-6 py-4 bg-emerald-600/10 border border-emerald-500/30 rounded-2xl text-emerald-500 font-black text-xs uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all shadow-xl shadow-emerald-500/10 disabled:opacity-50"
+        >
+          {exportando ? 'Generando...' : '📊 Descargar Reporte Excel'}
+        </button>
       </header>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">

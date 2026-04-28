@@ -515,3 +515,31 @@ def obtener_historial_producto(producto_id: str):
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener historial: {str(e)}")
+
+# -----------------------------------------------------------------------------
+
+@app.get("/api/productos/reporte-completo")
+@app.get("/productos/reporte-completo")
+def obtener_reporte_completo():
+    """Obtiene el catálogo completo con proveedores para exportación."""
+    try:
+        # Realizamos el Join con proveedores para traer el nombre
+        response = supabase.table("productos").select(
+            "nombre, costo_unitario:costo_unidad, precio_menor, precio_mayor, stock_actual, "
+            "proveedores(nombre)"
+        ).execute()
+        
+        resultado = []
+        for p in response.data:
+            prov_nombre = p.get("proveedores", {}).get("nombre", "SIN PROVEEDOR") if p.get("proveedores") else "SIN PROVEEDOR"
+            resultado.append({
+                "PRODUCTO": p["nombre"].toUpperCase() if p["nombre"] else "SIN NOMBRE",
+                "PROVEEDOR": prov_nombre.toUpperCase(),
+                "COSTO (S/)": float(p.get("costo_unitario") or 0),
+                "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
+                "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),
+                "STOCK ACTUAL": p.get("stock_actual") or 0
+            })
+        return resultado
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
