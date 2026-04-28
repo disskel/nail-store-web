@@ -1,23 +1,37 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from supabase import create_client, Client
 import os
+import time
 from dotenv import load_dotenv
 
 # -----------------------------------------------------------------------------
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
-# Se cargan las variables de entorno para la conexión segura con Supabase
-# load_dotenv() # Comentado para producción en Vercel
+# load_dotenv() # Comentado para producción en Vercel para evitar conflictos
 
 app = FastAPI(
     title="Nail-Store API",
-    description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
-    version="1.0.7",
-    root_path="/api" # Fundamento: Permite que Vercel gestione correctamente las sub-rutas
+    description="Backend robusto con diagnóstico de rutas para Vercel",
+    version="1.0.8"
 )
+
+# MIDDLEWARE DE DIAGNÓSTICO (Pista del error para Vercel)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    path = request.url.path
+    method = request.method
+    # Este print aparecerá en la pestaña "Functions" de los logs de Vercel
+    print(f"DIAGNÓSTICO: Recibida petición {method} en la ruta: {path}")
+    
+    response = await call_next(request)
+    
+    process_time = (time.time() - start_time) * 1000
+    print(f"DIAGNÓSTICO: Ruta {path} completada en {process_time:.2f}ms con status {response.status_code}")
+    return response
 
 # Configuración de CORS para permitir la comunicación con el Frontend en Next.js
 app.add_middleware(
@@ -28,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicialización del cliente de Supabase con validación de entorno[cite: 16]
+# Inicialización del cliente de Supabase con validación de entorno[cite: 21]
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
@@ -38,8 +52,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
-# 2. MODELOS DE DATOS (PYDANTIC)
-# Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB[cite: 16]
+# 2. MODELOS DE DATOS (PYDANTIC) - Validación estricta de tipos[cite: 21]
 # -----------------------------------------------------------------------------
 
 class ItemVenta(BaseModel):
@@ -92,29 +105,29 @@ class ProductoCreateRequest(BaseModel):
     stock_actual: int
 
 # -----------------------------------------------------------------------------
-# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas corregidas sin /api redundante)[cite: 16]
+# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas Duales para evitar 404)[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.get("/api/health")
 @app.get("/health")
 def health_check():
     """Verifica la disponibilidad del servidor y el estado de la conexión DB."""
     return {
         "status": "online", 
         "business": "Nail-Store", 
-        "database_connected": supabase is not None
+        "database_connected": supabase is not None,
+        "version": "1.0.8-diag"
     }
 
 # -----------------------------------------------------------------------------
-# 4. MÓDULO DE PRODUCTOS E INVENTARIO[cite: 16]
+# 4. MÓDULO DE PRODUCTOS E INVENTARIO[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """
-    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
-    """
+    """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
     try:
-        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -126,7 +139,6 @@ def obtener_margenes():
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
-            # Navegación segura por los objetos de la relación (Joins)
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
@@ -154,6 +166,7 @@ def obtener_margenes():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en márgenes: {str(e)}")
 
+@app.post("/api/productos")
 @app.post("/productos")
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto vinculándolo a su categoría y proveedor."""
@@ -173,6 +186,7 @@ def crear_producto(req: ProductoCreateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
+@app.put("/api/productos/{producto_id}/precios")
 @app.put("/productos/{producto_id}/precios")
 def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
     """Ajusta precios y registra la trazabilidad en historial_precios."""
@@ -201,6 +215,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/categorias")
 @app.get("/categorias")
 def listar_categorias():
     """Obtiene el catálogo de categorías para los selectores del frontend."""
@@ -211,31 +226,19 @@ def listar_categorias():
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)[cite: 16]
+# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
-    """
-    Calcula indicadores clave de valor de inventario y stock crítico.
-    Ideal para el panel principal de la demostración.
-    """
+    """Calcula indicadores clave de valor de inventario y stock crítico."""
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
         
-        valor_total = 0
-        agotados = 0
-        stock_bajo = 0
-        
-        for p in res.data:
-            costo = float(p.get("costo_unidad") or 0)
-            stock = int(p.get("stock_actual") or 0)
-            
-            valor_total += (costo * stock)
-            if stock <= 0:
-                agotados += 1
-            elif stock < 10:
-                stock_bajo += 1
+        valor_total = sum(float(p.get("costo_unidad") or 0) * int(p.get("stock_actual") or 0) for p in res.data)
+        agotados = sum(1 for p in res.data if (p.get("stock_actual") or 0) <= 0)
+        stock_bajo = sum(1 for p in res.data if 0 < (p.get("stock_actual") or 0) < 10)
                 
         return {
             "valor_total_inventario": round(valor_total, 2),
@@ -247,9 +250,10 @@ def obtener_resumen_dashboard():
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO DE PROVEEDORES[cite: 16]
+# 6. MÓDULO DE PROVEEDORES[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.get("/api/proveedores")
 @app.get("/proveedores")
 def listar_proveedores():
     """Lista todas las empresas proveedoras registradas."""
@@ -259,6 +263,7 @@ def listar_proveedores():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al listar proveedores: {str(e)}")
 
+@app.post("/api/proveedores")
 @app.post("/proveedores")
 def crear_proveedor(prov: ProveedorRequest):
     """Registra un nuevo proveedor en el sistema."""
@@ -270,9 +275,10 @@ def crear_proveedor(prov: ProveedorRequest):
         raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 7. MÓDULO DE CAJA (Arqueo Diario)[cite: 16]
+# 7. MÓDULO DE CAJA (Arqueo Diario)[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.post("/api/caja/abrir")
 @app.post("/caja/abrir")
 def abrir_caja(req: AperturaCajaRequest):
     """Inicia sesión de caja. Bloquea aperturas si ya hay una activa."""
@@ -295,6 +301,7 @@ def abrir_caja(req: AperturaCajaRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fallo en apertura: {str(e)}")
 
+@app.post("/api/caja/cerrar")
 @app.post("/caja/cerrar")
 def cerrar_caja(req: CierreCajaRequest):
     """Calcula diferencias entre sistema y físico para el arqueo."""
@@ -334,9 +341,10 @@ def cerrar_caja(req: CierreCajaRequest):
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE VENTAS (SALIDAS)[cite: 16]
+# 8. MÓDULO DE VENTAS (SALIDAS)[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
     """Registra ventas y descuenta stock si es Nota de Venta."""
@@ -368,9 +376,10 @@ def procesar_venta(venta: VentaRequest):
         raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)[cite: 16]
+# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)[cite: 21]
 # -----------------------------------------------------------------------------
 
+@app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
     """Aumenta stock y actualiza costos maestros tras compra."""
