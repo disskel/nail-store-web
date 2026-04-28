@@ -10,12 +10,13 @@ from dotenv import load_dotenv
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
 # Se cargan las variables de entorno para la conexión segura con Supabase
-# load_dotenv() # Comentado para producción en Vercel
+# load_dotenv() # Comentado para producción en Vercel[cite: 16]
 
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
-    version="1.0.7"
+    version="1.0.7",
+    root_path="/api" # Fundamento: Permite que Vercel gestione correctamente las sub-rutas[cite: 16]
 )
 
 # Configuración de CORS para permitir la comunicación con el Frontend en Next.js
@@ -27,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicialización del cliente de Supabase con validación de entorno
+# Inicialización del cliente de Supabase con validación de entorno[cite: 16]
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
@@ -38,7 +39,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
 # 2. MODELOS DE DATOS (PYDANTIC)
-# Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB
+# Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB[cite: 16]
 # -----------------------------------------------------------------------------
 
 class ItemVenta(BaseModel):
@@ -91,7 +92,7 @@ class ProductoCreateRequest(BaseModel):
     stock_actual: int
 
 # -----------------------------------------------------------------------------
-# 3. ENDPOINTS DE SISTEMA Y SALUD
+# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas corregidas sin /api redundante)[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.get("/health")
@@ -104,7 +105,7 @@ def health_check():
     }
 
 # -----------------------------------------------------------------------------
-# 4. MÓDULO DE PRODUCTOS E INVENTARIO
+# 4. MÓDULO DE PRODUCTOS E INVENTARIO[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.get("/productos/margenes")
@@ -210,7 +211,7 @@ def listar_categorias():
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
+# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.get("/dashboard/resumen")
@@ -246,7 +247,7 @@ def obtener_resumen_dashboard():
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO DE PROVEEDORES
+# 6. MÓDULO DE PROVEEDORES[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.get("/proveedores")
@@ -269,7 +270,7 @@ def crear_proveedor(prov: ProveedorRequest):
         raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 7. MÓDULO DE CAJA (Arqueo Diario)
+# 7. MÓDULO DE CAJA (Arqueo Diario)[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.post("/caja/abrir")
@@ -333,7 +334,7 @@ def cerrar_caja(req: CierreCajaRequest):
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE VENTAS (SALIDAS)
+# 8. MÓDULO DE VENTAS (SALIDAS)[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.post("/ventas/procesar")
@@ -367,7 +368,7 @@ def procesar_venta(venta: VentaRequest):
         raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
+# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)[cite: 16]
 # -----------------------------------------------------------------------------
 
 @app.post("/inventario/ingreso")
