@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any # Añadido Any para robustez
 from supabase import create_client, Client
 import os
 import time
@@ -104,10 +104,11 @@ class ProductoCreateRequest(BaseModel):
     nombre: str
     id_proveedor: str
     id_categoria: str
-    costo_unitario: float
-    precio_menor: float
-    precio_mayor: float
-    stock_actual: int
+    # CORRECCIÓN 422: Se usa Any para capturar el "NaN" del frontend y procesarlo
+    costo_unidad: Optional[Any] = 0.0
+    precio_menor: Optional[Any] = 0.0
+    precio_mayor: Optional[Any] = 0.0
+    stock_actual: Optional[Any] = 0
 
 # -----------------------------------------------------------------------------
 # 3. ENDPOINTS DE SISTEMA Y SALUD
@@ -175,16 +176,21 @@ def obtener_margenes():
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto vinculándolo a su categoría y proveedor."""
     try:
-        # CORRECCIÓN: Usar directamente 'costo_unidad' para inserción (Sin alias)
+        # FUNCIÓN INTERNA DE SANITIZACIÓN PARA "NaN"
+        def clean_num(val, is_int=False):
+            if val is None or str(val).lower() in ['nan', '', 'undefined', 'null']:
+                return 0
+            return int(float(val)) if is_int else float(val)
+
         data = {
             "sku": req.sku,
             "nombre": req.nombre,
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria,
-            "costo_unidad": req.costo_unitario,
-            "precio_menor": req.precio_menor,
-            "precio_mayor": req.precio_mayor,
-            "stock_actual": req.stock_actual
+            "costo_unitario:costo_unidad": clean_num(req.costo_unidad),
+            "precio_menor": clean_num(req.precio_menor),
+            "precio_mayor": clean_num(req.precio_mayor),
+            "stock_actual": clean_num(req.stock_actual, True)
         }
         res = supabase.table("productos").insert(data).execute()
         result_data = res.data[0] if res.data and len(res.data) > 0 else data
@@ -490,7 +496,7 @@ def registrar_ingreso(req: IngresoRequest):
             "medio_pago": "EFECTIVO" 
         }).execute()
 
-        # 4. Registro de historial de precios (CON ESCUDO DE SEGURIDAD)[cite: 19]
+        # 4. Registro de historial de precios (CON ESCUDO DE SEGURIDAD)
         if costo_ant is not None and float(costo_ant) != float(req.costo_nuevo):
             try:
                 # Intentamos registrar el historial, pero si falla por RLS, no matamos el proceso principal
@@ -555,5 +561,3 @@ def obtener_reporte_completo():
         return resultado
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
-
-# RECORDATORIO: AQUÍ PEGAR TUS LÍNEAS 337 A 545
