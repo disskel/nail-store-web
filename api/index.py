@@ -10,13 +10,13 @@ from dotenv import load_dotenv
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
 # Se cargan las variables de entorno para la conexión segura con Supabase
-# load_dotenv() # Comentado para producción en Vercel[cite: 16]
+# load_dotenv() # Comentado para producción en Vercel
 
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
     version="1.0.7",
-    root_path="/api" # Fundamento: Permite que Vercel gestione correctamente las sub-rutas[cite: 16]
+    root_path="/api" # Fundamento: Permite que Vercel gestione correctamente las sub-rutas
 )
 
 # Configuración de CORS para permitir la comunicación con el Frontend en Next.js
