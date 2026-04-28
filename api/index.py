@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
 # Se cargan las variables de entorno para la conexión segura con Supabase
-load_dotenv()
+#load_dotenv()
 
 app = FastAPI(
     title="Nail-Store API",
