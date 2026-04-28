@@ -376,7 +376,7 @@ def procesar_venta(venta: VentaRequest):
         raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)[cite: 21]
+# 9. MÓDULO DE INVENTARIO :D(ENTRADAS / COMPRAS)[cite: 21]
 # -----------------------------------------------------------------------------
 
 @app.post("/api/inventario/ingreso")
