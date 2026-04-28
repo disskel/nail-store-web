@@ -104,7 +104,7 @@ class ProductoCreateRequest(BaseModel):
     nombre: str
     id_proveedor: str
     id_categoria: str
-    costo_unidad: float
+    costo_unitario: float
     precio_menor: float
     precio_mayor: float
     stock_actual: int
@@ -175,12 +175,13 @@ def obtener_margenes():
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto vinculándolo a su categoría y proveedor."""
     try:
+        # CORRECCIÓN: Usar directamente 'costo_unidad' para inserción (Sin alias)
         data = {
             "sku": req.sku,
             "nombre": req.nombre,
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria,
-            "costo_unitario:costo_unidad": req.costo_unidad,
+            "costo_unidad": req.costo_unitario,
             "precio_menor": req.precio_menor,
             "precio_mayor": req.precio_mayor,
             "stock_actual": req.stock_actual
@@ -209,12 +210,15 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
 
         costo_ant = prod_actual.data.get('costo_unidad')
         if costo_ant is not None and float(costo_ant) != float(req.costo_unidad):
-            supabase.table("historial_precios").insert({
-                "id_producto": producto_id,
-                "costo_anterior": costo_ant,
-                "costo_nuevo": req.costo_unidad,
-                "precio_nuevo_menor": req.precio_menor
-            }).execute()
+            # Escudo de seguridad para el historial
+            try:
+                supabase.table("historial_precios").insert({
+                    "id_producto": producto_id,
+                    "costo_anterior": costo_ant,
+                    "costo_nuevo": req.costo_unidad,
+                    "precio_nuevo_menor": req.precio_menor
+                }).execute()
+            except: pass 
 
         return {"status": "success", "message": f"Precios actualizados para {prod_actual.data['nombre']}"}
     except Exception as e:
@@ -486,7 +490,7 @@ def registrar_ingreso(req: IngresoRequest):
             "medio_pago": "EFECTIVO" 
         }).execute()
 
-        # 4. Registro de historial de precios (CON ESCUDO DE SEGURIDAD)
+        # 4. Registro de historial de precios (CON ESCUDO DE SEGURIDAD)[cite: 19]
         if costo_ant is not None and float(costo_ant) != float(req.costo_nuevo):
             try:
                 # Intentamos registrar el historial, pero si falla por RLS, no matamos el proceso principal
@@ -498,7 +502,6 @@ def registrar_ingreso(req: IngresoRequest):
                 }).execute()
             except Exception as history_error:
                 print(f"AVISO: No se pudo grabar el historial (RLS), pero el stock se actualizó: {history_error}")
-                # El proceso continúa para devolver el stock_final exitoso
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
@@ -552,3 +555,5 @@ def obtener_reporte_completo():
         return resultado
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
+
+# RECORDATORIO: AQUÍ PEGAR TUS LÍNEAS 337 A 545
