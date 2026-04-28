@@ -13,7 +13,22 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, descripcion }),
     });
-    if (!res.ok) throw new Error('Fallo al crear categoría');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Fallo al crear categoría');
+    return data; // Contiene "Registro de Categoria exitoso"
+  },
+  async updateCategoria(id: string, nombre: string, descripcion?: string) {
+    const res = await fetch(`${API_URL}/categorias/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, descripcion }),
+    });
+    return res.json();
+  },
+  async deleteCategoria(id: string) {
+    const res = await fetch(`${API_URL}/categorias/${id}`, {
+      method: 'DELETE',
+    });
     return res.json();
   },
 
@@ -29,11 +44,22 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, contacto }),
     });
-    if (!res.ok) {
-        const errData = await res.json();
-        // Esto lanzará el error exacto de Supabase en el alert
-        throw new Error(errData.detail || 'Fallo al crear proveedor'); 
-    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Fallo al crear proveedor');
+    return data; // Contiene "Registro de Proveedor exitoso"
+  },
+  async updateProveedor(id: string, nombre: string, contacto?: string) {
+    const res = await fetch(`${API_URL}/proveedores/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, contacto }),
+    });
+    return res.json();
+  },
+  async deleteProveedor(id: string) {
+    const res = await fetch(`${API_URL}/proveedores/${id}`, {
+      method: 'DELETE',
+    });
     return res.json();
   },
 

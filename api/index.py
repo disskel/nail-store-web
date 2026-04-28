@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
-    version="1.0.9"
+    version="1.0.10"
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
@@ -130,11 +130,8 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """
-    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
-    """
+    """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
     try:
-        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -146,7 +143,6 @@ def obtener_margenes():
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
-            # Navegación segura por los objetos de la relación (Joins)
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
@@ -190,7 +186,6 @@ def crear_producto(req: ProductoCreateRequest):
             "stock_actual": req.stock_actual
         }
         res = supabase.table("productos").insert(data).execute()
-        # FIX: Validación de seguridad para evitar 500 si res.data está vacío
         result_data = res.data[0] if res.data and len(res.data) > 0 else data
         return {"status": "success", "data": result_data}
     except Exception as e:
@@ -225,12 +220,16 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# -----------------------------------------------------------------------------
+# 5. MÓDULO DE CATEGORÍAS (Mantenimiento Completo)
+# -----------------------------------------------------------------------------
+
 @app.get("/api/categorias")
 @app.get("/categorias")
 def listar_categorias():
-    """Obtiene el catálogo de categorías para los selectores del frontend."""
+    """Obtiene categorías activas para los selectores."""
     try:
-        res = supabase.table("categorias").select("*").execute()
+        res = supabase.table("categorias").select("*").eq("activo", True).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -238,30 +237,44 @@ def listar_categorias():
 @app.post("/api/categorias")
 @app.post("/categorias")
 def crear_categoria(req: CategoriaRequest):
-    """Registra una nueva categoría en el catálogo maestro."""
+    """Registra una nueva categoría."""
     try:
-        data = {
-            "nombre": req.nombre,
-            "descripcion": req.descripcion
-        }
+        data = {"nombre": req.nombre, "descripcion": req.descripcion, "activo": True}
         res = supabase.table("categorias").insert(data).execute()
-        # FIX: Validación de seguridad para evitar 500
         result_data = res.data[0] if res.data and len(res.data) > 0 else data
-        return {"status": "success", "data": result_data}
+        return {"status": "success", "message": "Registro de Categoria exitoso", "data": result_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
 
+@app.put("/api/categorias/{categoria_id}")
+@app.put("/categorias/{categoria_id}")
+def editar_categoria(categoria_id: str, req: CategoriaRequest):
+    """Edita campos de una categoría existente."""
+    try:
+        data = {"nombre": req.nombre, "descripcion": req.descripcion}
+        res = supabase.table("categorias").update(data).eq("id", categoria_id).execute()
+        return {"status": "success", "message": "Actualización de Categoria exitosa"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/categorias/{categoria_id}")
+@app.delete("/categorias/{categoria_id}")
+def eliminar_logico_categoria(categoria_id: str):
+    """Desactiva una categoría sin borrarla de la DB."""
+    try:
+        res = supabase.table("categorias").update({"activo": False}).eq("id", categoria_id).execute()
+        return {"status": "success", "message": "Categoría eliminada de la vista"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # -----------------------------------------------------------------------------
-# 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
+# 6. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
-    """
-    Calcula indicadores clave de valor de inventario y stock crítico.
-    Ideal para el panel principal de la demostración.
-    """
+    """Calcula indicadores clave de valor de inventario y stock crítico."""
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
         
@@ -289,15 +302,15 @@ def obtener_resumen_dashboard():
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO DE PROVEEDORES
+# 7. MÓDULO DE PROVEEDORES (Mantenimiento Completo)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/proveedores")
 @app.get("/proveedores")
 def listar_proveedores():
-    """Lista todas las empresas proveedoras registradas."""
+    """Lista empresas proveedoras activas."""
     try:
-        response = supabase.table("proveedores").select("*").execute()
+        response = supabase.table("proveedores").select("*").eq("activo", True).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al listar proveedores: {str(e)}")
@@ -305,25 +318,44 @@ def listar_proveedores():
 @app.post("/api/proveedores")
 @app.post("/proveedores")
 def crear_proveedor(prov: ProveedorRequest):
-    """Registra un nuevo proveedor en el sistema."""
+    """Registra un nuevo proveedor."""
     try:
-        data = {"nombre": prov.nombre, "contacto": prov.contacto}
+        data = {"nombre": prov.nombre, "contacto": prov.contacto, "activo": True}
         response = supabase.table("proveedores").insert(data).execute()
-        # FIX: Validación de seguridad crucial para evitar el error 500
         result_data = response.data[0] if response.data and len(response.data) > 0 else data
-        return {"status": "success", "data": result_data}
+        return {"status": "success", "message": "Registro de Proveedor exitoso", "data": result_data}
     except Exception as e:
-        # Mejora de reporte: Devolvemos el error real de la base de datos
         raise HTTPException(status_code=500, detail=f"Error DB Supabase: {str(e)}")
 
+@app.put("/api/proveedores/{proveedor_id}")
+@app.put("/proveedores/{proveedor_id}")
+def editar_proveedor(proveedor_id: str, prov: ProveedorRequest):
+    """Edita campos de un proveedor existente."""
+    try:
+        data = {"nombre": prov.nombre, "contacto": prov.contacto}
+        res = supabase.table("proveedores").update(data).eq("id", proveedor_id).execute()
+        return {"status": "success", "message": "Actualización de Proveedor exitosa"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/proveedores/{proveedor_id}")
+@app.delete("/proveedores/{proveedor_id}")
+def eliminar_logico_proveedor(proveedor_id: str):
+    """Desactiva un proveedor sin borrarlo de la DB."""
+    try:
+        res = supabase.table("proveedores").update({"activo": False}).eq("id", proveedor_id).execute()
+        return {"status": "success", "message": "Proveedor eliminado de la vista"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # -----------------------------------------------------------------------------
-# 7. MÓDULO DE CAJA (Arqueo Diario)
+# 8. MÓDULO DE CAJA (Arqueo Diario)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/caja/abrir")
 @app.post("/caja/abrir")
 def abrir_caja(req: AperturaCajaRequest):
-    """Inicia sesión de caja. Bloquea aperturas si ya hay una activa."""
+    """Inicia sesión de caja."""
     try:
         caja_abierta = supabase.table("sesiones_caja").select("*").eq("estado", "ABIERTA").execute()
         if caja_abierta.data:
@@ -346,7 +378,7 @@ def abrir_caja(req: AperturaCajaRequest):
 @app.post("/api/caja/cerrar")
 @app.post("/caja/cerrar")
 def cerrar_caja(req: CierreCajaRequest):
-    """Calcula diferencias entre sistema y físico para el arqueo."""
+    """Calcula arqueo de caja."""
     try:
         ventas_res = supabase.table("movimientos_inventario").select("cantidad, precio_momento")\
             .eq("id_sesion_caja", req.id_sesion)\
@@ -383,13 +415,13 @@ def cerrar_caja(req: CierreCajaRequest):
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE VENTAS (SALIDAS)
+# 9. MÓDULO DE VENTAS (SALIDAS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
-    """Registra ventas y descuenta stock si es Nota de Venta."""
+    """Registra ventas y descuenta stock."""
     try:
         for item in venta.items:
             prod_res = supabase.table("productos").select("nombre, stock_actual").eq("id", item.id_producto).single().execute()
@@ -418,7 +450,7 @@ def procesar_venta(venta: VentaRequest):
         raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
+# 10. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/inventario/ingreso")
