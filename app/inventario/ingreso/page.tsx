@@ -4,9 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 
 export default function RegistrarIngreso() {
-  // -------------------------------------------------------------------------
-  // 1. ESTADOS DEL SISTEMA
-  // -------------------------------------------------------------------------
+  // ... (Estados permanecen iguales hasta el handleSubmit)
   const [productosFull, setProductosFull] = useState<any[]>([]);
   const [proveedorFiltro, setProveedorFiltro] = useState('');
   const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null);
@@ -18,7 +16,7 @@ export default function RegistrarIngreso() {
     id_producto: '',
     cantidad: 1,
     costo_nuevo: 0,
-    costo_total_lote: 0, // Nuevo campo para facturación mayorista
+    costo_total_lote: 0, 
     margen_menor: 30,
     margen_mayor: 15,
     precio_menor_nuevo: 0,
@@ -26,17 +24,15 @@ export default function RegistrarIngreso() {
     documento_referencia: ''
   });
 
-  // -------------------------------------------------------------------------
-  // 2. LÓGICA DE FILTROS CRUZADOS
-  // -------------------------------------------------------------------------
+  // --- (Lógica de filtros y sincronización bidireccional igual a la versión anterior) ---
   const proveedoresUnicos = useMemo(() => {
-    const provs = productosFull.map(p => p.proveedor.toUpperCase());
+    const provs = productosFull.map(p => p.proveedor?.toUpperCase() || 'SIN PROVEEDOR');
     return Array.from(new Set(provs)).sort();
   }, [productosFull]);
 
   const productosFiltrados = useMemo(() => {
     if (!proveedorFiltro) return productosFull;
-    return productosFull.filter(p => p.proveedor.toUpperCase() === proveedorFiltro);
+    return productosFull.filter(p => p.proveedor?.toUpperCase() === proveedorFiltro);
   }, [proveedorFiltro, productosFull]);
 
   useEffect(() => {
@@ -44,18 +40,11 @@ export default function RegistrarIngreso() {
       try {
         const data = await apiService.getProductosParaIngreso();
         setProductosFull(data);
-      } catch (error) {
-        setMensaje({ texto: '❌ ERROR AL CONECTAR CON EL SERVIDOR', tipo: 'error' });
-      }
+      } catch (error) { setMensaje({ texto: '❌ ERROR DE CONEXIÓN', tipo: 'error' }); }
     }
     cargarCatalogo();
   }, []);
 
-  // -------------------------------------------------------------------------
-  // 3. SINCRONIZACIÓN FINANCIERA (Unidad <-> Lote <-> Margen <-> Precio)
-  // -------------------------------------------------------------------------
-  
-  // Función Maestra para sincronizar Margen -> Precio
   const syncMargenAPrecio = (costoUnit: number, mMenor: number, mMayor: number) => {
     return {
       precio_menor_nuevo: Number((costoUnit * (1 + mMenor / 100)).toFixed(2)),
@@ -63,41 +52,24 @@ export default function RegistrarIngreso() {
     };
   };
 
-  // Manejador cuando cambia la CANTIDAD o el COSTO UNITARIO
   const manejarCambioUnidadOCosto = (cant: number, unit: number) => {
     const totalLote = Number((cant * unit).toFixed(2));
     const nuevosPrecios = syncMargenAPrecio(unit, formData.margen_menor, formData.margen_mayor);
-    
-    setFormData(prev => ({
-      ...prev,
-      cantidad: cant,
-      costo_nuevo: unit,
-      costo_total_lote: totalLote,
-      ...nuevosPrecios
-    }));
+    setFormData(prev => ({ ...prev, cantidad: cant, costo_nuevo: unit, costo_total_lote: totalLote, ...nuevosPrecios }));
     setPreciosConfirmados(false);
   };
 
-  // Manejador cuando cambia el COSTO TOTAL DEL LOTE (Calculadora Automática)
   const manejarCambioTotalLote = (total: number) => {
     const cant = formData.cantidad || 1;
-    const unit = Number((total / cant).toFixed(4)); // Alta precisión decimal
+    const unit = Number((total / cant).toFixed(4));
     const nuevosPrecios = syncMargenAPrecio(unit, formData.margen_menor, formData.margen_mayor);
-
-    setFormData(prev => ({
-      ...prev,
-      costo_total_lote: total,
-      costo_nuevo: unit,
-      ...nuevosPrecios
-    }));
+    setFormData(prev => ({ ...prev, costo_total_lote: total, costo_nuevo: unit, ...nuevosPrecios }));
     setPreciosConfirmados(false);
   };
 
-  // Manejador cuando cambia el PRECIO DE VENTA directamente
   const recalcarMargenDesdePrecio = (tipo: 'menor' | 'mayor', nuevoPrecio: number) => {
     const costo = formData.costo_nuevo || 1;
     const nuevoMargen = Number((((nuevoPrecio / costo) - 1) * 100).toFixed(2));
-
     setFormData(prev => ({
       ...prev,
       [tipo === 'menor' ? 'precio_menor_nuevo' : 'precio_mayor_nuevo']: nuevoPrecio,
@@ -117,23 +89,42 @@ export default function RegistrarIngreso() {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // 4. LÓGICA DE ENVÍO CORREGIDA (LIMPIEZA DE PAYLOAD)
+  // -------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!preciosConfirmados) return;
+    
     setCargando(true);
+    setMensaje({ texto: '', tipo: '' });
+
     try {
-      await apiService.registrarIngreso(formData);
-      setMensaje({ texto: `✅ INGRESO REGISTRADO CORRECTAMENTE`, tipo: 'success' });
-      setFormData({ ...formData, id_producto: '', cantidad: 1, documento_referencia: '' });
+      // CRÍTICO: Enviamos solo lo que el servidor espera recibir
+      const payloadLimpio = {
+        id_producto: formData.id_producto,
+        cantidad: formData.cantidad,
+        costo_nuevo: formData.costo_nuevo, // El backend debe mapear esto a costo_unidad
+        precio_menor_nuevo: formData.precio_menor_nuevo,
+        precio_mayor_nuevo: formData.precio_mayor_nuevo,
+        documento_referencia: formData.documento_referencia
+      };
+
+      await apiService.registrarIngreso(payloadLimpio);
+      
+      setMensaje({ texto: `✅ STOCK ACTUALIZADO CORRECTAMENTE`, tipo: 'success' });
+      setFormData({ ...formData, id_producto: '', cantidad: 1, documento_referencia: '', costo_nuevo: 0, costo_total_lote: 0 });
       setProductoSeleccionado(null);
       setPreciosConfirmados(false);
     } catch (err: any) {
-      setMensaje({ texto: `❌ ERROR: ${err.message}`, tipo: 'error' });
+      // Capturamos el error 500 y mostramos el detalle si es posible
+      setMensaje({ texto: `❌ ERROR SERVIDOR: ${err.message || 'Verificar Backend'}`, tipo: 'error' });
     } finally {
       setCargando(false);
     }
   };
 
+  // ... (El resto del JSX permanece igual)
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-700">
       <header className="mb-10">
@@ -144,7 +135,6 @@ export default function RegistrarIngreso() {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           
-          {/* SECCIÓN 1: FILTROS */}
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl shadow-2xl">
             <h3 className="text-xs font-black uppercase tracking-widest text-indigo-400 mb-6 flex items-center gap-3">
               <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span> 1. Localización del Producto
@@ -167,7 +157,6 @@ export default function RegistrarIngreso() {
             </div>
           </section>
 
-          {/* SECCIÓN 2: DATOS COMPRA + CALCULADORA DE LOTE */}
           {productoSeleccionado && (
             <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl animate-in zoom-in duration-300">
               <div className="flex justify-between items-center mb-6">
@@ -191,13 +180,9 @@ export default function RegistrarIngreso() {
                   <input type="number" step="0.01" value={formData.costo_total_lote} onChange={e => manejarCambioTotalLote(parseFloat(e.target.value) || 0)} className="w-full p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl font-black text-3xl text-center text-emerald-500 outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
               </div>
-              <p className="text-[9px] text-zinc-600 font-bold uppercase mt-4 italic text-center px-4">
-                * Consejo: Si solo tienes el total de la caja, escríbelo en el tercer cuadro y el sistema calculará el costo unitario por ti.
-              </p>
             </section>
           )}
 
-          {/* SECCIÓN 3: ESTRATEGIA DE VENTA */}
           {productoSeleccionado && (
             <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl animate-in slide-in-from-bottom-4 duration-500">
               <h3 className="text-xs font-black uppercase tracking-widest text-amber-400 mb-8 flex items-center gap-3">
@@ -228,7 +213,6 @@ export default function RegistrarIngreso() {
           )}
         </div>
 
-        {/* COLUMNA LATERAL */}
         <div className="space-y-8">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-6">Referencia Documental</h3>
@@ -237,6 +221,12 @@ export default function RegistrarIngreso() {
           <button type="submit" disabled={cargando || !preciosConfirmados || !formData.id_producto} className={`w-full py-8 rounded-[2.25rem] font-black text-xl tracking-tighter shadow-2xl transition-all active:scale-95 uppercase ${cargando || !preciosConfirmados || !formData.id_producto ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}>
             {cargando ? 'SINCRONIZANDO...' : '🚀 ACTUALIZAR STOCK'}
           </button>
+          
+          {mensaje.texto && (
+            <div className={`p-4 rounded-xl text-center font-bold text-xs uppercase ${mensaje.tipo === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+              {mensaje.texto}
+            </div>
+          )}
         </div>
       </form>
     </div>
