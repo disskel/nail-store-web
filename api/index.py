@@ -10,21 +10,22 @@ from dotenv import load_dotenv
 # -----------------------------------------------------------------------------
 # 1. CONFIGURACIÓN E INICIALIZACIÓN (Setup)
 # -----------------------------------------------------------------------------
-# load_dotenv() # Comentado para producción en Vercel para evitar conflictos
+# Se cargan las variables de entorno para la conexión segura con Supabase
+# load_dotenv() # Comentado para producción en Vercel
 
 app = FastAPI(
     title="Nail-Store API",
-    description="Backend robusto con diagnóstico de rutas para Vercel",
-    version="1.0.8"
+    description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
+    version="1.0.9"
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
+# Este bloque ayudará a identificar si las rutas llegan con o sin el prefijo /api
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
     path = request.url.path
     method = request.method
-    # Este mensaje aparecerá en la pestaña "Functions" -> Logs de Vercel
     print(f"DIAGNÓSTICO: Recibida petición {method} en la ruta: {path}")
     
     response = await call_next(request)
@@ -52,7 +53,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
-# 2. MODELOS DE DATOS (PYDANTIC) - Validación estricta de tipos
+# 2. MODELOS DE DATOS (PYDANTIC)
+# Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB
 # -----------------------------------------------------------------------------
 
 class ItemVenta(BaseModel):
@@ -80,6 +82,11 @@ class ProveedorRequest(BaseModel):
     nombre: str
     contacto: Optional[str] = None
 
+class CategoriaRequest(BaseModel):
+    """Modelo para el registro de nuevas categorías en el mantenedor"""
+    nombre: str
+    descripcion: Optional[str] = None
+
 class AperturaCajaRequest(BaseModel):
     monto_inicial: float = 0.0 
     observaciones: Optional[str] = None
@@ -105,7 +112,7 @@ class ProductoCreateRequest(BaseModel):
     stock_actual: int
 
 # -----------------------------------------------------------------------------
-# 3. ENDPOINTS DE SISTEMA Y SALUD (Rutas Duales para evitar 404)
+# 3. ENDPOINTS DE SISTEMA Y SALUD
 # -----------------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -115,8 +122,7 @@ def health_check():
     return {
         "status": "online", 
         "business": "Nail-Store", 
-        "database_connected": supabase is not None,
-        "version": "1.0.8-diag"
+        "database_connected": supabase is not None
     }
 
 # -----------------------------------------------------------------------------
@@ -126,8 +132,11 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """Calcula márgenes e incluye Categoría y Proveedor mediante Joins."""
+    """
+    Calcula márgenes e incluye Categoría y Proveedor mediante Joins de Supabase.
+    """
     try:
+        # Realizamos el Join con las tablas relacionadas para una vista pro en el frontend
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -139,6 +148,7 @@ def obtener_margenes():
             precio = p.get("precio_menor")
             stock = p.get("stock_actual") or 0
             
+            # Navegación segura por los objetos de la relación (Joins)
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
@@ -225,6 +235,20 @@ def listar_categorias():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/categorias")
+@app.post("/categorias")
+def crear_categoria(req: CategoriaRequest):
+    """Registra una nueva categoría en el catálogo maestro."""
+    try:
+        data = {
+            "nombre": req.nombre,
+            "descripcion": req.descripcion
+        }
+        res = supabase.table("categorias").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
+
 # -----------------------------------------------------------------------------
 # 5. MÓDULO DE DASHBOARD (PARA PRESENTACIÓN)
 # -----------------------------------------------------------------------------
@@ -232,13 +256,26 @@ def listar_categorias():
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
-    """Calcula indicadores clave de valor de inventario y stock crítico."""
+    """
+    Calcula indicadores clave de valor de inventario y stock crítico.
+    Ideal para el panel principal de la demostración.
+    """
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
         
-        valor_total = sum(float(p.get("costo_unidad") or 0) * int(p.get("stock_actual") or 0) for p in res.data)
-        agotados = sum(1 for p in res.data if (p.get("stock_actual") or 0) <= 0)
-        stock_bajo = sum(1 for p in res.data if 0 < (p.get("stock_actual") or 0) < 10)
+        valor_total = 0
+        agotados = 0
+        stock_bajo = 0
+        
+        for p in res.data:
+            costo = float(p.get("costo_unidad") or 0)
+            stock = int(p.get("stock_actual") or 0)
+            
+            valor_total += (costo * stock)
+            if stock <= 0:
+                agotados += 1
+            elif stock < 10:
+                stock_bajo += 1
                 
         return {
             "valor_total_inventario": round(valor_total, 2),
@@ -270,7 +307,7 @@ def crear_proveedor(prov: ProveedorRequest):
     try:
         data = {"nombre": prov.nombre, "contacto": prov.contacto}
         response = supabase.table("proveedores").insert(data).execute()
-        return {"status": "success", "data": response.data}
+        return {"status": "success", "data": response.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear proveedor: {str(e)}")
 
