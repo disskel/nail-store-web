@@ -1,65 +1,71 @@
-import Image from "next/image";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
-export default function Home() {
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Nail-Store | Gestión",
+  description: "Sistema inteligente para salones de belleza",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full dark`}>
+      <body className="flex flex-col lg:flex-row h-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+        
+        {/* Barra Lateral - Visible solo en Desktop (lg) */}
+        <aside className="hidden lg:flex w-72 bg-black border-r border-zinc-800 flex-col p-6 shadow-2xl">
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
+              N
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Nail-Store</h2>
+              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Admin Pro</p>
+            </div>
+          </div>
+
+          <nav className="flex-1 space-y-1">
+            <p className="text-[10px] font-bold text-zinc-500 uppercase px-3 mb-3">Principal</p>
+            <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+              <span className="text-lg">🏠</span> Dashboard
+            </a>
+            <a href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+              <span className="text-lg">📊</span> Inventario
+            </a>
+            {/* ACTUALIZACIÓN: Ruta profesional de ingreso de mercancía */}
+            <a href="/inventario/ingreso" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white bg-zinc-900/50 border border-zinc-800">
+              <span className="text-lg">📦</span> Registrar Ingreso
+            </a>
+            <a href="/inventario/nuevo" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+              <span className="text-lg">✨</span> Nuevo Producto
+            </a>
+          </nav>
+
+          <div className="pt-6 border-t border-zinc-800">
+            <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/50 rounded-xl">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-medium text-zinc-400">Servidor Python Activo</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* Navegación para Móvil (Solo visible en pantallas pequeñas) */}
+        <nav className="lg:hidden flex justify-around items-center bg-black border-b border-zinc-800 p-4 sticky top-0 z-50">
+          <a href="/" className="text-2xl">🏠</a>
+          <a href="/inventario" className="text-2xl">📊</a>
+          {/* ACTUALIZACIÓN: Ruta móvil centralizada */}
+          <a href="/inventario/ingreso" className="text-2xl bg-indigo-600 p-2 rounded-lg">📦</a>
+          <a href="/inventario/nuevo" className="text-2xl">✨</a>
+        </nav>
+
+        {/* Contenido Principal */}
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-zinc-950 to-black pb-20 lg:pb-0">
+          {children}
+        </main>
+      </body>
+    </html>
   );
 }
