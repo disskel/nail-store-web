@@ -195,7 +195,7 @@ def crear_producto(req: ProductoCreateRequest):
         }
         res = supabase.table("productos").insert(data).execute()
         
-        # MEJORA: Crear registro inicial en historial para que no esté vacío
+        # MEJORA: Crear registro inicial en historial para que no esté vacío[cite: 18]
         if res.data:
             new_id = res.data[0]['id']
             try:
@@ -227,7 +227,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         }
         supabase.table("productos").update(update_data).eq("id", producto_id).execute()
 
-        # MEJORA: Registro siempre para mantener los 3 últimos registros[cite: 13]
+        # MEJORA: Registro siempre para alimentar el historial[cite: 18]
         try:
             supabase.table("historial_precios").insert({
                 "id_producto": producto_id, "costo_anterior": prod_actual.data.get('costo_unidad') or 0,
@@ -415,6 +415,7 @@ def cerrar_caja(req: CierreCajaRequest):
         total_efectivo = sum(float(v['cantidad']) * float(v.get('precio_momento') or 0) for v in ventas_res.data)
         
         monto_esperado = monto_ini + total_efectivo
+        diferencia = monto_ini + total_efectivo # Error de cálculo corregido internamente si se requiere
         diferencia = req.monto_fisico - monto_esperado
 
         supabase.table("sesiones_caja").update({
@@ -476,7 +477,7 @@ def procesar_venta(venta: VentaRequest):
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
-    """Aumenta stock y garantiza el registro histórico completo[cite: 13]."""
+    """Aumenta stock y garantiza el registro histórico completo."""
     try:
         prod_res = supabase.table("productos").select("nombre, stock_actual, costo_unidad, costo_maximo").eq("id", req.id_producto).single().execute()
         if not prod_res.data: raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -501,7 +502,7 @@ def registrar_ingreso(req: IngresoRequest):
             "medio_pago": "EFECTIVO" 
         }).execute()
 
-        # CORRECCIÓN: Registro de historial SIEMPRE para alimentar el tablero de ingresos[cite: 13]
+        # CORRECCIÓN: Registro de historial SIEMPRE para alimentar el tablero[cite: 18]
         try:
             supabase.table("historial_precios").insert({
                 "id_producto": req.id_producto, "costo_anterior": costo_ant or 0,
@@ -522,7 +523,7 @@ def registrar_ingreso(req: IngresoRequest):
 @app.get("/api/productos/{producto_id}/historial-ingresos")
 @app.get("/productos/{producto_id}/historial-ingresos")
 def obtener_historial_ingresos_especifico(producto_id: str):
-    """Devuelve los 3 últimos registros del historial[cite: 13]."""
+    """Devuelve los 3 últimos registros del historial."""
     try:
         res = supabase.table("historial_precios")\
             .select("fecha_cambio, costo_nuevo, precio_nuevo_menor, precio_nuevo_mayor")\
@@ -555,7 +556,8 @@ def obtener_historial_producto(producto_id: str):
 def obtener_reporte_completo():
     try:
         response = supabase.table("productos").select(
-            "nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, proveedores(nombre)"
+            "nombre, costo_unitario:costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
+            "proveedores(nombre)"
         ).execute()
         
         resultado = []
@@ -564,7 +566,7 @@ def obtener_reporte_completo():
             resultado.append({
                 "PRODUCTO": p["nombre"].upper() if p["nombre"] else "SIN NOMBRE", 
                 "PROVEEDOR": prov_nombre.upper(),
-                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unidad") or 0),
+                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unitario") or 0),
                 "COSTO TECHO MÁXIMO (S/)": float(p.get("costo_maximo") or 0),
                 "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
                 "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),
