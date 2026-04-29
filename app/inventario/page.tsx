@@ -19,7 +19,7 @@ export default function InventarioDetallado() {
   useEffect(() => {
     async function cargarDatos() {
       try {
-        // Obtenemos los productos con el JOIN de categoría y proveedor del backend
+        // Obtenemos los productos. El backend ahora envía 'costo' y 'costo_maximo'
         const data = await apiService.getProductosParaIngreso();
         setProductos(data);
       } catch (error) {
@@ -37,7 +37,6 @@ export default function InventarioDetallado() {
   const verTrazabilidad = async (prod: any) => {
     try {
       setProductoSel(prod);
-      // Consultamos el historial de movimientos de la tabla movimientos_inventario
       const data = await apiService.getHistorialProducto(prod.id);
       setHistorial(data);
     } catch (error) {
@@ -105,9 +104,30 @@ export default function InventarioDetallado() {
                         {p.stock} UNID
                       </div>
                     </td>
+
+                    {/* IMPLEMENTACIÓN DEL INDICADOR DUAL Y ALERTA DE VARIACIÓN */}
                     <td className="p-8 text-right">
-                      <div className="font-mono font-black text-zinc-300 text-lg">S/ {p.costo.toFixed(2)}</div>
+                      <div className="flex flex-col items-end gap-1">
+                        {/* Costo de Reposición (Principal) */}
+                        <div className="font-mono font-black text-white text-xl">
+                          S/ {p.costo.toFixed(2)}
+                        </div>
+                        
+                        {/* Alerta de Variación: Se muestra si el costo bajó respecto al máximo[cite: 13] */}
+                        {p.costo_maximo > p.costo && (
+                          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-in zoom-in duration-300">
+                            <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">¡Mejor Precio!</span>
+                            <span className="text-[10px] text-zinc-600 font-bold line-through">S/ {p.costo_maximo.toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {/* Indicador de Techo Máximo (Secundario) */}
+                        <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest opacity-60">
+                          Techo Histórico: S/ {(p.costo_maximo || p.costo).toFixed(2)}
+                        </div>
+                      </div>
                     </td>
+
                     <td className="p-8 text-center">
                       <button 
                         onClick={() => verTrazabilidad(p)}
