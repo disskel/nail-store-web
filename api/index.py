@@ -133,7 +133,6 @@ def health_check():
 def obtener_margenes():
     """Calcula márgenes incluyendo ambos indicadores de costo."""
     try:
-        # Añadida la columna costo_maximo a la consulta
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -150,7 +149,6 @@ def obtener_margenes():
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
             if costo_rep is not None and precio is not None and precio > 0:
-                # El margen se sigue calculando sobre el costo de reposición para ser realistas
                 margen_porcentaje = ((precio - float(costo_rep)) / precio) * 100
                 resultado.append({
                     "id": p["id"],
@@ -193,7 +191,7 @@ def crear_producto(req: ProductoCreateRequest):
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria,
             "costo_unidad": costo_limpio, 
-            "costo_maximo": costo_limpio, # En creación, el máximo es el inicial[cite: 14]
+            "costo_maximo": costo_limpio, 
             "precio_menor": clean_num(req.precio_menor),
             "precio_mayor": clean_num(req.precio_mayor),
             "stock_actual": clean_num(req.stock_actual, True)
@@ -218,7 +216,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
 
         update_data = {
             "costo_unidad": req.costo_unidad,
-            "costo_maximo": nuevo_c_max, # Lógica híbrida aplicada aquí[cite: 14]
+            "costo_maximo": nuevo_c_max,
             "precio_menor": req.precio_menor,
             "precio_mayor": req.precio_mayor
         }
@@ -231,7 +229,8 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
                     "id_producto": producto_id,
                     "costo_anterior": costo_ant,
                     "costo_nuevo": req.costo_unidad,
-                    "precio_nuevo_menor": req.precio_menor
+                    "precio_nuevo_menor": req.precio_menor,
+                    "precio_nuevo_mayor": req.precio_mayor # Soporte mayorista añadido
                 }).execute()
             except: pass 
 
@@ -477,7 +476,6 @@ def procesar_venta(venta: VentaRequest):
 def registrar_ingreso(req: IngresoRequest):
     """Aumenta stock y aplica la lógica de costo híbrida."""
     try:
-        # LÓGICA HÍBRIDA: Obtenemos el costo máximo actual de la DB[cite: 14]
         prod_res = supabase.table("productos").select("nombre, stock_actual, costo_unidad, costo_maximo").eq("id", req.id_producto).single().execute()
         
         if not prod_res.data:
@@ -485,16 +483,15 @@ def registrar_ingreso(req: IngresoRequest):
 
         stock_act = prod_res.data['stock_actual'] or 0
         costo_ant = prod_res.data['costo_unidad']
-        c_max_ant = float(prod_res.data.get('costo_maximo') or 0) # Obtenemos el techo actual[cite: 14]
+        c_max_ant = float(prod_res.data.get('costo_maximo') or 0) 
         
         nuevo_stock = stock_act + req.cantidad
-        # El nuevo máximo es el mayor entre el que había y el que entra ahora[cite: 14]
         nuevo_c_max = max(c_max_ant, float(req.costo_nuevo))
 
         supabase.table("productos").update({
             "stock_actual": nuevo_stock,
-            "costo_unidad": req.costo_nuevo, # Siempre se guarda la última compra (Reposición)[cite: 14]
-            "costo_maximo": nuevo_c_max,     # Se guarda el techo histórico[cite: 14]
+            "costo_unidad": req.costo_nuevo,
+            "costo_maximo": nuevo_c_max,
             "precio_menor": req.precio_menor_nuevo,
             "precio_mayor": req.precio_mayor_nuevo
         }).eq("id", req.id_producto).execute()
@@ -508,33 +505,49 @@ def registrar_ingreso(req: IngresoRequest):
             "medio_pago": "EFECTIVO" 
         }).execute()
 
+        # Registro de historial CON SOPORTE PARA PRECIO MAYOR[cite: 10]
         if costo_ant is not None and float(costo_ant) != float(req.costo_nuevo):
-            try: # ESCUDO CONTRA ERROR 42501 RLS[cite: 15]
+            try:
                 supabase.table("historial_precios").insert({
                     "id_producto": req.id_producto,
                     "costo_anterior": costo_ant,
                     "costo_nuevo": req.costo_nuevo,
-                    "precio_nuevo_menor": req.precio_menor_nuevo
+                    "precio_nuevo_menor": req.precio_menor_nuevo,
+                    "precio_nuevo_mayor": req.precio_mayor_nuevo # Dato capturado
                 }).execute()
             except Exception as history_error:
-                print(f"AVISO: No se pudo grabar el historial (RLS), pero el stock se actualizó: {history_error}")
+                print(f"AVISO: Fallo al grabar historial (RLS): {history_error}")
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en registro de ingreso: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 11. MÓDULO DE TRAZABILIDAD (NUEVO)
+# 11. MÓDULO DE TRAZABILIDAD Y CONTEXTO
 # -----------------------------------------------------------------------------
+
+@app.get("/api/productos/{producto_id}/historial-ingresos")
+@app.get("/productos/{producto_id}/historial-ingresos")
+def obtener_historial_ingresos_especifico(producto_id: str):
+    """Devuelve los 3 últimos registros de historial para el panel de ingresos."""
+    try:
+        res = supabase.table("historial_precios")\
+            .select("fecha_cambio, costo_nuevo, precio_nuevo_menor, precio_nuevo_mayor")\
+            .eq("id_producto", producto_id)\
+            .order("fecha_cambio", desc=True)\
+            .limit(3)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/productos/{producto_id}/historial")
 @app.get("/productos/{producto_id}/historial")
 def obtener_historial_producto(producto_id: str):
-    """Obtiene la hoja de vida del producto: entradas, salidas y ajustes."""
+    """Obtiene la hoja de vida detallada del producto."""
     try:
         res = supabase.table("productos").select("id").eq("id", producto_id).single().execute()
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        if not res.data: raise HTTPException(status_code=404, detail="Producto no encontrado")
             
         res = supabase.table("movimientos_inventario")\
             .select("fecha, tipo_movimiento, cantidad, precio_momento, referencia, medio_pago")\
@@ -552,7 +565,6 @@ def obtener_historial_producto(producto_id: str):
 def obtener_reporte_completo():
     """Obtiene el catálogo completo incluyendo ambos costos para el Excel."""
     try:
-        # Añadida la columna costo_maximo al reporte[cite: 14]
         response = supabase.table("productos").select(
             "nombre, costo_unitario:costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
             "proveedores(nombre)"
@@ -564,8 +576,8 @@ def obtener_reporte_completo():
             resultado.append({
                 "PRODUCTO": p["nombre"].upper() if p["nombre"] else "SIN NOMBRE", 
                 "PROVEEDOR": prov_nombre.upper(),
-                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unitario") or 0), # Nombre amigable en Excel[cite: 14]
-                "COSTO TECHO MÁXIMO (S/)": float(p.get("costo_maximo") or 0), # Nueva columna en Excel[cite: 14]
+                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unitario") or 0),
+                "COSTO TECHO MÁXIMO (S/)": float(p.get("costo_maximo") or 0),
                 "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
                 "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),
                 "STOCK ACTUAL": p.get("stock_actual") or 0

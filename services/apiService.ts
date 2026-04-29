@@ -1,12 +1,15 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export const apiService = {
-  // --- CATEGORÍAS ---
+  // -------------------------------------------------------------------------
+  // 1. MANTENEDOR DE CATEGORÍAS
+  // -------------------------------------------------------------------------
   async getCategorias() {
     const res = await fetch(`${API_URL}/categorias`);
     if (!res.ok) throw new Error('Error al listar categorías');
     return res.json();
   },
+
   async createCategoria(nombre: string, descripcion?: string) {
     const res = await fetch(`${API_URL}/categorias`, {
       method: 'POST',
@@ -17,6 +20,7 @@ export const apiService = {
     if (!res.ok) throw new Error(data.detail || 'Fallo al crear categoría');
     return data;
   },
+
   async updateCategoria(id: string, nombre: string, descripcion?: string) {
     const res = await fetch(`${API_URL}/categorias/${id}`, {
       method: 'PUT',
@@ -25,6 +29,7 @@ export const apiService = {
     });
     return res.json();
   },
+
   async deleteCategoria(id: string) {
     const res = await fetch(`${API_URL}/categorias/${id}`, {
       method: 'DELETE',
@@ -32,12 +37,15 @@ export const apiService = {
     return res.json();
   },
 
-  // --- PROVEEDORES ---
+  // -------------------------------------------------------------------------
+  // 2. MANTENEDOR DE PROVEEDORES
+  // -------------------------------------------------------------------------
   async getProveedores() {
     const res = await fetch(`${API_URL}/proveedores`);
     if (!res.ok) throw new Error('Error al listar proveedores');
     return res.json();
   },
+
   async createProveedor(nombre: string, contacto?: string) {
     const res = await fetch(`${API_URL}/proveedores`, {
       method: 'POST',
@@ -48,6 +56,7 @@ export const apiService = {
     if (!res.ok) throw new Error(data.detail || 'Fallo al crear proveedor');
     return data;
   },
+
   async updateProveedor(id: string, nombre: string, contacto?: string) {
     const res = await fetch(`${API_URL}/proveedores/${id}`, {
       method: 'PUT',
@@ -56,6 +65,7 @@ export const apiService = {
     });
     return res.json();
   },
+
   async deleteProveedor(id: string) {
     const res = await fetch(`${API_URL}/proveedores/${id}`, {
       method: 'DELETE',
@@ -63,7 +73,9 @@ export const apiService = {
     return res.json();
   },
 
-  // --- PRODUCTOS ---
+  // -------------------------------------------------------------------------
+  // 3. GESTIÓN DE PRODUCTOS Y CATÁLOGO
+  // -------------------------------------------------------------------------
   async registrarProducto(data: any) {
     const res = await fetch(`${API_URL}/productos`, {
       method: 'POST',
@@ -77,16 +89,16 @@ export const apiService = {
     return res.json();
   },
 
-  // --- NUEVAS FUNCIONES PARA INGRESO Y TRAZABILIDAD (SOLUCIONAN EL ERROR) ---
-  
-  // Obtiene productos con sus proveedores para el selector[cite: 20]
+  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 14]
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
     return res.json();
   },
 
-  // Envía el registro de entrada de mercadería al backend[cite: 20]
+  // -------------------------------------------------------------------------
+  // 4. MÓDULO DE INVENTARIO E INGRESOS (Lógica Híbrida)
+  // -------------------------------------------------------------------------
   async registrarIngreso(data: any) {
     const res = await fetch(`${API_URL}/inventario/ingreso`, {
       method: 'POST',
@@ -100,10 +112,24 @@ export const apiService = {
     return res.json();
   },
 
-  // Obtiene el historial de movimientos de un item específico[cite: 20]
+  // -------------------------------------------------------------------------
+  // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS
+  // -------------------------------------------------------------------------
+  
+  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 12]
   async getHistorialProducto(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial`);
     if (!res.ok) throw new Error('Error al cargar historial del producto');
+    return res.json();
+  },
+
+  // NUEVA FUNCIÓN: Obtiene los 3 últimos ingresos para referencia rápida
+  async getHistorialIngresosCorta(id: string) {
+    const res = await fetch(`${API_URL}/productos/${id}/historial-ingresos`);
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al cargar referencia histórica');
+    }
     return res.json();
   }
 };
