@@ -180,18 +180,30 @@ export default function RegistrarIngreso() {
             </div>
           )}
 
-          {/* PASO 2: FACTURA */}
+          {/* PASO 2: DETALLE DE LA FACTURA CORREGIDO CON ETIQUETAS */}
           {productoSeleccionado && (
             <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl animate-in zoom-in duration-300">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 flex items-center gap-3">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full"></span> 2. Detalle de la Factura
                 </h3>
+                <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-full border border-emerald-500/20 uppercase tracking-tighter">Sincronización Automática</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <input required type="number" min="1" value={formData.cantidad} onChange={e => manejarCambioUnidadOCosto(parseInt(e.target.value) || 0, formData.costo_nuevo)} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl font-black text-3xl text-center text-white" />
-                <input required type="number" step="0.0001" value={formData.costo_nuevo} onChange={e => manejarCambioUnidadOCosto(formData.cantidad, parseFloat(e.target.value) || 0)} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl font-black text-3xl text-center text-emerald-400" />
-                <div className="p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl font-black text-3xl text-center text-emerald-500">{formData.costo_total_lote}</div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-widest">Unidades</label>
+                  <input required type="number" min="1" value={formData.cantidad} onChange={e => manejarCambioUnidadOCosto(parseInt(e.target.value) || 0, formData.costo_nuevo)} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl font-black text-3xl text-center text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 tracking-widest">Costo Unidad (S/)</label>
+                  <input required type="number" step="0.0001" value={formData.costo_nuevo} onChange={e => manejarCambioUnidadOCosto(formData.cantidad, parseFloat(e.target.value) || 0)} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl font-black text-3xl text-center text-emerald-400" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-emerald-500/50 uppercase ml-2 tracking-widest">Costo Total Lote (S/)</label>
+                  <div className="w-full p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl font-black text-3xl text-center text-emerald-500">
+                    {formData.costo_total_lote}
+                  </div>
+                </div>
               </div>
             </section>
           )}
