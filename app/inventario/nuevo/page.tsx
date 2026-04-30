@@ -18,6 +18,9 @@ export default function NuevoProducto() {
     costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0
   });
 
+  // -------------------------------------------------------------------------
+  // 1. CARGA DE MAESTROS (PROVEEDORES Y CATEGORÍAS)
+  // -------------------------------------------------------------------------
   async function cargarMaestros() {
     try {
       const [cats, provs] = await Promise.all([
@@ -33,6 +36,9 @@ export default function NuevoProducto() {
 
   useEffect(() => { cargarMaestros(); }, []);
 
+  // -------------------------------------------------------------------------
+  // 2. GESTIÓN DE MODALES PARA CREACIÓN RÁPIDA
+  // -------------------------------------------------------------------------
   const openMaestroModal = (tipo: 'cat' | 'prov', modo: 'create' | 'edit') => {
     if (modo === 'edit') {
       const item: any = tipo === 'cat' 
@@ -93,11 +99,15 @@ export default function NuevoProducto() {
     }
   };
 
+  // -------------------------------------------------------------------------
+  // 3. LÓGICA DE ENVÍO DEL PRODUCTO
+  // -------------------------------------------------------------------------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
     setMensaje({ texto: '', tipo: '' });
     try {
+      // Enviamos el formData. El backend forzará stock_actual a 0 por seguridad[cite: 21]
       await apiService.registrarProducto(formData);
       setMensaje({ texto: '✅ REGISTRO DE PRODUCTO EXITOSO EN NAIL-STORE', tipo: 'success' });
       setFormData({ sku: '', nombre: '', id_proveedor: '', id_categoria: '', costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0 });
@@ -113,6 +123,7 @@ export default function NuevoProducto() {
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-500 relative">
       
+      {/* MODAL DE MAESTROS */}
       {showModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl">
@@ -162,6 +173,7 @@ export default function NuevoProducto() {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
         <div className="lg:col-span-2 space-y-10">
+          {/* SECCIÓN 1: INFORMACIÓN BÁSICA */}
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-indigo-400 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span> Información del Item
@@ -178,6 +190,7 @@ export default function NuevoProducto() {
             </div>
           </section>
 
+          {/* SECCIÓN 2: FINANZAS (SOPORTA VALORES EN 0) */}
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Finanzas y Márgenes
@@ -200,6 +213,7 @@ export default function NuevoProducto() {
         </div>
 
         <div className="space-y-10">
+          {/* SECCIÓN 3: CLASIFICACIÓN (OBLIGATORIA) */}
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-zinc-300 rounded-full"></span> Clasificación
@@ -245,11 +259,21 @@ export default function NuevoProducto() {
             </div>
           </section>
 
+          {/* SECCIÓN 4: STOCK (BLOQUEADO A 0) */}
           <section className="bg-zinc-900/50 border border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-300 mb-8 flex items-center gap-3">
               <span className="w-1.5 h-1.5 bg-zinc-300 rounded-full"></span> Stock Inicial
             </h3>
-            <input required type="number" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: parseInt(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-black text-2xl text-center" />
+            {/* Campo bloqueado: El stock inicial siempre debe ser 0 para forzar Registrar Ingreso */}
+            <input 
+              readOnly 
+              type="number" 
+              value={0} 
+              className="w-full p-5 bg-black/20 border border-zinc-800/50 rounded-2xl outline-none font-black text-2xl text-center text-zinc-600 cursor-not-allowed" 
+            />
+            <p className="text-[9px] text-zinc-500 font-bold uppercase mt-4 text-center tracking-tighter">
+              El stock se habilita desde el menú "Registrar Ingreso"
+            </p>
           </section>
 
           <button type="submit" disabled={cargando} className={`w-full py-7 rounded-[2rem] font-black text-xl tracking-tight shadow-2xl transition-all active:scale-95 ${cargando ? 'bg-zinc-800 text-zinc-500' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}>
