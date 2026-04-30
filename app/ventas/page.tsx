@@ -17,7 +17,7 @@ export default function ModuloVentas() {
   const [carrito, setCarrito] = useState<any[]>([]);
   const [medioPago, setMedioPago] = useState('EFECTIVO');
 
-  // 1. CARGA INICIAL Y SEGURIDAD[cite: 21]
+  // 1. CARGA INICIAL Y SEGURIDAD
   async function inicializarPOS() {
     try {
       const [status, catalog] = await Promise.all([
@@ -44,29 +44,62 @@ export default function ModuloVentas() {
     ).slice(0, 8);
   }, [busqueda, productos]);
 
-  // 3. GESTIÓN DEL CARRITO[cite: 21]
+  // 3. GESTIÓN AVANZADA DEL CARRITO[cite: 18]
   const agregarAlCarrito = (prod: any) => {
     setCarrito(prev => {
       const existe = prev.find(item => item.id === prod.id);
-      if (existe) {
-        if (existe.cantidad >= prod.stock) {
-          setMensaje({ texto: '⚠️ STOCK MÁXIMO ALCANZADO', tipo: 'error' });
-          return prev;
-        }
-        return prev.map(item => 
-          item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item
-        );
-      }
-      return [...prev, { ...prod, cantidad: 1 }];
+      if (existe) return prev; // Si ya existe, se gestiona desde el panel derecho
+
+      // Al agregar, inicializamos con precio menor por defecto
+      return [...prev, { 
+        ...prod, 
+        cantidad: 1, 
+        precioSeleccionado: prod.precio, 
+        esPrecioMayor: false 
+      }];
     });
     setFiltro('');
   };
 
+  // Función para ajustar cantidades (+/-) y validar stock[cite: 18]
+  const actualizarCantidad = (id: string, nuevaCant: number) => {
+    if (nuevaCant < 1) return;
+    const prodOriginal = productos.find(p => p.id === id);
+    
+    if (prodOriginal && nuevaCant > prodOriginal.stock) {
+      setMensaje({ texto: '⚠️ STOCK MÁXIMO ALCANZADO', tipo: 'error' });
+      return;
+    }
+
+    setCarrito(prev => prev.map(item => 
+      item.id === id ? { ...item, cantidad: nuevaCant } : item
+    ));
+  };
+
+  // Función para intercambiar entre Precio Menor y Mayor[cite: 18]
+  const cambiarTipoPrecio = (id: string) => {
+    setCarrito(prev => prev.map(item => {
+      if (item.id === id) {
+        const estadoNuevo = !item.esPrecioMayor;
+        return {
+          ...item,
+          esPrecioMayor: estadoNuevo,
+          precioSeleccionado: estadoNuevo ? item.precio_mayor : item.precio
+        };
+      }
+      return item;
+    }));
+  };
+
+  const eliminarDelCarrito = (id: string) => {
+    setCarrito(prev => prev.filter(item => item.id !== id));
+  };
+
   const totalVenta = useMemo(() => {
-    return carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+    return carrito.reduce((acc, item) => acc + (item.precioSeleccionado * item.cantidad), 0);
   }, [carrito]);
 
-  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS
+  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS[cite: 18]
   const confirmarVenta = async () => {
     if (carrito.length === 0) return;
     setProcesandoVenta(true);
@@ -75,7 +108,7 @@ export default function ModuloVentas() {
         items: carrito.map(i => ({
           id_producto: i.id,
           cantidad: i.cantidad,
-          precio_unitario: i.precio
+          precio_unitario: i.precioSeleccionado
         })),
         tipo_documento: "NOTA_VENTA",
         id_sesion_caja: sesionActiva.id,
@@ -86,7 +119,7 @@ export default function ModuloVentas() {
       setMensaje({ texto: '✅ VENTA REALIZADA CON ÉXITO', tipo: 'success' });
       setCarrito([]);
       setMedioPago('EFECTIVO');
-      await inicializarPOS(); // Recargar stock real
+      await inicializarPOS(); // Recargar stock real tras la venta
     } catch (error: any) {
       setMensaje({ texto: `❌ ERROR: ${error.message}`, tipo: 'error' });
     } finally {
@@ -112,7 +145,7 @@ export default function ModuloVentas() {
     <div className="flex h-screen items-center justify-center bg-zinc-950 text-emerald-500 font-black">SINCRONIZANDO POS...</div>
   );
 
-  // INTERFAZ A: APERTURA (Bloqueo de Terminal)[cite: 21]
+  // INTERFAZ A: APERTURA (Bloqueo de Terminal)[cite: 18]
   if (!sesionActiva) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-zinc-950">
@@ -137,7 +170,7 @@ export default function ModuloVentas() {
     );
   }
 
-  // INTERFAZ B: PUNTO DE VENTA (Activo)[cite: 21]
+  // INTERFAZ B: PUNTO DE VENTA (Activo)[cite: 18]
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -153,7 +186,7 @@ export default function ModuloVentas() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
-        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS */}
+        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS[cite: 18] */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
             <input 
@@ -183,35 +216,50 @@ export default function ModuloVentas() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO Y CIERRE */}
+        {/* COLUMNA DERECHA: CARRITO AVANZADO[cite: 18] */}
         <div className="space-y-6">
-          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[600px] shadow-2xl">
+          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl">
             <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3">
               <span className="w-2 h-2 bg-emerald-500 rounded-full"></span> Resumen de Venta
             </h2>
 
-            <div className="flex-1 space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
+            <div className="flex-1 space-y-6 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
               {carrito.map(item => (
-                <div key={item.id} className="p-4 bg-black/40 border border-zinc-800 rounded-2xl flex justify-between items-center group">
-                  <div className="max-w-[140px]">
-                    <p className="text-[10px] font-black text-white uppercase truncate">{item.nombre}</p>
-                    <p className="text-[10px] text-zinc-500 font-bold">Cant: {item.cantidad} x S/ {Number(item.precio).toFixed(2)}</p>
+                <div key={item.id} className="space-y-4 p-5 bg-black/40 border border-zinc-800/50 rounded-3xl relative group">
+                  <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
+                  
+                  <p className="text-[11px] font-black text-white uppercase leading-tight pr-6">{item.nombre}</p>
+                  
+                  {/* SELECTOR DE PRECIO (MENOR / MAYOR)[cite: 18] */}
+                  <div className="flex gap-2">
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-zinc-800 text-zinc-500'}`}>P. MENOR</button>
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-zinc-800 text-zinc-500'}`}>P. MAYOR</button>
                   </div>
-                  <p className="font-black text-white text-sm italic">S/ {(item.precio * item.cantidad).toFixed(2)}</p>
+
+                  <div className="flex justify-between items-center bg-black/60 p-3 rounded-2xl">
+                    {/* CONTROLES DE CANTIDAD[cite: 18] */}
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => actualizarCantidad(item.id, item.cantidad - 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">-</button>
+                      <input type="number" readOnly value={item.cantidad} className="w-8 bg-transparent text-center font-black text-white outline-none" />
+                      <button onClick={() => actualizarCantidad(item.id, item.cantidad + 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">+</button>
+                    </div>
+                    <p className="font-mono font-black text-white italic">S/ {(item.precioSeleccionado * item.cantidad).toFixed(2)}</p>
+                  </div>
                 </div>
               ))}
+              
+              {carrito.length === 0 && (
+                <div className="text-center py-20 opacity-20 italic font-bold text-xs text-zinc-500 uppercase tracking-widest">Carrito Vacío</div>
+              )}
             </div>
 
             <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6">
-              {/* SELECTOR DE MEDIO DE PAGO[cite: 14] */}
               <div className="grid grid-cols-2 gap-2">
                 {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
                   <button 
                     key={metodo}
                     onClick={() => setMedioPago(metodo)}
-                    className={`py-3 rounded-xl text-[10px] font-black transition-all ${
-                      medioPago === metodo ? 'bg-indigo-600 text-white shadow-lg' : 'bg-black text-zinc-500 border border-zinc-800 hover:border-zinc-600'
-                    }`}
+                    className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white' : 'bg-black text-zinc-500 border border-zinc-800'}`}
                   >
                     {metodo}
                   </button>
@@ -226,9 +274,7 @@ export default function ModuloVentas() {
               <button 
                 disabled={carrito.length === 0 || procesandoVenta}
                 onClick={confirmarVenta}
-                className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${
-                  carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
-                }`}
+                className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}
               >
                 {procesandoVenta ? 'PROCESANDO...' : '🚀 FINALIZAR VENTA'}
               </button>
@@ -239,9 +285,7 @@ export default function ModuloVentas() {
 
       {/* NOTIFICACIÓN FLOTANTE */}
       {mensaje.texto && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${
-          mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'
-        }`}>
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>
           {mensaje.texto.toUpperCase()}
         </div>
       )}
