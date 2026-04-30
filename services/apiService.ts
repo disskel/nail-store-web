@@ -96,7 +96,8 @@ export const apiService = {
     return res.json();
   },
 
-  // ACTUALIZACIÓN: Ajuste manual de precios (Sincronización con el Backend)[cite: 17]
+  // ACTUALIZACIÓN: Ajuste manual de precios (Sincronización con el Backend)
+  // Esta función es vital para que el Shampoo y otros productos carguen sus datos correctamente
   async actualizarPreciosProducto(id: string, data: { costo_unidad: number, precio_menor: number, precio_mayor: number }) {
     const response = await fetch(`${API_URL}/productos/${id}/precios`, {
       method: 'PUT',

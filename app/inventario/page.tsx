@@ -116,7 +116,7 @@ export default function InventarioDetallado() {
                 <input 
                   type="number" 
                   step="0.01" 
-                  value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} 
+                  value={ajusteForm.costo === 0 ? '' : Number(ajusteForm.costo).toFixed(2)}
                   onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} 
                   className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-emerald-400 font-black text-2xl text-center outline-none focus:ring-2 focus:ring-emerald-600 transition-all" 
                 />
@@ -128,7 +128,7 @@ export default function InventarioDetallado() {
                   <input 
                     type="number" 
                     step="0.01" 
-                    value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} 
+                    value={ajusteForm.menor === 0 ? '' : Number(ajusteForm.menor).toFixed(2)}
                     onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} 
                     className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" 
                   />
@@ -138,7 +138,7 @@ export default function InventarioDetallado() {
                   <input 
                     type="number" 
                     step="0.01" 
-                    value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} 
+                    value={ajusteForm.mayor === 0 ? '' : Number(ajusteForm.mayor).toFixed(2)}
                     onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} 
                     className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" 
                   />

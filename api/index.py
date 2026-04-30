@@ -143,6 +143,7 @@ def obtener_margenes():
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
+            p_mayor = float(p.get("precio_mayor") or 0.0)
             stock = int(p.get("stock_actual") or 0)
             
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
@@ -159,6 +160,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
+                    "precio_mayor": p_mayor,
                     "stock": stock,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
@@ -171,6 +173,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
+                    "precio_mayor": p_mayor,
                     "stock": stock,
                     "margen_porcentaje": 0.0
                 })
