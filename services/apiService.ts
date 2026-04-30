@@ -128,7 +128,7 @@ export const apiService = {
   },
 
   // -------------------------------------------------------------------------
-  // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS
+  // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS y GESTIÓN DE VENTAS Y CAJA (POS)
   // -------------------------------------------------------------------------
   
   // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 18]
@@ -146,5 +146,36 @@ export const apiService = {
       throw new Error(error.detail || 'Error al cargar referencia histórica');
     }
     return res.json();
-  }
+  },
+
+  async getEstadoCaja() {
+    const res = await fetch(`${API_URL}/caja/estado-actual`);
+    if (!res.ok) throw new Error('Error al consultar estado de caja');
+    return res.json();
+  },
+
+  async abrirCaja(monto: number, notas?: string) {
+    const res = await fetch(`${API_URL}/caja/abrir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monto_inicial: monto, observaciones: notas }),
+    });
+    if (!res.ok) throw new Error('Error al abrir caja');
+    return res.json();
+  },
+
+  // NUEVA FUNCIÓN: Registra la venta y descuenta stock en tiempo real
+  async procesarVenta(data: { items: any[], tipo_documento: string, id_sesion_caja: string, medio_pago: string }) {
+    const res = await fetch(`${API_URL}/ventas/procesar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al procesar la venta');
+    }
+    return res.json();
+  },
+  
 };

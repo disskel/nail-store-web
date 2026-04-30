@@ -477,3 +477,23 @@ def obtener_reporte_completo():
         return resultado
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
+
+# -----------------------------------------------------------------------------
+@app.get("/api/caja/estado-actual")
+@app.get("/caja/estado-actual")
+def obtener_estado_caja():
+    """Busca si existe una sesión abierta actualmente."""
+    try:
+        # Buscamos la última sesión que esté en estado ABIERTA
+        res = supabase.table("sesiones_caja")\
+            .select("*")\
+            .eq("estado", "ABIERTA")\
+            .order("fecha_apertura", desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if res.data and len(res.data) > 0:
+            return {"esta_abierta": True, "sesion": res.data[0]}
+        return {"esta_abierta": False, "sesion": None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
