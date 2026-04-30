@@ -37,6 +37,7 @@ export default function InventarioDetallado() {
   const verTrazabilidad = async (prod: any) => {
     try {
       setProductoSel(prod);
+      // Consultamos el historial de movimientos de la tabla movimientos_inventario
       const data = await apiService.getHistorialProducto(prod.id);
       setHistorial(data);
     } catch (error) {
@@ -105,7 +106,7 @@ export default function InventarioDetallado() {
                       </div>
                     </td>
 
-                    {/* IMPLEMENTACIÓN DEL INDICADOR DUAL Y ALERTA DE VARIACIÓN */}
+                    {/* IMPLEMENTACIÓN DEL INDICADOR DUAL Y ALERTA DE VARIACIÓN[cite: 21] */}
                     <td className="p-8 text-right">
                       <div className="flex flex-col items-end gap-1">
                         {/* Costo de Reposición (Principal) */}
@@ -113,7 +114,7 @@ export default function InventarioDetallado() {
                           S/ {p.costo.toFixed(2)}
                         </div>
                         
-                        {/* Alerta de Variación: Se muestra si el costo bajó respecto al máximo[cite: 13] */}
+                        {/* Alerta de Variación: Se muestra si el costo bajó respecto al máximo */}
                         {p.costo_maximo > p.costo && (
                           <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-in zoom-in duration-300">
                             <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">¡Mejor Precio!</span>
