@@ -29,15 +29,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           <nav className="flex-1 space-y-1">
             <p className="text-[10px] font-bold text-zinc-500 uppercase px-3 mb-3">Principal</p>
+            
             <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
               <span className="text-lg">🏠</span> Dashboard
             </a>
+
+            {/* NUEVO ACCESO: MÓDULO DE VENTAS (POS) */}
+            <a href="/ventas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+              <span className="text-lg">🛍️</span> Ventas
+            </a>
+
             <a href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
               <span className="text-lg">📊</span> Inventario
             </a>
-            <a href="/compras" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white bg-zinc-900/50 border border-zinc-800">
+
+            <a href="/compras" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
               <span className="text-lg">📦</span> Registrar Ingreso
             </a>
+
             <a href="/inventario/nuevo" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
               <span className="text-lg">✨</span> Nuevo Producto
             </a>
@@ -54,8 +63,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Navegación para Móvil (Solo visible en pantallas pequeñas) */}
         <nav className="lg:hidden flex justify-around items-center bg-black border-b border-zinc-800 p-4 sticky top-0 z-50">
           <a href="/" className="text-2xl">🏠</a>
+          <a href="/ventas" className="text-2xl">🛍️</a>
           <a href="/inventario" className="text-2xl">📊</a>
-          <a href="/compras" className="text-2xl bg-indigo-600 p-2 rounded-lg">📦</a>
+          <a href="/compras" className="text-2xl">📦</a>
           <a href="/inventario/nuevo" className="text-2xl">✨</a>
         </nav>
 
