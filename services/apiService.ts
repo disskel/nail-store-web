@@ -89,11 +89,25 @@ export const apiService = {
     return res.json();
   },
 
-  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 14]
+  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 18]
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
     return res.json();
+  },
+
+  // ACTUALIZACIÓN: Ajuste manual de precios (Sincronización con el Backend)[cite: 17]
+  async actualizarPreciosProducto(id: string, data: { costo_unidad: number, precio_menor: number, precio_mayor: number }) {
+    const response = await fetch(`${API_URL}/productos/${id}/precios`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Error al actualizar precios');
+    }
+    return await response.json();
   },
 
   // -------------------------------------------------------------------------
@@ -116,14 +130,14 @@ export const apiService = {
   // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS
   // -------------------------------------------------------------------------
   
-  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 12]
+  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 18]
   async getHistorialProducto(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial`);
     if (!res.ok) throw new Error('Error al cargar historial del producto');
     return res.json();
   },
 
-  // NUEVA FUNCIÓN: Obtiene los 3 últimos ingresos para referencia rápida
+  // Obtiene los 3 últimos ingresos para referencia rápida[cite: 18]
   async getHistorialIngresosCorta(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial-ingresos`);
     if (!res.ok) {

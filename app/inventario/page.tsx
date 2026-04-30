@@ -13,26 +13,73 @@ export default function InventarioDetallado() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
+  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO (Sincronización de UI)
+  const [showAjuste, setShowAjuste] = useState(false);
+  const [itemAjuste, setItemAjuste] = useState<any>(null);
+  const [ajusteForm, setAjusteForm] = useState({ costo: 0, menor: 0, mayor: 0 });
+  const [guardando, setGuardando] = useState(false);
+
   // -------------------------------------------------------------------------
   // 2. CARGA INICIAL DE PRODUCTOS (TRUJILLO CATÁLOGO)
   // -------------------------------------------------------------------------
-  useEffect(() => {
-    async function cargarDatos() {
-      try {
-        // Obtenemos los productos. El backend ahora envía 'costo' y 'costo_maximo'
-        const data = await apiService.getProductosParaIngreso();
-        setProductos(data);
-      } catch (error) {
-        setMensaje('❌ ERROR AL SINCRONIZAR EL INVENTARIO');
-      } finally {
-        setCargando(false);
-      }
+  async function cargarDatos() {
+    try {
+      // Obtenemos los productos. El backend ahora envía 'costo' y 'costo_maximo'
+      const data = await apiService.getProductosParaIngreso();
+      setProductos(data);
+    } catch (error) {
+      setMensaje('❌ ERROR AL SINCRONIZAR EL INVENTARIO');
+    } finally {
+      setCargando(false);
     }
+  }
+
+  useEffect(() => {
     cargarDatos();
   }, []);
 
   // -------------------------------------------------------------------------
-  // 3. LÓGICA DE TRAZABILIDAD (HOJA DE VIDA DEL PRODUCTO)
+  // 3. LÓGICA DE AJUSTE RÁPIDO Y SEGURIDAD DE DATOS
+  // -------------------------------------------------------------------------
+  
+  // Función para limpiar ceros a la izquierda y manejar vacíos
+  const parseInput = (val: string) => {
+    if (val === '') return 0;
+    const n = parseFloat(val);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const abrirAjuste = (p: any) => {
+    setItemAjuste(p);
+    // Seguridad de Datos: Fallback a 0 si los valores son indefinidos
+    setAjusteForm({ 
+      costo: p.costo || 0, 
+      menor: p.precio || 0, 
+      mayor: p.precio_mayor || 0 
+    });
+    setShowAjuste(true);
+  };
+
+  const guardarCambiosPrecio = async () => {
+    setGuardando(true);
+    try {
+      // CORRECCIÓN: Se cambió costo_unitario por costo_unidad para el backend[cite: 14, 18]
+      await apiService.actualizarPreciosProducto(itemAjuste.id, {
+        costo_unidad: ajusteForm.costo, 
+        precio_menor: ajusteForm.menor,
+        precio_mayor: ajusteForm.mayor
+      });
+      setShowAjuste(false);
+      await cargarDatos(); // Refrescar tabla principal
+    } catch (e) {
+      alert("Error al actualizar precios en la base de datos");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // 4. LÓGICA DE TRAZABILIDAD (HOJA DE VIDA DEL PRODUCTO)
   // -------------------------------------------------------------------------
   const verTrazabilidad = async (prod: any) => {
     try {
@@ -54,6 +101,65 @@ export default function InventarioDetallado() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
+      {/* MODAL DE GESTIÓN DE PRECIOS (Botón de Gestión) */}
+      {showAjuste && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
+            <div className="mb-8">
+              <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Ajuste Rápido</h2>
+              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Sincronización Manual de Precios</p>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">Costo Unidad (S/)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} 
+                  onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} 
+                  className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-emerald-400 font-black text-2xl text-center outline-none focus:ring-2 focus:ring-emerald-600 transition-all" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Menor (S/)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} 
+                    onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} 
+                    className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Mayor (S/)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} 
+                    onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} 
+                    className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" 
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-6">
+                <button onClick={() => setShowAjuste(false)} className="flex-1 py-4 text-zinc-500 font-bold hover:text-white transition-colors uppercase text-[10px] tracking-widest">Cancelar</button>
+                <button 
+                  disabled={guardando} 
+                  onClick={guardarCambiosPrecio} 
+                  className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-500 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all uppercase text-[10px] tracking-widest"
+                >
+                  {guardando ? 'Guardando...' : 'Actualizar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CABECERA DE CONTROL */}
       <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
@@ -73,8 +179,6 @@ export default function InventarioDetallado() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-        
-        {/* COLUMNA 1 Y 2: TABLA DE ESPECIFICACIÓN DE PRODUCTOS */}
         <div className="xl:col-span-2 space-y-6">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl backdrop-blur-xl">
             <table className="w-full text-left">
@@ -83,7 +187,7 @@ export default function InventarioDetallado() {
                   <th className="p-8">Información del Producto</th>
                   <th className="p-8 text-center">Stock Actual</th>
                   <th className="p-8 text-right">Costo Maestro</th>
-                  <th className="p-8 text-center">Acción</th>
+                  <th className="p-8 text-center">Gestión</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
@@ -98,48 +202,48 @@ export default function InventarioDetallado() {
                     </td>
                     <td className="p-8 text-center">
                       <div className={`inline-block px-5 py-2 rounded-2xl font-black text-sm shadow-inner ${
-                        p.stock <= 0 ? 'bg-red-500/20 text-red-500 animate-pulse' : 
-                        p.stock < 10 ? 'bg-amber-500/20 text-amber-500' : 
+                        (p.stock || 0) <= 0 ? 'bg-red-500/20 text-red-500 animate-pulse' : 
+                        (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 
                         'bg-emerald-500/20 text-emerald-400'
                       }`}>
-                        {p.stock} UNID
+                        {p.stock || 0} UNID
                       </div>
                     </td>
-
-                    {/* IMPLEMENTACIÓN DEL INDICADOR DUAL Y ALERTA DE VARIACIÓN[cite: 21] */}
                     <td className="p-8 text-right">
                       <div className="flex flex-col items-end gap-1">
-                        {/* Costo de Reposición (Principal) */}
                         <div className="font-mono font-black text-white text-xl">
-                          S/ {p.costo.toFixed(2)}
+                          S/ {Number(p.costo || 0).toFixed(2)}
                         </div>
-                        
-                        {/* Alerta de Variación: Se muestra si el costo bajó respecto al máximo */}
-                        {p.costo_maximo > p.costo && (
+                        {Number(p.costo_maximo || 0) > Number(p.costo || 0) && (
                           <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-in zoom-in duration-300">
                             <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">¡Mejor Precio!</span>
-                            <span className="text-[10px] text-zinc-600 font-bold line-through">S/ {p.costo_maximo.toFixed(2)}</span>
+                            <span className="text-[10px] text-zinc-600 font-bold line-through">S/ {Number(p.costo_maximo || 0).toFixed(2)}</span>
                           </div>
                         )}
-
-                        {/* Indicador de Techo Máximo (Secundario) */}
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest opacity-60">
-                          Techo Histórico: S/ {(p.costo_maximo || p.costo).toFixed(2)}
+                          Techo Histórico: S/ {Number(p.costo_maximo || p.costo || 0).toFixed(2)}
                         </div>
                       </div>
                     </td>
-
                     <td className="p-8 text-center">
-                      <button 
-                        onClick={() => verTrazabilidad(p)}
-                        className={`p-4 rounded-2xl transition-all shadow-lg ${
-                          productoSel?.id === p.id 
-                            ? 'bg-indigo-600 text-white' 
-                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
-                        }`}
-                      >
-                        <span className="text-xl">🔍</span>
-                      </button>
+                      <div className="flex justify-center gap-3">
+                        <button 
+                          onClick={() => abrirAjuste(p)}
+                          className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg"
+                          title="Ajuste Rápido de Precios"
+                        >
+                          🏷️
+                        </button>
+                        <button 
+                          onClick={() => verTrazabilidad(p)}
+                          className={`p-3 rounded-xl transition-all shadow-lg ${
+                            productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-indigo-600 hover:text-white'
+                          }`}
+                          title="Ver Trazabilidad"
+                        >
+                          🔍
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -148,13 +252,11 @@ export default function InventarioDetallado() {
           </div>
         </div>
 
-        {/* COLUMNA 3: PANEL DE TRAZABILIDAD (AUDITORÍA DE MOVIMIENTOS) */}
         <div className="space-y-8">
           <section className="bg-zinc-900/60 border border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8 flex items-center gap-3">
               <span className="w-2 h-2 bg-indigo-400 rounded-full"></span> Trazabilidad del Ítem
             </h3>
-
             {productoSel ? (
               <div className="space-y-8 animate-in slide-in-from-right duration-500">
                 <div className="pb-6 border-b border-zinc-800">
@@ -163,32 +265,24 @@ export default function InventarioDetallado() {
                   </div>
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mt-2">Últimos movimientos registrados</p>
                 </div>
-
                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
                   {historial.length > 0 ? (
                     historial.map((m, i) => (
                       <div key={i} className="p-5 bg-black/40 rounded-[1.5rem] border border-zinc-800/50 flex justify-between items-center group hover:border-zinc-700 transition-all">
                         <div className="space-y-1">
-                          <div className={`text-[10px] font-black tracking-widest ${
-                            m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'
-                          }`}>
+                          <div className={`text-[10px] font-black tracking-widest ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'}`}>
                             {m.tipo_movimiento}
                           </div>
                           <div className="text-xs font-black text-zinc-300">
                             {new Date(m.fecha).toLocaleDateString()}
                           </div>
-                          <div className="text-[9px] text-zinc-500 italic uppercase font-bold truncate max-w-[120px]">
-                            {m.referencia || 'SIN REF.'}
-                          </div>
                         </div>
                         <div className="text-right">
-                          <div className={`text-xl font-black ${
-                            m.tipo_movimiento === 'ENTRADA' ? 'text-white' : 'text-zinc-400'
-                          }`}>
+                          <div className={`text-xl font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-white' : 'text-zinc-400'}`}>
                             {m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}
                           </div>
                           <div className="text-[10px] text-zinc-500 font-black tracking-tighter">
-                            S/ {m.precio_momento.toFixed(2)}
+                            S/ {Number(m.precio_momento || 0).toFixed(2)}
                           </div>
                         </div>
                       </div>
