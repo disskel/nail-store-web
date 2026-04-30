@@ -130,19 +130,21 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """Calcula márgenes incluyendo ambos indicadores de costo y soporte para valores cero."""
+    """Calcula márgenes incluyendo todos los indicadores de precio para Trujillo."""
     try:
+        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 16]
         response = supabase.table("productos").select(
-            "id, nombre, costo_unidad, costo_maximo, precio_menor, stock_actual, "
+            "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
         ).execute()
         
         resultado = []
         for p in response.data:
-            # Aseguramos que siempre existan valores numéricos para evitar toFixed(undefined)[cite: 20]
+            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 16]
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
+            # CAPTURA CORRECTA: Ahora sí obtenemos el precio mayor de la DB[cite: 16]
             p_mayor = float(p.get("precio_mayor") or 0.0)
             stock = int(p.get("stock_actual") or 0)
             
@@ -160,7 +162,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor,
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 16]
                     "stock": stock,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
@@ -173,7 +175,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor,
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 16]
                     "stock": stock,
                     "margen_porcentaje": 0.0
                 })
@@ -186,7 +188,7 @@ def obtener_margenes():
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
     try:
-        # Validación de reglas de negocio Trujillo[cite: 20]
+        # Validación de reglas de negocio Trujillo
         if not req.id_proveedor or str(req.id_proveedor).strip() == "":
             raise HTTPException(status_code=400, detail="El Proveedor es obligatorio")
         if not req.id_categoria or str(req.id_categoria).strip() == "":
@@ -210,7 +212,7 @@ def crear_producto(req: ProductoCreateRequest):
             "costo_maximo": costo_limpio, 
             "precio_menor": p_menor,
             "precio_mayor": p_mayor, 
-            "stock_actual": 0 # BLOQUEO: Siempre inicia en 0 para forzar Registrar Ingreso[cite: 20]
+            "stock_actual": 0 # BLOQUEO: Siempre inicia en 0 para forzar Registrar Ingreso
         }
         res = supabase.table("productos").insert(data).execute()
         
@@ -251,7 +253,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         }
         supabase.table("productos").update(update_data).eq("id", producto_id).execute()
 
-        # Inserción forzada en historial para mantener el tablero activo[cite: 20]
+        # Inserción forzada en historial para mantener el tablero activo
         supabase.table("historial_precios").insert({
             "id_producto": producto_id, 
             "costo_anterior": float(prod_actual.data.get('costo_unidad') or 0.0),
