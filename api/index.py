@@ -130,7 +130,7 @@ def health_check():
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes():
-    """Calcula márgenes incluyendo ambos indicadores de costo."""
+    """Calcula márgenes incluyendo ambos indicadores de costo y soporte para valores cero."""
     try:
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, stock_actual, "
@@ -139,24 +139,26 @@ def obtener_margenes():
         
         resultado = []
         for p in response.data:
-            costo_rep = p.get("costo_unidad")
-            costo_max = p.get("costo_maximo") or costo_rep 
-            precio = p.get("precio_menor")
-            stock = p.get("stock_actual") or 0
+            # Aseguramos que siempre existan valores numéricos para evitar toFixed(undefined)[cite: 20]
+            costo_rep = float(p.get("costo_unidad") or 0.0)
+            costo_max = float(p.get("costo_maximo") or costo_rep) 
+            precio = float(p.get("precio_menor") or 0.0)
+            stock = int(p.get("stock_actual") or 0)
             
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
-            if costo_rep is not None and precio is not None and precio > 0:
-                margen_porcentaje = ((float(precio) - float(costo_rep)) / float(precio)) * 100
+            # Cálculo de margen protegido contra división por cero
+            if precio > 0:
+                margen_porcentaje = ((precio - costo_rep) / precio) * 100
                 resultado.append({
                     "id": p["id"],
                     "nombre": p["nombre"],
                     "categoria": cat_nombre,
                     "proveedor": prov_nombre,
-                    "costo": float(costo_rep),
-                    "costo_maximo": float(costo_max),
-                    "precio": float(precio),
+                    "costo": costo_rep,
+                    "costo_maximo": costo_max,
+                    "precio": precio,
                     "stock": stock,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
@@ -165,8 +167,12 @@ def obtener_margenes():
                     "id": p["id"],
                     "nombre": p["nombre"],
                     "categoria": cat_nombre,
+                    "proveedor": prov_nombre,
+                    "costo": costo_rep,
+                    "costo_maximo": costo_max,
+                    "precio": precio,
                     "stock": stock,
-                    "margen_porcentaje": "Pendiente"
+                    "margen_porcentaje": 0.0
                 })
         return resultado
     except Exception as e:
@@ -175,28 +181,39 @@ def obtener_margenes():
 @app.post("/api/productos")
 @app.post("/productos")
 def crear_producto(req: ProductoCreateRequest):
-    """Registra un nuevo producto e inicia su historial de precios obligatoriamente."""
+    """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
     try:
-        def clean_num(val, is_int=False):
+        # Validación de reglas de negocio Trujillo[cite: 20]
+        if not req.id_proveedor or str(req.id_proveedor).strip() == "":
+            raise HTTPException(status_code=400, detail="El Proveedor es obligatorio")
+        if not req.id_categoria or str(req.id_categoria).strip() == "":
+            raise HTTPException(status_code=400, detail="La Categoría es obligatoria")
+
+        def clean_num(val):
             if val is None or str(val).lower() in ['nan', '', 'undefined', 'null']:
-                return 0
-            return int(float(val)) if is_int else float(val)
+                return 0.0
+            return float(val)
 
         costo_limpio = clean_num(req.costo_unidad)
         p_menor = clean_num(req.precio_menor)
         p_mayor = clean_num(req.precio_mayor)
 
         data = {
-            "sku": req.sku, "nombre": req.nombre, "id_proveedor": req.id_proveedor,
-            "id_categoria": req.id_categoria, "costo_unidad": costo_limpio, 
-            "costo_maximo": costo_limpio, "precio_menor": p_menor,
-            "precio_mayor": p_mayor, "stock_actual": clean_num(req.stock_actual, True)
+            "sku": req.sku, 
+            "nombre": req.nombre, 
+            "id_proveedor": req.id_proveedor,
+            "id_categoria": req.id_categoria, 
+            "costo_unidad": costo_limpio, 
+            "costo_maximo": costo_limpio, 
+            "precio_menor": p_menor,
+            "precio_mayor": p_mayor, 
+            "stock_actual": 0 # BLOQUEO: Siempre inicia en 0 para forzar Registrar Ingreso[cite: 20]
         }
         res = supabase.table("productos").insert(data).execute()
         
-        # INSERCIÓN FORZADA EN HISTORIAL (Sin try-except para detectar errores)
-        if res.data:
+        if res.data and len(res.data) > 0:
             new_id = res.data[0]['id']
+            # Historial inicial obligatorio
             supabase.table("historial_precios").insert({
                 "id_producto": new_id, 
                 "costo_anterior": 0.0, 
@@ -206,6 +223,8 @@ def crear_producto(req: ProductoCreateRequest):
             }).execute()
 
         return {"status": "success", "data": res.data[0] if res.data else data}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
@@ -218,20 +237,21 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         if not prod_actual.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-        c_max_actual = float(prod_actual.data.get('costo_maximo') or 0)
+        c_max_actual = float(prod_actual.data.get('costo_maximo') or 0.0)
         nuevo_c_max = max(c_max_actual, float(req.costo_unidad))
 
-        supabase.table("productos").update({
+        update_data = {
             "costo_unidad": req.costo_unidad, 
             "costo_maximo": nuevo_c_max,
             "precio_menor": req.precio_menor, 
             "precio_mayor": req.precio_mayor
-        }).eq("id", producto_id).execute()
+        }
+        supabase.table("productos").update(update_data).eq("id", producto_id).execute()
 
-        # INSERCIÓN FORZADA EN HISTORIAL
+        # Inserción forzada en historial para mantener el tablero activo[cite: 20]
         supabase.table("historial_precios").insert({
             "id_producto": producto_id, 
-            "costo_anterior": float(prod_actual.data.get('costo_unidad') or 0),
+            "costo_anterior": float(prod_actual.data.get('costo_unidad') or 0.0),
             "costo_nuevo": float(req.costo_unidad), 
             "precio_nuevo_menor": float(req.precio_menor),
             "precio_nuevo_mayor": float(req.precio_mayor)
@@ -273,7 +293,8 @@ def crear_categoria(req: CategoriaRequest):
 def obtener_resumen_dashboard():
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
-        v_total = sum(float(p.get("costo_unidad") or 0) * int(p.get("stock_actual") or 0) for p in res.data)
+        # Protección contra valores nulos en el cálculo del valor total[cite: 20]
+        v_total = sum(float(p.get("costo_unitario") or p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
@@ -324,7 +345,7 @@ def procesar_venta(venta: VentaRequest):
     try:
         for item in venta.items:
             prod = supabase.table("productos").select("stock_actual").eq("id", item.id_producto).single().execute()
-            nuevo_stock = (prod.data['stock_actual'] or 0) - item.cantidad
+            nuevo_stock = (int(prod.data.get('stock_actual') or 0)) - item.cantidad
             supabase.table("productos").update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
             
             supabase.table("movimientos_inventario").insert({
@@ -346,15 +367,15 @@ def procesar_venta(venta: VentaRequest):
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
-    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)."""
+    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)[cite: 20]."""
     try:
         # 1. Obtener estado actual del producto
         prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
         if not prod_res.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-        c_ant = prod_res.data.get('costo_unidad') or 0.0
-        s_act = prod_res.data.get('stock_actual') or 0
+        c_ant = float(prod_res.data.get('costo_unidad') or 0.0)
+        s_act = int(prod_res.data.get('stock_actual') or 0)
         c_max_ant = float(prod_res.data.get('costo_maximo') or 0.0) 
         
         nuevo_stock = s_act + req.cantidad
@@ -378,10 +399,10 @@ def registrar_ingreso(req: IngresoRequest):
             "referencia": req.documento_referencia or "Ingreso Manual"
         }).execute()
 
-        # 4. Registrar Historial Obligatorio (Eliminado el 'if' bloqueante y el 'try-except')[cite: 18]
+        # 4. Registrar Historial Obligatorio[cite: 20]
         hist_entry = {
             "id_producto": req.id_producto, 
-            "costo_anterior": float(c_ant), 
+            "costo_anterior": c_ant, 
             "costo_nuevo": float(req.costo_nuevo),
             "precio_nuevo_menor": float(req.precio_menor_nuevo),
             "precio_nuevo_mayor": float(req.precio_mayor_nuevo)
@@ -390,7 +411,6 @@ def registrar_ingreso(req: IngresoRequest):
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
-        # Si falla Supabase por RLS o columnas, ahora verás el error real en la web
         raise HTTPException(status_code=500, detail=f"Error Crítico BD: {str(e)}")
 
 # -----------------------------------------------------------------------------
@@ -440,13 +460,13 @@ def obtener_reporte_completo():
         for p in response.data:
             prov_nombre = p.get("proveedores", {}).get("nombre", "SIN PROVEEDOR") if p.get("proveedores") else "SIN PROVEEDOR"
             resultado.append({
-                "PRODUCTO": p["nombre"].upper(), 
+                "PRODUCTO": p["nombre"].upper() if p["nombre"] else "SIN NOMBRE", 
                 "PROVEEDOR": prov_nombre.upper(),
-                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unitario") or p.get("costo_unidad") or 0),
-                "COSTO TECHO MÁXIMO (S/)": float(p.get("costo_maximo") or 0),
-                "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0),
-                "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0),
-                "STOCK ACTUAL": p.get("stock_actual") or 0
+                "COSTO REPOSICIÓN (S/)": float(p.get("costo_unidad") or 0.0),
+                "COSTO TECHO MÁXIMO (S/)": float(p.get("costo_maximo") or 0.0),
+                "PRECIO MENOR (S/)": float(p.get("precio_menor") or 0.0),
+                "PRECIO MAYOR (S/)": float(p.get("precio_mayor") or 0.0),
+                "STOCK ACTUAL": int(p.get("stock_actual") or 0)
             })
         return resultado
     except Exception as e:
