@@ -13,7 +13,7 @@ export default function InventarioDetallado() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
-  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO (Sincronización de UI)
+  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO (Sincronización de UI)[cite: 19]
   const [showAjuste, setShowAjuste] = useState(false);
   const [itemAjuste, setItemAjuste] = useState<any>(null);
   const [ajusteForm, setAjusteForm] = useState({ costo: 0, menor: 0, mayor: 0 });
@@ -39,10 +39,10 @@ export default function InventarioDetallado() {
   }, []);
 
   // -------------------------------------------------------------------------
-  // 3. LÓGICA DE AJUSTE RÁPIDO Y SEGURIDAD DE DATOS
+  // 3. LÓGICA DE AJUSTE RÁPIDO Y SEGURIDAD DE DATOS[cite: 19]
   // -------------------------------------------------------------------------
   
-  // Función para limpiar ceros a la izquierda y manejar vacíos
+  // Función para limpiar ceros a la izquierda y manejar vacíos (Solución 2 decimales)[cite: 18, 19]
   const parseInput = (val: string) => {
     if (val === '') return 0;
     const n = parseFloat(val);
@@ -63,7 +63,7 @@ export default function InventarioDetallado() {
   const guardarCambiosPrecio = async () => {
     setGuardando(true);
     try {
-      // CORRECCIÓN: Se cambió costo_unitario por costo_unidad para el backend[cite: 14, 18]
+      // Sincronización con el backend usando la precisión requerida[cite: 18, 19]
       await apiService.actualizarPreciosProducto(itemAjuste.id, {
         costo_unidad: ajusteForm.costo, 
         precio_menor: ajusteForm.menor,
@@ -101,7 +101,7 @@ export default function InventarioDetallado() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* MODAL DE GESTIÓN DE PRECIOS (Botón de Gestión) */}
+      {/* MODAL DE GESTIÓN DE PRECIOS (Ajuste 2 decimales y limpieza de ceros)[cite: 18, 19] */}
       {showAjuste && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
@@ -179,6 +179,8 @@ export default function InventarioDetallado() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
+        
+        {/* COLUMNA 1 Y 2: TABLA DE ESPECIFICACIÓN DE PRODUCTOS */}
         <div className="xl:col-span-2 space-y-6">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl backdrop-blur-xl">
             <table className="w-full text-left">
@@ -209,22 +211,26 @@ export default function InventarioDetallado() {
                         {p.stock || 0} UNID
                       </div>
                     </td>
+
                     <td className="p-8 text-right">
                       <div className="flex flex-col items-end gap-1">
                         <div className="font-mono font-black text-white text-xl">
                           S/ {Number(p.costo || 0).toFixed(2)}
                         </div>
+                        
                         {Number(p.costo_maximo || 0) > Number(p.costo || 0) && (
                           <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-in zoom-in duration-300">
                             <span className="text-[8px] text-emerald-500 font-black uppercase tracking-tighter">¡Mejor Precio!</span>
                             <span className="text-[10px] text-zinc-600 font-bold line-through">S/ {Number(p.costo_maximo || 0).toFixed(2)}</span>
                           </div>
                         )}
+
                         <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest opacity-60">
                           Techo Histórico: S/ {Number(p.costo_maximo || p.costo || 0).toFixed(2)}
                         </div>
                       </div>
                     </td>
+
                     <td className="p-8 text-center">
                       <div className="flex justify-center gap-3">
                         <button 
@@ -252,11 +258,13 @@ export default function InventarioDetallado() {
           </div>
         </div>
 
+        {/* COLUMNA 3: PANEL DE TRAZABILIDAD (AUDITORÍA DE MOVIMIENTOS) */}
         <div className="space-y-8">
           <section className="bg-zinc-900/60 border border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8 flex items-center gap-3">
               <span className="w-2 h-2 bg-indigo-400 rounded-full"></span> Trazabilidad del Ítem
             </h3>
+
             {productoSel ? (
               <div className="space-y-8 animate-in slide-in-from-right duration-500">
                 <div className="pb-6 border-b border-zinc-800">
@@ -265,12 +273,15 @@ export default function InventarioDetallado() {
                   </div>
                   <p className="text-[10px] text-zinc-500 font-bold uppercase mt-2">Últimos movimientos registrados</p>
                 </div>
+
                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
                   {historial.length > 0 ? (
                     historial.map((m, i) => (
                       <div key={i} className="p-5 bg-black/40 rounded-[1.5rem] border border-zinc-800/50 flex justify-between items-center group hover:border-zinc-700 transition-all">
                         <div className="space-y-1">
-                          <div className={`text-[10px] font-black tracking-widest ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <div className={`text-[10px] font-black tracking-widest ${
+                            m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'
+                          }`}>
                             {m.tipo_movimiento}
                           </div>
                           <div className="text-xs font-black text-zinc-300">
@@ -278,7 +289,9 @@ export default function InventarioDetallado() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className={`text-xl font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-white' : 'text-zinc-400'}`}>
+                          <div className={`text-xl font-black ${
+                            m.tipo_movimiento === 'ENTRADA' ? 'text-white' : 'text-zinc-400'
+                          }`}>
                             {m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}
                           </div>
                           <div className="text-[10px] text-zinc-500 font-black tracking-tighter">

@@ -411,6 +411,7 @@ def registrar_ingreso(req: IngresoRequest):
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
+        # Si falla Supabase por RLS o columnas, ahora verás el error real en la web
         raise HTTPException(status_code=500, detail=f"Error Crítico BD: {str(e)}")
 
 # -----------------------------------------------------------------------------
