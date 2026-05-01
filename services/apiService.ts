@@ -177,5 +177,21 @@ export const apiService = {
     }
     return res.json();
   },
+
+  // NUEVA FUNCIÓN: End point de Ventas Acumuladas
+  async getResumenCaja(id: string) {
+    const res = await fetch(`${API_URL}/caja/resumen/${id}`);
+    return res.json();
+  },
+
+  async cerrarCaja(id_sesion: string, monto_fisico: number) {
+    const res = await fetch(`${API_URL}/caja/cerrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_sesion, monto_fisico }),
+    });
+    if (!res.ok) throw new Error('Error al procesar el cierre');
+    return res.json();
+  }
   
 };

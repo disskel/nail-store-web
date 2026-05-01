@@ -132,7 +132,7 @@ def health_check():
 def obtener_margenes():
     """Calcula márgenes incluyendo todos los indicadores de precio para Trujillo."""
     try:
-        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 16]
+        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 19]
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -140,11 +140,11 @@ def obtener_margenes():
         
         resultado = []
         for p in response.data:
-            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 16]
+            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 19]
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
-            # CAPTURA CORRECTA: Ahora sí obtenemos el precio mayor de la DB[cite: 16]
+            # CAPTURA CORRECTA: Ahora sí obtenemos el precio mayor de la DB[cite: 19]
             p_mayor = float(p.get("precio_mayor") or 0.0)
             stock = int(p.get("stock_actual") or 0)
             
@@ -162,7 +162,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 16]
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 19]
                     "stock": stock,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
@@ -175,7 +175,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 16]
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 19]
                     "stock": stock,
                     "margen_porcentaje": 0.0
                 })
@@ -298,7 +298,7 @@ def crear_categoria(req: CategoriaRequest):
 def obtener_resumen_dashboard():
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
-        # Protección contra valores nulos en el cálculo del valor total[cite: 20]
+        # Protección contra valores nulos en el cálculo del valor total[cite: 19]
         v_total = sum(float(p.get("costo_unitario") or p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
     except Exception as e:
@@ -372,7 +372,7 @@ def procesar_venta(venta: VentaRequest):
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
-    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)[cite: 20]."""
+    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)[cite: 19]."""
     try:
         # 1. Obtener estado actual del producto
         prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
@@ -404,7 +404,7 @@ def registrar_ingreso(req: IngresoRequest):
             "referencia": req.documento_referencia or "Ingreso Manual"
         }).execute()
 
-        # 4. Registrar Historial Obligatorio[cite: 20]
+        # 4. Registrar Historial Obligatorio[cite: 19]
         hist_entry = {
             "id_producto": req.id_producto, 
             "costo_anterior": c_ant, 
@@ -479,6 +479,9 @@ def obtener_reporte_completo():
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
 
 # -----------------------------------------------------------------------------
+# 12. GESTIÓN DE SESIÓN DE CAJA
+# -----------------------------------------------------------------------------
+
 @app.get("/api/caja/estado-actual")
 @app.get("/caja/estado-actual")
 def obtener_estado_caja():
@@ -497,3 +500,89 @@ def obtener_estado_caja():
         return {"esta_abierta": False, "sesion": None}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# NUEVO ENDPOINT: Resumen de Ventas Acumuladas[cite: 19]
+@app.get("/api/caja/resumen/{sesion_id}")
+@app.get("/caja/resumen/{sesion_id}")
+def obtener_resumen_caja(sesion_id: str):
+    """Calcula el total de ventas acumuladas en la sesión actual desglosado por pago."""
+    try:
+        # 1. Obtener datos de la sesión para el monto inicial[cite: 19]
+        sesion = supabase.table("sesiones_caja").select("monto_inicial").eq("id", sesion_id).single().execute()
+        if not sesion.data:
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
+        
+        m_inicial = float(sesion.data.get("monto_inicial") or 0.0)
+
+        # 2. Consultar todos los movimientos de salida de esta sesión[cite: 19]
+        movs = supabase.table("movimientos_inventario")\
+            .select("cantidad, precio_momento, medio_pago")\
+            .eq("id_sesion_caja", sesion_id)\
+            .eq("tipo_movimiento", "SALIDA")\
+            .execute()
+        
+        # 3. Calcular totales acumulados por medio de pago[cite: 19]
+        total_ventas = 0.0
+        desglose = {
+            "EFECTIVO": 0.0,
+            "YAPE": 0.0,
+            "PLIN": 0.0,
+            "TRANSFERENCIA": 0.0
+        }
+
+        for m in movs.data:
+            # Subtotal por línea de movimiento[cite: 19]
+            subtotal = int(m.get("cantidad") or 0) * float(m.get("precio_momento") or 0.0)
+            total_ventas += subtotal
+            
+            # Clasificación por medio de pago[cite: 19]
+            medio = str(m.get("medio_pago", "EFECTIVO")).upper()
+            if medio in desglose:
+                desglose[medio] += subtotal
+            else:
+                desglose[medio] = desglose.get(medio, 0.0) + subtotal
+
+        return {
+            "monto_inicial": round(m_inicial, 2),
+            "total_ventas": round(total_ventas, 2),
+            # Cuánto efectivo debería haber físicamente (Inicial + Ventas Cash)[cite: 19]
+            "saldo_esperado_efectivo": round(m_inicial + desglose["EFECTIVO"], 2),
+            "desglose_pagos": {k: round(v, 2) for k, v in desglose.items()},
+            "total_general_sistema": round(m_inicial + total_ventas, 2)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- END POINT PARA PROCESAR CIERRE - TABLA CIERRES_CAJA_DETALLE ---
+
+@app.post("/api/caja/cerrar")
+@app.post("/caja/cerrar")
+def cerrar_caja(req: CierreCajaRequest):
+    """Finaliza el turno, calcula descuadres y bloquea la terminal."""
+    try:
+        # 1. Obtener el resumen actual del sistema para esta sesión[cite: 19]
+        resumen = obtener_resumen_caja(req.id_sesion)
+        
+        m_sistema_efectivo = resumen["saldo_esperado_efectivo"]
+        m_sistema_total = resumen["total_general_sistema"]
+        diferencia = req.monto_fisico - m_sistema_efectivo
+
+        # 2. Actualizar Tabla Maestra de Sesiones[cite: 20]
+        supabase.table("sesiones_caja").update({
+            "monto_final_contado": req.monto_fisico,
+            "monto_final_sistema": m_sistema_efectivo,
+            "estado": "CERRADA"
+        }).eq("id", req.id_sesion).execute()
+
+        # 3. Registrar Detalle de Auditoría
+        supabase.table("cierres_caja_detalle").insert({
+            "id_sesion": req.id_sesion,
+            "total_efectivo_sistema": m_sistema_efectivo,
+            "total_digital_sistema": resumen["total_ventas"] - resumen["desglose_pagos"]["EFECTIVO"],
+            "monto_fisico_contado": req.monto_fisico,
+            "diferencia": diferencia
+        }).execute()
+
+        return {"status": "success", "diferencia": diferencia}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
