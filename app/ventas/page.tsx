@@ -8,7 +8,7 @@ export default function ModuloVentas() {
   const [cargando, setCargando] = useState(true);
   const [procesandoVenta, setProcesandoVenta] = useState(false);
   const [sesionActiva, setSesionActiva] = useState<any>(null);
-  const [resumenSesion, setResumenSesion] = useState<any>(null); // NUEVO: Estado para totales
+  const [resumenSesion, setResumenSesion] = useState<any>(null); // Estado para totales acumulados
   const [montoApertura, setMontoApertura] = useState(0);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
@@ -22,7 +22,7 @@ export default function ModuloVentas() {
   const [carrito, setCarrito] = useState<any[]>([]);
   const [medioPago, setMedioPago] = useState('EFECTIVO');
 
-  // 1. CARGA INICIAL Y SEGURIDAD[cite: 20]
+  // 1. CARGA INICIAL Y SEGURIDAD
   async function inicializarPOS() {
     try {
       const [status, catalog] = await Promise.all([
@@ -32,7 +32,7 @@ export default function ModuloVentas() {
       
       if (status.esta_abierta) {
         setSesionActiva(status.sesion);
-        // NUEVO: Cargar los totales acumulados (Tus 104 soles aparecerán aquí)[cite: 21, 22]
+        // Cargar los totales acumulados para la visualización superior
         const resumen = await apiService.getResumenCaja(status.sesion.id);
         setResumenSesion(resumen);
       } else {
@@ -56,7 +56,7 @@ export default function ModuloVentas() {
     ).slice(0, 8);
   }, [busqueda, productos]);
 
-  // 3. GESTIÓN AVANZADA DEL CARRITO[cite: 20]
+  // 3. GESTIÓN AVANZADA DEL CARRITO[cite: 22]
   const agregarAlCarrito = (prod: any) => {
     setCarrito(prev => {
       const existe = prev.find(item => item.id === prod.id);
@@ -108,7 +108,7 @@ export default function ModuloVentas() {
     return carrito.reduce((acc, item) => acc + (item.precioSeleccionado * item.cantidad), 0);
   }, [carrito]);
 
-  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS[cite: 21, 22]
+  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS[cite: 22]
   const confirmarVenta = async () => {
     if (carrito.length === 0) return;
     setProcesandoVenta(true);
@@ -129,7 +129,7 @@ export default function ModuloVentas() {
       setCarrito([]);
       setMedioPago('EFECTIVO');
       
-      // REFRESCAR TOTALES: Después de la venta, actualizamos el resumen visual[cite: 21, 22]
+      // REFRESCAR TOTALES: Sincronización inmediata de stock y caja[cite: 22]
       const [resumenActualizado, catalogActualizado] = await Promise.all([
         apiService.getResumenCaja(sesionActiva.id),
         apiService.getProductosParaIngreso()
@@ -145,7 +145,7 @@ export default function ModuloVentas() {
     }
   };
 
-  // 5. LÓGICA DE CIERRE DEFINITIVO (BLOQUEO DE CAJA)[cite: 21]
+  // 5. LÓGICA DE CIERRE DEFINITIVO (BLOQUEO DE CAJA)[cite: 22]
   const ejecutarCierre = async () => {
     try {
       setCargando(true);
@@ -185,7 +185,7 @@ export default function ModuloVentas() {
   if (!sesionActiva) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-zinc-950">
-        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[3rem] shadow-2xl animate-in fade-in zoom-in duration-500">
+        <div className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[3rem] shadow-2xl animate-in zoom-in duration-500">
           <div className="text-center mb-10">
             <div className="text-5xl mb-4">🔐</div>
             <h1 className="text-3xl font-black text-white uppercase italic tracking-tighter">Terminal Bloqueada</h1>
@@ -213,7 +213,7 @@ export default function ModuloVentas() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* MODAL DE ARQUEO DE CAJA (Cierre de Turno)[cite: 21] */}
+      {/* MODAL DE ARQUEO DE CAJA (Cierre de Turno)[cite: 22] */}
       {showCierre && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
           <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-lg shadow-2xl">
@@ -265,7 +265,7 @@ export default function ModuloVentas() {
           <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Caja Activa • Trujillo Centro</p>
         </div>
         
-        {/* PANEL DE TOTALES DINÁMICOS Y CIERRE[cite: 21] */}
+        {/* PANEL DE TOTALES DINÁMICOS Y CIERRE[cite: 22] */}
         <div className="flex gap-4 items-center">
           <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
             <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Ventas del Turno</p>
@@ -287,7 +287,7 @@ export default function ModuloVentas() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
-        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS */}
+        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS[cite: 22] */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
             <input 
@@ -306,10 +306,15 @@ export default function ModuloVentas() {
                 onClick={() => agregarAlCarrito(p)}
                 className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all group active:scale-95"
               >
+                {/* CABECERA DE TARJETA ACTUALIZADA CON PROVEEDOR[cite: 22] */}
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
+                    <span className="text-[8px] font-black text-zinc-500 uppercase tracking-tighter italic">📦 {p.proveedor}</span>
+                  </div>
                   <span className="text-[10px] font-black text-zinc-500 bg-black px-2 py-1 rounded-lg border border-zinc-800">STOCK: {p.stock}</span>
                 </div>
+                
                 <h3 className="font-black text-white text-lg leading-tight uppercase group-hover:text-indigo-400 transition-colors">{p.nombre}</h3>
                 <p className="mt-4 text-2xl font-black text-white italic">S/ {Number(p.precio).toFixed(2)}</p>
               </button>
@@ -317,7 +322,7 @@ export default function ModuloVentas() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO AVANZADO */}
+        {/* COLUMNA DERECHA: CARRITO AVANZADO[cite: 22] */}
         <div className="space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl">
             <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3">
