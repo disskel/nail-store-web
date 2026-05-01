@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
-    version="1.0.10"
+    version="1.0.11"
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
@@ -65,6 +65,7 @@ class VentaRequest(BaseModel):
     id_sesion_caja: str
     medio_pago: Optional[str] = "EFECTIVO"
     observaciones: Optional[str] = None
+    descuento: Optional[float] = 0.0 # NUEVO: Captura el descuento global aplicado en la venta
 
 class IngresoRequest(BaseModel):
     """Modelo para el registro de entrada de mercancía de proveedores"""
@@ -341,29 +342,57 @@ def abrir_caja(req: AperturaCajaRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE VENTAS
+# 9. MÓDULO DE VENTAS (ARQUITECTURA DE CABECERA Y DETALLE)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
+    """Registra el evento financiero en 'ventas' y descuenta stock en 'movimientos_inventario'."""
     try:
+        # 1. Cálculos de Auditoría Financiera
+        monto_bruto = sum(item.cantidad * item.precio_unitario for item in venta.items)
+        monto_descuento = float(venta.descuento or 0.0)
+        monto_neto = max(0.0, monto_bruto - monto_descuento) # El neto es lo que ingresa real
+
+        # 2. Insertar Cabecera de Venta para Trazabilidad Total
+        res_header = supabase.table("ventas").insert({
+            "id_sesion_caja": venta.id_sesion_caja,
+            "monto_bruto": monto_bruto,
+            "monto_descuento": monto_descuento,
+            "monto_neto": monto_neto,
+            "medio_pago": venta.medio_pago,
+            "motivo_descuento": venta.observaciones
+        }).execute()
+
+        if not res_header.data:
+            raise HTTPException(status_code=500, detail="Error al generar el registro maestro de venta")
+        
+        id_venta_db = res_header.data[0]['id']
+
+        # 3. Procesar Ítems (Detalle) y Actualizar Stock[cite: 19]
         for item in venta.items:
+            # Obtener stock actual para el descuento[cite: 19]
             prod = supabase.table("productos").select("stock_actual").eq("id", item.id_producto).single().execute()
             nuevo_stock = (int(prod.data.get('stock_actual') or 0)) - item.cantidad
+            
+            # Actualizar Maestro de Productos[cite: 19]
             supabase.table("productos").update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
             
+            # Registrar Movimiento de Inventario Vinculado a la Venta[cite: 19]
             supabase.table("movimientos_inventario").insert({
                 "id_producto": item.id_producto, 
                 "tipo_movimiento": "SALIDA", 
                 "cantidad": item.cantidad, 
                 "precio_momento": item.precio_unitario, 
                 "id_sesion_caja": venta.id_sesion_caja,
-                "medio_pago": venta.medio_pago
+                "medio_pago": venta.medio_pago,
+                "id_venta": id_venta_db # <--- VINCULACIÓN CRÍTICA
             }).execute()
-        return {"status": "success"}
+
+        return {"status": "success", "id_venta": id_venta_db}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en venta: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error crítico en proceso de venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
 # 10. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
@@ -479,7 +508,7 @@ def obtener_reporte_completo():
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 12. GESTIÓN DE SESIÓN DE CAJA
+# 12. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO PRECISO[cite: 19]
 # -----------------------------------------------------------------------------
 
 @app.get("/api/caja/estado-actual")
@@ -501,11 +530,11 @@ def obtener_estado_caja():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# NUEVO ENDPOINT: Resumen de Ventas Acumuladas[cite: 19]
+# ACTUALIZACIÓN DE RESUMEN: Ahora consultamos la tabla 'ventas' (Montos Netos)
 @app.get("/api/caja/resumen/{sesion_id}")
 @app.get("/caja/resumen/{sesion_id}")
 def obtener_resumen_caja(sesion_id: str):
-    """Calcula el total de ventas acumuladas en la sesión actual desglosado por pago."""
+    """Calcula ventas acumuladas usando la cabecera 'ventas' para mayor precisión en arqueos."""
     try:
         # 1. Obtener datos de la sesión para el monto inicial[cite: 19]
         sesion = supabase.table("sesiones_caja").select("monto_inicial").eq("id", sesion_id).single().execute()
@@ -514,15 +543,15 @@ def obtener_resumen_caja(sesion_id: str):
         
         m_inicial = float(sesion.data.get("monto_inicial") or 0.0)
 
-        # 2. Consultar todos los movimientos de salida de esta sesión[cite: 19]
-        movs = supabase.table("movimientos_inventario")\
-            .select("cantidad, precio_momento, medio_pago")\
+        # 2. Consultar Cabeceras de Venta (Donde el Neto ya descuenta la rebaja)
+        ventas_res = supabase.table("ventas")\
+            .select("monto_neto, medio_pago")\
             .eq("id_sesion_caja", sesion_id)\
-            .eq("tipo_movimiento", "SALIDA")\
+            .eq("estado", "COMPLETADA")\
             .execute()
         
-        # 3. Calcular totales acumulados por medio de pago[cite: 19]
-        total_ventas = 0.0
+        # 3. Clasificación y Totalización
+        total_ventas_netas = 0.0
         desglose = {
             "EFECTIVO": 0.0,
             "YAPE": 0.0,
@@ -530,25 +559,23 @@ def obtener_resumen_caja(sesion_id: str):
             "TRANSFERENCIA": 0.0
         }
 
-        for m in movs.data:
-            # Subtotal por línea de movimiento[cite: 19]
-            subtotal = int(m.get("cantidad") or 0) * float(m.get("precio_momento") or 0.0)
-            total_ventas += subtotal
+        for v in ventas_res.data:
+            neto = float(v.get("monto_neto") or 0.0)
+            total_ventas_netas += neto
             
-            # Clasificación por medio de pago[cite: 19]
-            medio = str(m.get("medio_pago", "EFECTIVO")).upper()
+            medio = str(v.get("medio_pago", "EFECTIVO")).upper()
             if medio in desglose:
-                desglose[medio] += subtotal
+                desglose[medio] += neto
             else:
-                desglose[medio] = desglose.get(medio, 0.0) + subtotal
+                desglose[medio] = desglose.get(medio, 0.0) + neto
 
         return {
             "monto_inicial": round(m_inicial, 2),
-            "total_ventas": round(total_ventas, 2),
-            # Cuánto efectivo debería haber físicamente (Inicial + Ventas Cash)[cite: 19]
+            "total_ventas": round(total_ventas_netas, 2),
+            # El efectivo esperado suma el inicial + ventas en cash netas
             "saldo_esperado_efectivo": round(m_inicial + desglose["EFECTIVO"], 2),
             "desglose_pagos": {k: round(v, 2) for k, v in desglose.items()},
-            "total_general_sistema": round(m_inicial + total_ventas, 2)
+            "total_general_sistema": round(m_inicial + total_ventas_netas, 2)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -560,21 +587,21 @@ def obtener_resumen_caja(sesion_id: str):
 def cerrar_caja(req: CierreCajaRequest):
     """Finaliza el turno, calcula descuadres y bloquea la terminal."""
     try:
-        # 1. Obtener el resumen actual del sistema para esta sesión[cite: 19]
+        # 1. Obtener el resumen actualizado con montos netos[cite: 19]
         resumen = obtener_resumen_caja(req.id_sesion)
         
         m_sistema_efectivo = resumen["saldo_esperado_efectivo"]
         m_sistema_total = resumen["total_general_sistema"]
         diferencia = req.monto_fisico - m_sistema_efectivo
 
-        # 2. Actualizar Tabla Maestra de Sesiones[cite: 20]
+        # 2. Actualizar Tabla Maestra de Sesiones[cite: 19]
         supabase.table("sesiones_caja").update({
             "monto_final_contado": req.monto_fisico,
             "monto_final_sistema": m_sistema_efectivo,
             "estado": "CERRADA"
         }).eq("id", req.id_sesion).execute()
 
-        # 3. Registrar Detalle de Auditoría
+        # 3. Registrar Detalle de Auditoría Final
         supabase.table("cierres_caja_detalle").insert({
             "id_sesion": req.id_sesion,
             "total_efectivo_sistema": m_sistema_efectivo,

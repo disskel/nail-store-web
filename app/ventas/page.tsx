@@ -16,11 +16,12 @@ export default function ModuloVentas() {
   const [showCierre, setShowCierre] = useState(false);
   const [montoFisico, setMontoFisico] = useState(0);
 
-  // --- ESTADOS DE VENTA ---
+  // --- ESTADOS DE VENTA Y DESCUENTO ---
   const [productos, setProductos] = useState<any[]>([]);
   const [busqueda, setFiltro] = useState('');
   const [carrito, setCarrito] = useState<any[]>([]);
   const [medioPago, setMedioPago] = useState('EFECTIVO');
+  const [descuento, setDescuento] = useState(0); // NUEVO: Estado para capturar descuento global
 
   // 1. CARGA INICIAL Y SEGURIDAD
   async function inicializarPOS() {
@@ -56,7 +57,7 @@ export default function ModuloVentas() {
     ).slice(0, 8);
   }, [busqueda, productos]);
 
-  // 3. GESTIÓN AVANZADA DEL CARRITO[cite: 22]
+  // 3. GESTIÓN AVANZADA DEL CARRITO
   const agregarAlCarrito = (prod: any) => {
     setCarrito(prev => {
       const existe = prev.find(item => item.id === prod.id);
@@ -104,11 +105,17 @@ export default function ModuloVentas() {
     setCarrito(prev => prev.filter(item => item.id !== id));
   };
 
-  const totalVenta = useMemo(() => {
+  // --- LÓGICA DE CÁLCULOS FINANCIEROS (CON DESCUENTO) ---
+  const subtotalCarrito = useMemo(() => {
     return carrito.reduce((acc, item) => acc + (item.precioSeleccionado * item.cantidad), 0);
   }, [carrito]);
 
-  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS[cite: 22]
+  const totalFinal = useMemo(() => {
+    const calculado = subtotalCarrito - descuento;
+    return calculado < 0 ? 0 : calculado; // Evitar que el total sea negativo
+  }, [subtotalCarrito, descuento]);
+
+  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS
   const confirmarVenta = async () => {
     if (carrito.length === 0) return;
     setProcesandoVenta(true);
@@ -121,15 +128,19 @@ export default function ModuloVentas() {
         })),
         tipo_documento: "NOTA_VENTA",
         id_sesion_caja: sesionActiva.id,
-        medio_pago: medioPago
+        medio_pago: medioPago,
+        descuento: descuento // NUEVO: Enviar descuento al backend para trazabilidad[cite: 21]
       };
 
       await apiService.procesarVenta(ventaData);
       setMensaje({ texto: '✅ VENTA REALIZADA CON ÉXITO', tipo: 'success' });
+      
+      // Limpiar estados locales tras éxito[cite: 21]
       setCarrito([]);
+      setDescuento(0); 
       setMedioPago('EFECTIVO');
       
-      // REFRESCAR TOTALES: Sincronización inmediata de stock y caja[cite: 22]
+      // REFRESCAR TOTALES: Sincronización inmediata de stock y caja
       const [resumenActualizado, catalogActualizado] = await Promise.all([
         apiService.getResumenCaja(sesionActiva.id),
         apiService.getProductosParaIngreso()
@@ -145,7 +156,7 @@ export default function ModuloVentas() {
     }
   };
 
-  // 5. LÓGICA DE CIERRE DEFINITIVO (BLOQUEO DE CAJA)[cite: 22]
+  // 5. LÓGICA DE CIERRE DEFINITIVO (BLOQUEO DE CAJA)[cite: 21]
   const ejecutarCierre = async () => {
     try {
       setCargando(true);
@@ -213,7 +224,7 @@ export default function ModuloVentas() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* MODAL DE ARQUEO DE CAJA (Cierre de Turno)[cite: 22] */}
+      {/* MODAL DE ARQUEO DE CAJA (Cierre de Turno)[cite: 21] */}
       {showCierre && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
           <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-lg shadow-2xl">
@@ -265,7 +276,7 @@ export default function ModuloVentas() {
           <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Caja Activa • Trujillo Centro</p>
         </div>
         
-        {/* PANEL DE TOTALES DINÁMICOS Y CIERRE[cite: 22] */}
+        {/* PANEL DE TOTALES DINÁMICOS Y CIERRE */}
         <div className="flex gap-4 items-center">
           <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
             <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Ventas del Turno</p>
@@ -287,7 +298,7 @@ export default function ModuloVentas() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
-        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS[cite: 22] */}
+        {/* COLUMNA IZQUIERDA: BUSCADOR Y RESULTADOS */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
             <input 
@@ -306,7 +317,6 @@ export default function ModuloVentas() {
                 onClick={() => agregarAlCarrito(p)}
                 className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all group active:scale-95"
               >
-                {/* CABECERA DE TARJETA ACTUALIZADA CON PROVEEDOR[cite: 22] */}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
@@ -322,14 +332,14 @@ export default function ModuloVentas() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO AVANZADO[cite: 22] */}
+        {/* COLUMNA DERECHA: CARRITO AVANZADO[cite: 21] */}
         <div className="space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl">
             <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta
             </h2>
 
-            <div className="flex-1 space-y-4 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+            <div className="flex-1 space-y-4 overflow-y-auto max-h-[380px] pr-2 custom-scrollbar">
               {carrito.map(item => (
                 <div key={item.id} className="space-y-4 p-5 bg-black/40 border border-zinc-800/50 rounded-3xl relative group">
                   <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
@@ -358,6 +368,26 @@ export default function ModuloVentas() {
             </div>
 
             <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6">
+              
+              {/* CAMPO DE DESCUENTO GLOBAL[cite: 21] */}
+              <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-zinc-800/50">
+                <div>
+                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Descuento Especial</p>
+                  <p className="text-[8px] text-zinc-600 font-bold uppercase italic">Monto Fijo (S/)</p>
+                </div>
+                <input 
+                  type="number"
+                  step="0.01"
+                  value={descuento === 0 ? '' : descuento}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setDescuento(val > subtotalCarrito ? subtotalCarrito : val); // Protección lógica
+                  }}
+                  className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none focus:ring-1 focus:ring-amber-600 transition-all"
+                  placeholder="0.00"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
                   <button 
@@ -371,8 +401,11 @@ export default function ModuloVentas() {
               </div>
 
               <div className="flex justify-between items-end px-2">
-                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total a Cobrar</p>
-                <p className="text-5xl font-black text-white italic tracking-tighter">S/ {totalVenta.toFixed(2)}</p>
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total Final</p>
+                <div className="text-right">
+                   {descuento > 0 && <p className="text-[10px] text-zinc-600 line-through font-bold">S/ {subtotalCarrito.toFixed(2)}</p>}
+                   <p className="text-5xl font-black text-white italic tracking-tighter">S/ {totalFinal.toFixed(2)}</p>
+                </div>
               </div>
               
               <button 
