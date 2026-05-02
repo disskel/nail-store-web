@@ -89,14 +89,14 @@ export const apiService = {
     return res.json();
   },
 
-  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 19]
+  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
     return res.json();
   },
 
-  // Ajuste manual de precios (Sincronización con el Backend)[cite: 19]
+  // Ajuste manual de precios (Sincronización con el Backend)
   async actualizarPreciosProducto(id: string, data: { costo_unidad: number, precio_menor: number, precio_mayor: number }) {
     const response = await fetch(`${API_URL}/productos/${id}/precios`, {
       method: 'PUT',
@@ -130,14 +130,14 @@ export const apiService = {
   // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS
   // -------------------------------------------------------------------------
   
-  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 19]
+  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario
   async getHistorialProducto(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial`);
     if (!res.ok) throw new Error('Error al cargar historial del producto');
     return res.json();
   },
 
-  // Obtiene los 3 últimos ingresos para referencia rápida[cite: 19]
+  // Obtiene los 3 últimos ingresos para referencia rápida
   async getHistorialIngresosCorta(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial-ingresos`);
     if (!res.ok) {
@@ -148,9 +148,16 @@ export const apiService = {
   },
 
   // -------------------------------------------------------------------------
-  // 6. MANTENEDOR DE CLIENTES (TRUJILLO)
+  // 6. MANTENEDOR Y CRM DE CLIENTES (ACTUALIZADO)
   // -------------------------------------------------------------------------
   
+  // Obtiene todos los clientes para el nuevo menú "Clientes"
+  async getClientes() {
+    const res = await fetch(`${API_URL}/clientes`);
+    if (!res.ok) throw new Error('Error al listar clientes');
+    return res.json();
+  },
+
   async buscarCliente(numero: string) {
     const res = await fetch(`${API_URL}/clientes/${numero}`);
     if (!res.ok) return null;
@@ -164,6 +171,13 @@ export const apiService = {
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Error al registrar cliente');
+    return res.json();
+  },
+
+  // Obtiene el historial de compras de un cliente para seguimiento de compras
+  async getHistorialCliente(idCliente: string) {
+    const res = await fetch(`${API_URL}/clientes/${idCliente}/historial`);
+    if (!res.ok) throw new Error('Error al cargar historial del cliente');
     return res.json();
   },
 
@@ -187,14 +201,15 @@ export const apiService = {
     return res.json();
   },
 
-  // ACTUALIZADO: Registra la venta, vincula cliente y soporta Nota de Pedido
+  // Registra la venta, vincula cliente y devuelve datos para la Nota de Pedido
   async procesarVenta(data: { 
     items: any[], 
     tipo_documento: string, 
     id_sesion_caja: string, 
     medio_pago: string, 
     descuento?: number, 
-    cliente_data?: any 
+    cliente_data?: any,
+    id_cliente?: string | null
   }) {
     const res = await fetch(`${API_URL}/ventas/procesar`, {
       method: 'POST',
@@ -208,18 +223,27 @@ export const apiService = {
     return res.json();
   },
 
+  // Obtiene el resumen detallado para visualización total de dinero (Caja + Apps)[cite: 19]
   async getResumenCaja(id: string) {
     const res = await fetch(`${API_URL}/caja/resumen/${id}`);
+    if (!res.ok) throw new Error('Error al obtener resumen de caja');
     return res.json();
   },
 
-  async cerrarCaja(id_sesion: string, monto_fisico: number) {
+  // ACTUALIZADO: Soporta arqueo multimodal para corroborar montos en Apps y Banco
+  async cerrarCaja(data: { 
+    id_sesion: string, 
+    monto_fisico_efectivo: number, 
+    monto_yape_contado: number, 
+    monto_plin_contado: number, 
+    monto_transf_contado: number 
+  }) {
     const res = await fetch(`${API_URL}/caja/cerrar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_sesion, monto_fisico }),
+      body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Error al procesar el cierre');
+    if (!res.ok) throw new Error('Error al procesar el cierre multimodal');
     return res.json();
   }
   
