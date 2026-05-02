@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 // IMPORTACIÓN DEL COMPONENTE DE IMPRESIÓN PROFESIONAL
 import NotaPedidoPrint from './components/NotaPedidoPrint';
+import ClienteModal from './components/ClienteModal';
 
 export default function ModuloVentas() {
   // --- 1. ESTADOS DE SESIÓN Y CARGA ---
@@ -28,7 +29,7 @@ export default function ModuloVentas() {
   const [medioPago, setMedioPago] = useState('EFECTIVO');
   const [descuento, setDescuento] = useState(0);
 
-  // --- 4. NUEVOS ESTADOS: MODAL DE CLIENTE Y SEGUIMIENTO[cite: 14, 18] ---
+  // --- 4. NUEVOS ESTADOS: MODAL DE CLIENTE Y SEGUIMIENTO ---
   const [showClienteModal, setShowClienteModal] = useState(false); // Se activa al presionar "Generar Pedido"
   const [clienteDoc, setClienteDoc] = useState('');
   const [clienteData, setClienteData] = useState<any>(null);
@@ -161,7 +162,7 @@ export default function ModuloVentas() {
     return calculado < 0 ? 0 : calculado; 
   }, [subtotalCarrito, descuento]);
 
-  // --- PROCESAMIENTO FINAL: VENTA + NOTA DE PEDIDO[cite: 13, 19, 22] ---
+  // --- PROCESAMIENTO FINAL: VENTA + NOTA DE PEDIDO ---
   const finalizarTransaccion = async () => {
     if (!clienteData?.nombre_razon_social) {
       setMensaje({ texto: '⚠️ IDENTIFIQUE AL CLIENTE PARA CONTINUAR', tipo: 'error' });
@@ -186,7 +187,7 @@ export default function ModuloVentas() {
 
       const resultado = await apiService.procesarVenta(ventaData);
       
-      // PREPARACIÓN DE DATOS PARA COMPONENTE DE IMPRESIÓN[cite: 13]
+      // PREPARACIÓN DE DATOS PARA COMPONENTE DE IMPRESIÓN
       setDatosImpresion({
         items: carrito.map(i => ({
           codigo: i.sku || 'S/C',
@@ -231,7 +232,7 @@ export default function ModuloVentas() {
     }
   };
 
-  // --- LÓGICA DE CIERRE MULTIMODAL (CORROBORACIÓN APP/FÍSICO)[cite: 22] ---
+  // --- LÓGICA DE CIERRE MULTIMODAL (CORROBORACIÓN APP/FÍSICO) ---
   const ejecutarCierre = async () => {
     try {
       setCargando(true);
@@ -302,7 +303,7 @@ export default function ModuloVentas() {
       {/* COMPONENTE DE IMPRESIÓN (OCULTO) */}
       {datosImpresion && <NotaPedidoPrint data={datosImpresion} />}
 
-      {/* MODAL DE SELECCIÓN DE CLIENTE (PASO OBLIGATORIO)[cite: 14, 18] */}
+      {/* MODAL DE SELECCIÓN DE CLIENTE (PASO OBLIGATORIO) */}
       {showClienteModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
@@ -387,7 +388,7 @@ export default function ModuloVentas() {
         </div>
       )}
 
-      {/* MODAL DE ARQUEO MULTIMODAL (CIERRE)[cite: 19, 22] */}
+      {/* MODAL DE ARQUEO MULTIMODAL (CIERRE) */}
       {showCierre && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
           <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl">
@@ -439,7 +440,7 @@ export default function ModuloVentas() {
         </div>
       )}
 
-      {/* CABECERA CON MONITOREO DE CAJA Y BANCOS[cite: 19] */}
+      {/* CABECERA CON MONITOREO DE CAJA Y BANCOS */}
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Punto de Venta</h1>
@@ -447,7 +448,7 @@ export default function ModuloVentas() {
         </div>
         
         <div className="flex gap-4 items-center">
-          {/* VISUALIZACIÓN DE DINERO TOTAL (REQUERIMIENTO)[cite: 19] */}
+          {/* VISUALIZACIÓN DE DINERO TOTAL (REQUERIMIENTO) */}
           <div className="bg-zinc-900/50 border border-zinc-800 px-8 py-5 rounded-3xl text-right border-indigo-500/30 backdrop-blur-md">
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Total en Sistema (INC. INICIAL)</p>
             <p className="text-2xl text-white font-black italic tracking-tighter">S/ {Number(resumenSesion?.total_general_caja_bancos || 0).toFixed(2)}</p>
@@ -506,6 +507,13 @@ export default function ModuloVentas() {
                 <div key={item.id} className="p-5 bg-black/40 border border-zinc-800/50 rounded-3xl relative">
                   <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
                   <p className="text-[11px] font-black text-white uppercase leading-tight pr-6">{item.nombre}</p>
+                  
+                  {/* SELECTOR DE PRECIO (MENOR/MAYOR) */}
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MENOR</button>
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MAYOR</button>
+                  </div>
+
                   <div className="flex justify-between items-center bg-black/60 p-3 mt-4 rounded-2xl">
                     <div className="flex items-center gap-3">
                       <button onClick={() => actualizarCantidad(item.id, item.cantidad - 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">-</button>
@@ -553,7 +561,7 @@ export default function ModuloVentas() {
                 onClick={() => setShowClienteModal(true)} 
                 className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}
               >
-                {procesandoVenta ? 'REGISTRANDO...' : '🚀 GENERAR PEDIDO'}
+                {procesandoVenta ? 'ESPERE...' : '🚀 GENERAR PEDIDO'}
               </button>
             </div>
           </section>
