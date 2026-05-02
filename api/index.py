@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, márgenes, proveedores y caja diaria",
-    version="1.0.11"
+    version="1.0.12" # ACTUALIZADO: Soporte para Nota de Pedido y Clientes
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
@@ -50,9 +50,57 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
-# 2. MODELOS DE DATOS (PYDANTIC)
+# 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)[cite: 13]
+# -----------------------------------------------------------------------------
+
+def monto_a_letras(monto: float) -> str:
+    """Convierte el total numérico a texto formal para la Nota de Pedido[cite: 13]."""
+    unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
+    decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"]
+    especiales = {11: "ONCE", 12: "DOCE", 13: "TRECE", 14: "CATORCE", 15: "QUINCE"}
+    centenas = ["", "CIEN", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"]
+
+    def convertir_grupo(n):
+        res = ""
+        if n >= 100:
+            res += (centenas[n // 100] if n != 100 else "CIENTO") + " "
+            n %= 100
+        if 10 < n < 20 and n in especiales:
+            res += especiales[n] + " "
+            n = 0
+        elif n >= 10:
+            res += decenas[n // 10] + (" Y " if n % 10 != 0 else "")
+            n %= 10
+        if n > 0:
+            res += unidades[n] + " "
+        return res
+
+    entero = int(monto)
+    decimales = int(round((monto - entero) * 100))
+    
+    palabras = ""
+    if entero == 0: palabras = "CERO "
+    elif entero < 1000: palabras = convertir_grupo(entero)
+    else:
+        miles = entero // 1000
+        resto = entero % 1000
+        palabras = (convertir_grupo(miles) if miles > 1 else "") + "MIL " + convertir_grupo(resto)
+
+    return f"SON {palabras.strip()} CON {decimales:02d}/100 SOLES"
+
+# -----------------------------------------------------------------------------
+# 3. MODELOS DE DATOS (PYDANTIC)
 # Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB
 # -----------------------------------------------------------------------------
+
+class ClienteRequest(BaseModel):
+    """Modelo para el registro y búsqueda de clientes[cite: 14]"""
+    tipo_documento: str # DNI, RUC, VARIOS
+    numero_documento: str
+    nombre_razon_social: str
+    direccion: Optional[str] = None
+    celular: Optional[str] = None
+    contacto_nombre: Optional[str] = None
 
 class ItemVenta(BaseModel):
     id_producto: str
@@ -65,7 +113,10 @@ class VentaRequest(BaseModel):
     id_sesion_caja: str
     medio_pago: Optional[str] = "EFECTIVO"
     observaciones: Optional[str] = None
-    descuento: Optional[float] = 0.0 # NUEVO: Captura el descuento global aplicado en la venta
+    descuento: Optional[float] = 0.0 # Captura el descuento global aplicado en la venta
+    # NUEVOS CAMPOS PARA NOTA DE PEDIDO[cite: 14]
+    id_cliente: Optional[str] = None 
+    cliente_data: Optional[ClienteRequest] = None # Para crear cliente en el momento
 
 class IngresoRequest(BaseModel):
     """Modelo para el registro de entrada de mercancía de proveedores"""
@@ -111,7 +162,7 @@ class ProductoCreateRequest(BaseModel):
     stock_actual: Optional[Any] = 0
 
 # -----------------------------------------------------------------------------
-# 3. ENDPOINTS DE SISTEMA Y SALUD
+# 4. ENDPOINTS DE SISTEMA Y SALUD
 # -----------------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -125,7 +176,7 @@ def health_check():
     }
 
 # -----------------------------------------------------------------------------
-# 4. MÓDULO DE PRODUCTOS E INVENTARIO
+# 5. MÓDULO DE PRODUCTOS E INVENTARIO
 # -----------------------------------------------------------------------------
 
 @app.get("/api/productos/margenes")
@@ -133,7 +184,7 @@ def health_check():
 def obtener_margenes():
     """Calcula márgenes incluyendo todos los indicadores de precio para Trujillo."""
     try:
-        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 19]
+        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 20]
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -141,11 +192,11 @@ def obtener_margenes():
         
         resultado = []
         for p in response.data:
-            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 19]
+            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 20]
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
-            # CAPTURA CORRECTA: Ahora sí obtenemos el precio mayor de la DB[cite: 19]
+            # CAPTURA CORRECTA: Ahora sí obtenemos el precio mayor de la DB[cite: 20]
             p_mayor = float(p.get("precio_mayor") or 0.0)
             stock = int(p.get("stock_actual") or 0)
             
@@ -163,7 +214,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 19]
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 20]
                     "stock": stock,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
@@ -176,7 +227,7 @@ def obtener_margenes():
                     "costo": costo_rep,
                     "costo_maximo": costo_max,
                     "precio": precio,
-                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 19]
+                    "precio_mayor": p_mayor, # AHORA SE ENVÍA AL FRONTEND[cite: 20]
                     "stock": stock,
                     "margen_porcentaje": 0.0
                 })
@@ -268,7 +319,39 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 5. MÓDULO DE CATEGORÍAS (Mantenimiento Completo)
+# 6. MÓDULO DE CLIENTES (MANTENEDOR TRUJILLO)[cite: 14]
+# -----------------------------------------------------------------------------
+
+@app.get("/api/clientes/{numero}")
+def buscar_cliente(numero: str):
+    """Localiza un cliente registrado por su DNI o RUC[cite: 14]."""
+    try:
+        res = supabase.table("clientes").select("*").eq("numero_documento", numero).execute()
+        if res.data and len(res.data) > 0:
+            return res.data[0]
+        return None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/clientes")
+def crear_cliente(req: ClienteRequest):
+    """Registra un nuevo cliente con formato en mayúsculas para el PDF[cite: 14]."""
+    try:
+        data = {
+            "tipo_documento": req.tipo_documento,
+            "numero_documento": req.numero_documento,
+            "nombre_razon_social": req.nombre_razon_social.upper(),
+            "direccion": req.direccion.upper() if req.direccion else None,
+            "celular": req.celular,
+            "contacto_nombre": req.contacto_nombre.upper() if req.contacto_nombre else None
+        }
+        res = supabase.table("clientes").insert(data).execute()
+        return res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# -----------------------------------------------------------------------------
+# 7. MÓDULO DE CATEGORÍAS (Mantenimiento Completo)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/categorias")
@@ -291,7 +374,7 @@ def crear_categoria(req: CategoriaRequest):
         raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO DE DASHBOARD
+# 8. MÓDULO DE DASHBOARD
 # -----------------------------------------------------------------------------
 
 @app.get("/api/dashboard/resumen")
@@ -299,14 +382,14 @@ def crear_categoria(req: CategoriaRequest):
 def obtener_resumen_dashboard():
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
-        # Protección contra valores nulos en el cálculo del valor total[cite: 19]
+        # Protección contra valores nulos en el cálculo del valor total[cite: 20]
         v_total = sum(float(p.get("costo_unitario") or p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 7. MÓDULO DE PROVEEDORES
+# 9. MÓDULO DE PROVEEDORES
 # -----------------------------------------------------------------------------
 
 @app.get("/api/proveedores")
@@ -329,7 +412,7 @@ def crear_proveedor(prov: ProveedorRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE CAJA
+# 10. MÓDULO DE CAJA
 # -----------------------------------------------------------------------------
 
 @app.post("/api/caja/abrir")
@@ -342,22 +425,46 @@ def abrir_caja(req: AperturaCajaRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 9. MÓDULO DE VENTAS (ARQUITECTURA DE CABECERA Y DETALLE)
+# 11. MÓDULO DE VENTAS (ARQUITECTURA DE CABECERA Y DETALLE)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
-    """Registra el evento financiero en 'ventas' y descuenta stock en 'movimientos_inventario'."""
+    """Registra transacción, vincula cliente y gestiona correlativos de Nota de Pedido[cite: 13, 14, 20]."""
     try:
-        # 1. Cálculos de Auditoría Financiera
+        # 1. Resolución de Cliente (Identificar o Crear)[cite: 14]
+        target_cliente_id = venta.id_cliente
+        if not target_cliente_id and venta.cliente_data:
+            existente = buscar_cliente(venta.cliente_data.numero_documento)
+            if existente: target_cliente_id = existente['id']
+            else:
+                nuevo = crear_cliente(venta.cliente_data)
+                target_cliente_id = nuevo['id']
+        
+        if not target_cliente_id:
+            # Fallback a registro "VARIOS" (debe existir en DB con ese tipo)
+            varios = supabase.table("clientes").select("id").eq("tipo_documento", "VARIOS").single().execute()
+            target_cliente_id = varios.data['id']
+
+        # 2. Generación de Correlativo Secuencial (P001-XXXXXXX)[cite: 13]
+        correlativo_final = None
+        if venta.tipo_documento == "NOTA_VENTA":
+            corr_data = supabase.table("correlativos").select("*").eq("tipo_documento", "NOTA_PEDIDO").single().execute()
+            nuevo_num = corr_data.data['ultimo_numero'] + 1
+            correlativo_final = f"{corr_data.data['serie']}-{str(nuevo_num).zfill(corr_data.data['longitud_numero'])}"
+            supabase.table("correlativos").update({"ultimo_numero": nuevo_num}).eq("id", corr_data.data['id']).execute()
+
+        # 3. Cálculos de Auditoría Financiera
         monto_bruto = sum(item.cantidad * item.precio_unitario for item in venta.items)
         monto_descuento = float(venta.descuento or 0.0)
-        monto_neto = max(0.0, monto_bruto - monto_descuento) # El neto es lo que ingresa real
+        monto_neto = max(0.0, monto_bruto - monto_descuento)
 
-        # 2. Insertar Cabecera de Venta para Trazabilidad Total
+        # 4. Insertar Cabecera de Venta[cite: 20]
         res_header = supabase.table("ventas").insert({
             "id_sesion_caja": venta.id_sesion_caja,
+            "id_cliente": target_cliente_id,
+            "correlativo_nota": correlativo_final,
             "monto_bruto": monto_bruto,
             "monto_descuento": monto_descuento,
             "monto_neto": monto_neto,
@@ -370,16 +477,16 @@ def procesar_venta(venta: VentaRequest):
         
         id_venta_db = res_header.data[0]['id']
 
-        # 3. Procesar Ítems (Detalle) y Actualizar Stock[cite: 19]
+        # 5. Procesar Ítems (Detalle) y Actualizar Stock[cite: 20]
         for item in venta.items:
-            # Obtener stock actual para el descuento[cite: 19]
+            # Obtener stock actual para el descuento[cite: 20]
             prod = supabase.table("productos").select("stock_actual").eq("id", item.id_producto).single().execute()
             nuevo_stock = (int(prod.data.get('stock_actual') or 0)) - item.cantidad
             
-            # Actualizar Maestro de Productos[cite: 19]
+            # Actualizar Maestro de Productos[cite: 20]
             supabase.table("productos").update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
             
-            # Registrar Movimiento de Inventario Vinculado a la Venta[cite: 19]
+            # Registrar Movimiento de Inventario Vinculado a la Venta[cite: 20]
             supabase.table("movimientos_inventario").insert({
                 "id_producto": item.id_producto, 
                 "tipo_movimiento": "SALIDA", 
@@ -390,18 +497,24 @@ def procesar_venta(venta: VentaRequest):
                 "id_venta": id_venta_db # <--- VINCULACIÓN CRÍTICA
             }).execute()
 
-        return {"status": "success", "id_venta": id_venta_db}
+        # 6. Respuesta para el Frontend (Preparación de Impresión)[cite: 13]
+        return {
+            "status": "success", 
+            "id_venta": id_venta_db,
+            "correlativo": correlativo_final,
+            "total_letras": monto_a_letras(monto_neto)
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error crítico en proceso de venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 10. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
+# 12. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
-    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)[cite: 19]."""
+    """Aumenta stock y garantiza el registro histórico completo (SIN SILENCIADOR)[cite: 20]."""
     try:
         # 1. Obtener estado actual del producto
         prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
@@ -433,7 +546,7 @@ def registrar_ingreso(req: IngresoRequest):
             "referencia": req.documento_referencia or "Ingreso Manual"
         }).execute()
 
-        # 4. Registrar Historial Obligatorio[cite: 19]
+        # 4. Registrar Historial Obligatorio[cite: 20]
         hist_entry = {
             "id_producto": req.id_producto, 
             "costo_anterior": c_ant, 
@@ -449,7 +562,7 @@ def registrar_ingreso(req: IngresoRequest):
         raise HTTPException(status_code=500, detail=f"Error Crítico BD: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 11. MÓDULO DE TRAZABILIDAD Y CONTEXTO
+# 13. MÓDULO DE TRAZABILIDAD Y CONTEXTO
 # -----------------------------------------------------------------------------
 
 @app.get("/api/productos/{producto_id}/historial-ingresos")
@@ -508,7 +621,7 @@ def obtener_reporte_completo():
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 12. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO PRECISO[cite: 19]
+# 14. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO PRECISO[cite: 20]
 # -----------------------------------------------------------------------------
 
 @app.get("/api/caja/estado-actual")
@@ -536,7 +649,7 @@ def obtener_estado_caja():
 def obtener_resumen_caja(sesion_id: str):
     """Calcula ventas acumuladas usando la cabecera 'ventas' para mayor precisión en arqueos."""
     try:
-        # 1. Obtener datos de la sesión para el monto inicial[cite: 19]
+        # 1. Obtener datos de la sesión para el monto inicial[cite: 20]
         sesion = supabase.table("sesiones_caja").select("monto_inicial").eq("id", sesion_id).single().execute()
         if not sesion.data:
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
@@ -587,14 +700,14 @@ def obtener_resumen_caja(sesion_id: str):
 def cerrar_caja(req: CierreCajaRequest):
     """Finaliza el turno, calcula descuadres y bloquea la terminal."""
     try:
-        # 1. Obtener el resumen actualizado con montos netos[cite: 19]
+        # 1. Obtener el resumen actualizado con montos netos[cite: 20]
         resumen = obtener_resumen_caja(req.id_sesion)
         
         m_sistema_efectivo = resumen["saldo_esperado_efectivo"]
         m_sistema_total = resumen["total_general_sistema"]
         diferencia = req.monto_fisico - m_sistema_efectivo
 
-        # 2. Actualizar Tabla Maestra de Sesiones[cite: 19]
+        # 2. Actualizar Tabla Maestra de Sesiones[cite: 20]
         supabase.table("sesiones_caja").update({
             "monto_final_contado": req.monto_fisico,
             "monto_final_sistema": m_sistema_efectivo,

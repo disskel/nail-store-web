@@ -89,15 +89,14 @@ export const apiService = {
     return res.json();
   },
 
-  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 18]
+  // Obtiene productos con sus proveedores y costos (incluye costo_maximo)[cite: 19]
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
     return res.json();
   },
 
-  // ACTUALIZACIÓN: Ajuste manual de precios (Sincronización con el Backend)
-  // Esta función es vital para que el Shampoo y otros productos carguen sus datos correctamente
+  // Ajuste manual de precios (Sincronización con el Backend)[cite: 19]
   async actualizarPreciosProducto(id: string, data: { costo_unidad: number, precio_menor: number, precio_mayor: number }) {
     const response = await fetch(`${API_URL}/productos/${id}/precios`, {
       method: 'PUT',
@@ -128,17 +127,17 @@ export const apiService = {
   },
 
   // -------------------------------------------------------------------------
-  // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS y GESTIÓN DE VENTAS Y CAJA (POS)
+  // 5. TRAZABILIDAD Y CONSULTAS HISTÓRICAS
   // -------------------------------------------------------------------------
   
-  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 18]
+  // Obtiene la hoja de vida completa (entradas/salidas) para el Inventario[cite: 19]
   async getHistorialProducto(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial`);
     if (!res.ok) throw new Error('Error al cargar historial del producto');
     return res.json();
   },
 
-  // Obtiene los 3 últimos ingresos para referencia rápida[cite: 18]
+  // Obtiene los 3 últimos ingresos para referencia rápida[cite: 19]
   async getHistorialIngresosCorta(id: string) {
     const res = await fetch(`${API_URL}/productos/${id}/historial-ingresos`);
     if (!res.ok) {
@@ -147,6 +146,30 @@ export const apiService = {
     }
     return res.json();
   },
+
+  // -------------------------------------------------------------------------
+  // 6. MANTENEDOR DE CLIENTES (TRUJILLO)
+  // -------------------------------------------------------------------------
+  
+  async buscarCliente(numero: string) {
+    const res = await fetch(`${API_URL}/clientes/${numero}`);
+    if (!res.ok) return null;
+    return res.json();
+  },
+
+  async registrarCliente(data: any) {
+    const res = await fetch(`${API_URL}/clientes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Error al registrar cliente');
+    return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // 7. GESTIÓN DE VENTAS Y CAJA (POS)
+  // -------------------------------------------------------------------------
 
   async getEstadoCaja() {
     const res = await fetch(`${API_URL}/caja/estado-actual`);
@@ -164,8 +187,15 @@ export const apiService = {
     return res.json();
   },
 
-  // NUEVA FUNCIÓN: Registra la venta y descuenta stock en tiempo real
-  async procesarVenta(data: { items: any[], tipo_documento: string, id_sesion_caja: string, medio_pago: string }) {
+  // ACTUALIZADO: Registra la venta, vincula cliente y soporta Nota de Pedido
+  async procesarVenta(data: { 
+    items: any[], 
+    tipo_documento: string, 
+    id_sesion_caja: string, 
+    medio_pago: string, 
+    descuento?: number, 
+    cliente_data?: any 
+  }) {
     const res = await fetch(`${API_URL}/ventas/procesar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -178,7 +208,6 @@ export const apiService = {
     return res.json();
   },
 
-  // NUEVA FUNCIÓN: End point de Ventas Acumuladas
   async getResumenCaja(id: string) {
     const res = await fetch(`${API_URL}/caja/resumen/${id}`);
     return res.json();

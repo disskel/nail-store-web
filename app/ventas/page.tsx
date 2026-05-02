@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
+// IMPORTACIÓN DEL NUEVO COMPONENTE DE IMPRESIÓN
+import NotaPedidoPrint from './components/NotaPedidoPrint';
 
 export default function ModuloVentas() {
   // --- ESTADOS DE SESIÓN Y CARGA ---
@@ -21,7 +23,16 @@ export default function ModuloVentas() {
   const [busqueda, setFiltro] = useState('');
   const [carrito, setCarrito] = useState<any[]>([]);
   const [medioPago, setMedioPago] = useState('EFECTIVO');
-  const [descuento, setDescuento] = useState(0); // NUEVO: Estado para capturar descuento global
+  const [descuento, setDescuento] = useState(0); // Captura el descuento global aplicado en la venta
+
+  // --- ESTADOS: GESTIÓN DE CLIENTES Y NOTA DE PEDIDO[cite: 20] ---
+  const [isNotaPedido, setIsNotaPedido] = useState(false); // Alternar entre Venta Rápida y Pedido
+  const [clienteDoc, setClienteDoc] = useState(''); // DNI o RUC para búsqueda
+  const [clienteData, setClienteData] = useState<any>(null); // Datos del cliente encontrado o nuevo
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
+
+  // --- NUEVO ESTADO: DATOS PARA EL MOTOR DE IMPRESIÓN ---
+  const [datosImpresion, setDatosImpresion] = useState<any>(null);
 
   // 1. CARGA INICIAL Y SEGURIDAD
   async function inicializarPOS() {
@@ -33,7 +44,6 @@ export default function ModuloVentas() {
       
       if (status.esta_abierta) {
         setSesionActiva(status.sesion);
-        // Cargar los totales acumulados para la visualización superior
         const resumen = await apiService.getResumenCaja(status.sesion.id);
         setResumenSesion(resumen);
       } else {
@@ -49,7 +59,7 @@ export default function ModuloVentas() {
 
   useEffect(() => { inicializarPOS(); }, []);
 
-  // 2. LÓGICA DE BÚSQUEDA FILTRADA
+  // 2. LÓGICA DE BÚSQUEDA FILTRADA (FRONTEND)
   const productosFiltrados = useMemo(() => {
     if (!busqueda) return [];
     return productos.filter(p => 
@@ -105,6 +115,32 @@ export default function ModuloVentas() {
     setCarrito(prev => prev.filter(item => item.id !== id));
   };
 
+  // --- LÓGICA DE CLIENTES (TRUJILLO)[cite: 14] ---
+  const buscarClienteRapido = async () => {
+    if (!clienteDoc) return;
+    setBuscandoCliente(true);
+    try {
+      const res = await apiService.buscarCliente(clienteDoc);
+      if (res) {
+        setClienteData(res);
+        setMensaje({ texto: '👤 CLIENTE LOCALIZADO', tipo: 'success' });
+      } else {
+        setClienteData({ 
+          numero_documento: clienteDoc, 
+          nombre_razon_social: '', 
+          direccion: '',
+          tipo_documento: clienteDoc.length === 8 ? 'DNI' : 'RUC' 
+        });
+        setMensaje({ texto: '🆕 CLIENTE NO REGISTRADO', tipo: 'error' });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBuscandoCliente(false);
+      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 2000);
+    }
+  };
+
   // --- LÓGICA DE CÁLCULOS FINANCIEROS (CON DESCUENTO) ---
   const subtotalCarrito = useMemo(() => {
     return carrito.reduce((acc, item) => acc + (item.precioSeleccionado * item.cantidad), 0);
@@ -112,12 +148,18 @@ export default function ModuloVentas() {
 
   const totalFinal = useMemo(() => {
     const calculado = subtotalCarrito - descuento;
-    return calculado < 0 ? 0 : calculado; // Evitar que el total sea negativo
+    return calculado < 0 ? 0 : calculado; 
   }, [subtotalCarrito, descuento]);
 
-  // 4. REGISTRO FINAL DE VENTA EN BASE DE DATOS
+  // 4. REGISTRO FINAL DE VENTA Y GENERACIÓN DE NOTA DE PEDIDO[cite: 13, 14, 20]
   const confirmarVenta = async () => {
     if (carrito.length === 0) return;
+    
+    if (isNotaPedido && clienteData && !clienteData.nombre_razon_social) {
+      setMensaje({ texto: '⚠️ EL NOMBRE DEL CLIENTE ES OBLIGATORIO', tipo: 'error' });
+      return;
+    }
+
     setProcesandoVenta(true);
     try {
       const ventaData = {
@@ -126,21 +168,51 @@ export default function ModuloVentas() {
           cantidad: i.cantidad,
           precio_unitario: i.precioSeleccionado
         })),
-        tipo_documento: "NOTA_VENTA",
+        tipo_documento: isNotaPedido ? "NOTA_VENTA" : "PROFORMA", 
         id_sesion_caja: sesionActiva.id,
         medio_pago: medioPago,
-        descuento: descuento // NUEVO: Enviar descuento al backend para trazabilidad[cite: 21]
+        descuento: descuento,
+        cliente_data: isNotaPedido ? clienteData : null 
       };
 
-      await apiService.procesarVenta(ventaData);
-      setMensaje({ texto: '✅ VENTA REALIZADA CON ÉXITO', tipo: 'success' });
+      const resultado = await apiService.procesarVenta(ventaData);
       
-      // Limpiar estados locales tras éxito[cite: 21]
+      // --- PREPARACIÓN DE DATOS PARA IMPRESIÓN[cite: 13, 19] ---
+      if (isNotaPedido) {
+        setDatosImpresion({
+          items: carrito.map(i => ({
+            codigo: i.sku || 'S/C',
+            cantidad: i.cantidad,
+            descripcion: i.nombre,
+            precio_unitario: i.precioSeleccionado,
+            total: i.precioSeleccionado * i.cantidad
+          })),
+          cliente: clienteData || { nombre_razon_social: "VARIOS / PÚBLICO GENERAL", numero_documento: "00000000" },
+          correlativo: resultado.correlativo,
+          total_letras: resultado.total_letras,
+          subtotal: subtotalCarrito,
+          descuento_global: descuento,
+          total_pagar: totalFinal,
+          fecha: new Date().toLocaleDateString('es-PE'),
+          vendedor: "Usuario Administrador"
+        });
+
+        // Disparo de impresión tras un breve delay para renderizado del componente oculto
+        setTimeout(() => {
+          window.print();
+          setDatosImpresion(null); // Limpiar tras imprimir
+        }, 800);
+      }
+
+      setMensaje({ texto: '✅ PROCESADO CON ÉXITO', tipo: 'success' });
+      
+      // Limpieza de estados locales
       setCarrito([]);
       setDescuento(0); 
+      setClienteData(null);
+      setClienteDoc('');
       setMedioPago('EFECTIVO');
       
-      // REFRESCAR TOTALES: Sincronización inmediata de stock y caja
       const [resumenActualizado, catalogActualizado] = await Promise.all([
         apiService.getResumenCaja(sesionActiva.id),
         apiService.getProductosParaIngreso()
@@ -156,7 +228,7 @@ export default function ModuloVentas() {
     }
   };
 
-  // 5. LÓGICA DE CIERRE DEFINITIVO (BLOQUEO DE CAJA)[cite: 21]
+  // 5. LÓGICA DE CIERRE DEFINITIVO
   const ejecutarCierre = async () => {
     try {
       setCargando(true);
@@ -164,10 +236,7 @@ export default function ModuloVentas() {
       setSesionActiva(null);
       setResumenSesion(null);
       setShowCierre(false);
-      setMensaje({ 
-        texto: `✅ CAJA CERRADA. DIFERENCIA: S/ ${res.diferencia.toFixed(2)}`, 
-        tipo: res.diferencia === 0 ? 'success' : 'error' 
-      });
+      setMensaje({ texto: `✅ CAJA CERRADA`, tipo: 'success' });
     } catch (e) {
       alert("Error al procesar el cierre");
     } finally {
@@ -189,7 +258,7 @@ export default function ModuloVentas() {
   };
 
   if (cargando) return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950 text-emerald-500 font-black tracking-widest uppercase">Sincronizando Terminal...</div>
+    <div className="flex h-screen items-center justify-center bg-zinc-950 text-emerald-500 font-black tracking-widest uppercase italic">Sincronizando Terminal...</div>
   );
 
   // INTERFAZ A: APERTURA (Bloqueo de Terminal)
@@ -203,17 +272,14 @@ export default function ModuloVentas() {
             <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Se requiere apertura de caja para vender</p>
           </div>
           <div className="space-y-6">
-            <div className="space-y-2">
-               <label className="text-[10px] font-black text-zinc-500 uppercase ml-3">Saldo Inicial (S/)</label>
-               <input 
-                type="number" 
-                value={montoApertura === 0 ? '' : montoApertura}
-                onChange={(e) => setMontoApertura(parseFloat(e.target.value) || 0)}
-                placeholder="0.00"
-                className="w-full p-6 bg-black border border-zinc-800 rounded-3xl text-center text-4xl font-black text-emerald-500 outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-              />
-            </div>
-            <button onClick={manejarApertura} className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-3xl text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 transition-all active:scale-95">🔓 Iniciar Turno de Venta</button>
+            <input 
+              type="number" 
+              value={montoApertura === 0 ? '' : montoApertura}
+              onChange={(e) => setMontoApertura(parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+              className="w-full p-6 bg-black border border-zinc-800 rounded-3xl text-center text-4xl font-black text-emerald-500 outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            />
+            <button onClick={manejarApertura} className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-3xl text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 transition-all active:scale-95">🔓 Iniciar Turno</button>
           </div>
         </div>
       </div>
@@ -224,46 +290,31 @@ export default function ModuloVentas() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* MODAL DE ARQUEO DE CAJA (Cierre de Turno)[cite: 21] */}
+      {/* RENDERIZADO DEL COMPONENTE DE IMPRESIÓN (Invisible excepto en impresión)[cite: 13, 19] */}
+      {datosImpresion && <NotaPedidoPrint data={datosImpresion} />}
+
+      {/* MODAL DE ARQUEO DE CAJA */}
       {showCierre && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
           <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-lg shadow-2xl">
             <div className="mb-10 text-center">
               <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Arqueo de Caja</h2>
-              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-2">Validación de Efectivo Físico</p>
             </div>
-            
             <div className="space-y-8">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-5 bg-black rounded-3xl border border-zinc-800 text-center">
-                  <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Monto Inicial</p>
-                  <p className="text-xl text-white font-black">S/ {sesionActiva.monto_inicial.toFixed(2)}</p>
-                </div>
-                <div className="p-5 bg-black rounded-3xl border border-zinc-800 text-center">
-                  <p className="text-[9px] text-zinc-500 font-black uppercase mb-1">Ventas Cash</p>
-                  <p className="text-xl text-emerald-400 font-black">S/ {(resumenSesion?.desglose_pagos?.EFECTIVO || 0).toFixed(2)}</p>
-                </div>
-              </div>
-
               <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2.5rem] text-center">
                  <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mb-2">Total Esperado en Efectivo</p>
                  <p className="text-5xl text-white font-black italic tracking-tighter">S/ {(resumenSesion?.saldo_esperado_efectivo || 0).toFixed(2)}</p>
               </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-4">Monto Contado en Mano (S/)</label>
-                <input 
-                  type="number" 
-                  autoFocus 
-                  value={montoFisico === 0 ? '' : montoFisico} 
-                  onChange={e => setMontoFisico(parseFloat(e.target.value) || 0)} 
-                  className="w-full p-8 bg-black border border-zinc-800 rounded-3xl text-center text-4xl font-black text-white outline-none focus:ring-2 focus:ring-emerald-500" 
-                />
-              </div>
-
+              <input 
+                type="number" 
+                autoFocus 
+                value={montoFisico === 0 ? '' : montoFisico} 
+                onChange={e => setMontoFisico(parseFloat(e.target.value) || 0)} 
+                className="w-full p-8 bg-black border border-zinc-800 rounded-3xl text-center text-4xl font-black text-white outline-none focus:ring-2 focus:ring-emerald-500" 
+              />
               <div className="flex gap-4 pt-4">
-                <button onClick={() => setShowCierre(false)} className="flex-1 py-5 text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Cancelar</button>
-                <button onClick={ejecutarCierre} className="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 transition-all">Finalizar Turno</button>
+                <button onClick={() => setShowCierre(false)} className="flex-1 py-5 text-zinc-500 font-bold uppercase text-[10px]">Cancelar</button>
+                <button onClick={ejecutarCierre} className="flex-1 py-5 bg-red-600 text-white font-black rounded-2xl uppercase text-[10px]">Finalizar Turno</button>
               </div>
             </div>
           </div>
@@ -276,23 +327,12 @@ export default function ModuloVentas() {
           <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Caja Activa • Trujillo Centro</p>
         </div>
         
-        {/* PANEL DE TOTALES DINÁMICOS Y CIERRE */}
         <div className="flex gap-4 items-center">
           <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
             <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Ventas del Turno</p>
             <p className="text-xl text-emerald-400 font-black">S/ {Number(resumenSesion?.total_ventas || 0).toFixed(2)}</p>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right border-indigo-500/30">
-            <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Efectivo en Caja</p>
-            <p className="text-xl text-white font-black">S/ {Number(resumenSesion?.saldo_esperado_efectivo || sesionActiva.monto_inicial).toFixed(2)}</p>
-          </div>
-          <button 
-            onClick={() => setShowCierre(true)} 
-            className="p-5 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-red-600/20 hover:border-red-500/30 transition-all text-xl" 
-            title="Arqueo y Cierre de Caja"
-          >
-            🔐
-          </button>
+          <button onClick={() => setShowCierre(true)} className="p-5 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-red-600/20 transition-all text-xl">🔐</button>
         </div>
       </header>
 
@@ -312,19 +352,14 @@ export default function ModuloVentas() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {productosFiltrados.map(p => (
-              <button 
-                key={p.id} 
-                onClick={() => agregarAlCarrito(p)}
-                className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all group active:scale-95"
-              >
+              <button key={p.id} onClick={() => agregarAlCarrito(p)} className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all active:scale-95 group">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
-                    <span className="text-[8px] font-black text-zinc-500 uppercase tracking-tighter italic">📦 {p.proveedor}</span>
+                    <span className="text-[8px] font-black text-zinc-500 uppercase italic">📦 {p.proveedor}</span>
                   </div>
                   <span className="text-[10px] font-black text-zinc-500 bg-black px-2 py-1 rounded-lg border border-zinc-800">STOCK: {p.stock}</span>
                 </div>
-                
                 <h3 className="font-black text-white text-lg leading-tight uppercase group-hover:text-indigo-400 transition-colors">{p.nombre}</h3>
                 <p className="mt-4 text-2xl font-black text-white italic">S/ {Number(p.precio).toFixed(2)}</p>
               </button>
@@ -332,25 +367,68 @@ export default function ModuloVentas() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO AVANZADO[cite: 21] */}
+        {/* COLUMNA DERECHA: CARRITO Y GESTIÓN DE NOTA DE PEDIDO[cite: 13, 14, 20] */}
         <div className="space-y-6">
-          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta
-            </h2>
+          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative">
+            
+            {/* BOTÓN TOGGLE: MODO DE VENTA */}
+            <button 
+              onClick={() => setIsNotaPedido(!isNotaPedido)}
+              className={`mb-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+                isNotaPedido ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-black border-zinc-800 text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {isNotaPedido ? '📝 MODO: NOTA DE PEDIDO ACTIVA' : '⚡ MODO: VENTA RÁPIDA'}
+            </button>
 
-            <div className="flex-1 space-y-4 overflow-y-auto max-h-[380px] pr-2 custom-scrollbar">
+            {/* FORMULARIO DE CLIENTE (Solo visible en Nota de Pedido)[cite: 14] */}
+            {isNotaPedido && (
+              <div className="mb-6 space-y-4 p-5 bg-black/40 border border-indigo-500/20 rounded-3xl animate-in fade-in duration-500">
+                <div className="flex gap-2">
+                  <input 
+                    placeholder="DNI / RUC" 
+                    value={clienteDoc} 
+                    onChange={e => setClienteDoc(e.target.value)}
+                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-indigo-600"
+                  />
+                  <button 
+                    onClick={buscarClienteRapido}
+                    className="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs"
+                    disabled={buscandoCliente}
+                  >
+                    {buscandoCliente ? '...' : '🔍'}
+                  </button>
+                </div>
+                
+                {clienteData && (
+                  <div className="space-y-3 animate-in slide-in-from-top duration-300">
+                    <input 
+                      placeholder="NOMBRE / RAZÓN SOCIAL" 
+                      value={clienteData.nombre_razon_social}
+                      onChange={e => setClienteData({...clienteData, nombre_razon_social: e.target.value.toUpperCase()})}
+                      className="w-full bg-transparent border-b border-zinc-800 p-2 text-[10px] font-black text-emerald-400 outline-none uppercase"
+                    />
+                    <input 
+                      placeholder="DIRECCIÓN (OPCIONAL)" 
+                      value={clienteData.direccion || ''}
+                      onChange={e => setClienteData({...clienteData, direccion: e.target.value.toUpperCase()})}
+                      className="w-full bg-transparent border-b border-zinc-800 p-2 text-[9px] font-bold text-zinc-400 outline-none uppercase"
+                    />
+                  </div>
+                )}
+                {!clienteData && <p className="text-[8px] text-zinc-600 font-black uppercase text-center italic">Ingresa documento para identificar cliente</p>}
+              </div>
+            )}
+
+            <div className="flex-1 space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
               {carrito.map(item => (
                 <div key={item.id} className="space-y-4 p-5 bg-black/40 border border-zinc-800/50 rounded-3xl relative group">
-                  <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
-                  
+                  <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500">✕</button>
                   <p className="text-[11px] font-black text-white uppercase leading-tight pr-6">{item.nombre}</p>
-                  
                   <div className="flex gap-2">
-                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-500'}`}>P. MENOR</button>
-                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-500'}`}>P. MAYOR</button>
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MENOR</button>
+                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MAYOR</button>
                   </div>
-
                   <div className="flex justify-between items-center bg-black/60 p-3 rounded-2xl">
                     <div className="flex items-center gap-3">
                       <button onClick={() => actualizarCantidad(item.id, item.cantidad - 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">-</button>
@@ -361,42 +439,28 @@ export default function ModuloVentas() {
                   </div>
                 </div>
               ))}
-              
-              {carrito.length === 0 && (
-                <div className="text-center py-20 opacity-20 italic font-bold text-xs text-zinc-500 uppercase tracking-[0.3em]">Carrito Vacío</div>
-              )}
             </div>
 
             <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6">
-              
-              {/* CAMPO DE DESCUENTO GLOBAL[cite: 21] */}
+              {/* DESCUENTO ESPECIAL */}
               <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-zinc-800/50">
-                <div>
-                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Descuento Especial</p>
-                  <p className="text-[8px] text-zinc-600 font-bold uppercase italic">Monto Fijo (S/)</p>
-                </div>
+                <div><p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Descuento Especial</p></div>
                 <input 
-                  type="number"
-                  step="0.01"
-                  value={descuento === 0 ? '' : descuento}
-                  onChange={(e) => {
+                  type="number" 
+                  step="0.01" 
+                  value={descuento === 0 ? '' : descuento} 
+                  onChange={e => {
                     const val = parseFloat(e.target.value) || 0;
-                    setDescuento(val > subtotalCarrito ? subtotalCarrito : val); // Protección lógica
-                  }}
-                  className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none focus:ring-1 focus:ring-amber-600 transition-all"
-                  placeholder="0.00"
+                    setDescuento(val > subtotalCarrito ? subtotalCarrito : val);
+                  }} 
+                  className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none" 
+                  placeholder="0.00" 
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
-                  <button 
-                    key={metodo}
-                    onClick={() => setMedioPago(metodo)}
-                    className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}
-                  >
-                    {metodo}
-                  </button>
+                  <button key={metodo} onClick={() => setMedioPago(metodo)} className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}>{metodo}</button>
                 ))}
               </div>
 
@@ -413,7 +477,7 @@ export default function ModuloVentas() {
                 onClick={confirmarVenta}
                 className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}
               >
-                {procesandoVenta ? 'REGISTRANDO...' : '🚀 FINALIZAR VENTA'}
+                {procesandoVenta ? 'REGISTRANDO...' : isNotaPedido ? '🚀 GENERAR PEDIDO' : '🚀 FINALIZAR VENTA'}
               </button>
             </div>
           </section>
