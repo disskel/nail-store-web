@@ -1,11 +1,48 @@
 @import "tailwindcss";
 
-/* En Tailwind v4, ya no usamos @tailwind base; 
-  Usamos @import y @layer para extender estilos.
+/* 
+  CONFIGURACIÓN GLOBAL - JEAN NAILS STORE
+  Versión 2.2: Eliminación total de @apply para máxima compatibilidad.
+  Propósito: Garantizar el Dark Mode y el estilo de scroll sin advertencias del editor.
 */
 
 @layer base {
   body {
-    @apply bg-zinc-950 text-white antialiased;
+    /* Mantiene el fondo negro profundo y suavizado de fuente en todo el sistema */
+    background-color: rgb(9, 9, 11); /* Equivalente a bg-zinc-950 */
+    color: rgb(255, 255, 255);       /* Equivalente a text-white */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* 
+  CAPA DE COMPONENTES: custom-scrollbar (CSS ESTÁNDAR)
+  Propósito: Estilizar las barras de desplazamiento para que coincidan 
+  con la estética Zinc/Indigo del sistema sin ocupar espacio excesivo.
+*/
+@layer components {
+  /* 1. Dimensiones del carril de desplazamiento */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  /* 2. Estilo del carril (Track) - Zinc 900 con 50% opacidad */
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background-color: rgba(24, 24, 27, 0.5); 
+    border-radius: 9999px;
+  }
+  
+  /* 3. Estilo del pulgar (Thumb) - Zinc 800 sólido */
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(39, 39, 42); 
+    border-radius: 9999px;
+  }
+
+  /* 4. Efecto de interacción (Hover) - Indigo 600 con 50% opacidad */
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(79, 70, 229, 0.5);
+    cursor: pointer;
   }
 }

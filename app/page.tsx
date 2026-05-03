@@ -1,71 +1,162 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+'use client';
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+import { useEffect, useState } from 'react';
+import { apiService } from '@/services/apiService';
 
-export const metadata: Metadata = {
-  title: "Nail-Store | Gestión",
-  description: "Sistema inteligente para salones de belleza",
-};
+/**
+ * COMPONENTE: Dashboard Principal - JEAN NAILS STORE
+ * Propósito: Centralizar los indicadores clave de rendimiento (KPIs).
+ * Conecta el valor del inventario real con la base de datos de clientes.
+ */
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function Dashboard() {
+  // --- 1. ESTADO DE LAS MÉTRICAS ---
+  // Inicializamos en 0 para que la interfaz se llene dinámicamente al cargar.
+  const [stats, setStats] = useState({
+    valorInventario: 0,
+    totalProductos: 0,
+    totalClientes: 0
+  });
+  const [cargando, setCargando] = useState(true);
+
+  // --- 2. MOTOR DE SINCRONIZACIÓN CON EL BACKEND ---
+  async function cargarEstadisticas() {
+    try {
+      setCargando(true);
+      
+      /**
+       * Ejecutamos peticiones en paralelo (Promise.all)
+       * 1. Traemos el resumen de inventario (Costo total y cantidad de items)
+       * 2. Traemos la lista de clientes para contar cuántos hay registrados
+       */
+      const [resumenInv, listaClientes] = await Promise.all([
+        // Nota: Asegúrate de tener 'getResumenDashboard' definido en tu apiService.ts
+        // que apunte al endpoint '/api/dashboard/resumen' del index.py
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api'}/dashboard/resumen`).then(res => res.json()),
+        apiService.getClientes()
+      ]);
+
+      // --- 3. ACTUALIZACIÓN DEL ESTADO CON DATOS REALES ---
+      setStats({
+        valorInventario: resumenInv.valor_total_inventario || 0, // Extraído del Bloque 8 de index.py
+        totalProductos: resumenInv.total_items || 0,           // Conteo real de filas en tabla productos
+        totalClientes: listaClientes.length || 0               // Longitud del array de clientes CRM
+      });
+    } catch (error) {
+      console.error("Fallo en la sincronización del Dashboard:", error);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  // Hook para cargar los números apenas el usuario abre el sistema
+  useEffect(() => { cargarEstadisticas(); }, []);
+
+  // Pantalla de transición profesional mientras llegan los datos de Trujillo
+  if (cargando) return (
+    <div className="flex h-screen items-center justify-center bg-zinc-950 text-indigo-500 font-black uppercase italic animate-pulse">
+      Sincronizando Dashboard con Supabase...
+    </div>
+  );
+
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full dark`}>
-      <body className="flex flex-col lg:flex-row h-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
+      
+      {/* CABECERA PRINCIPAL */}
+      <header className="mb-12">
+        <h1 className="text-6xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
+        <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2 italic">
+          Gestión Inteligente • Jean Nails Store Trujillo
+        </p>
+      </header>
+
+      {/* REJILLA DE INDICADORES (Bento Grid) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         
-        {/* Barra Lateral - Visible solo en Desktop (lg) */}
-        <aside className="hidden lg:flex w-72 bg-black border-r border-zinc-800 flex-col p-6 shadow-2xl">
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-              N
-            </div>
-            <div>
-              <h2 className="text-xl font-bold tracking-tight">Nail-Store</h2>
-              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Admin Pro</p>
-            </div>
+        {/* MÉTRICA: CAPITAL EN STOCK */}
+        <MetricCard 
+          titulo="Valor del Inventario" 
+          valor={`S/ ${stats.valorInventario.toFixed(2)}`} 
+          sub="Dinero actual invertido en productos"
+          color="text-emerald-400"
+          icon="💰"
+        />
+
+        {/* MÉTRICA: VARIEDAD DE CATÁLOGO */}
+        <MetricCard 
+          titulo="Items en Catálogo" 
+          valor={stats.totalProductos.toString()} 
+          sub="Total de SKU registrados"
+          color="text-indigo-400"
+          icon="📦"
+        />
+
+        {/* MÉTRICA: FIDELIZACIÓN (CRM) */}
+        <MetricCard 
+          titulo="Clientes Registrados" 
+          valor={stats.totalClientes.toString()} 
+          sub="Base de datos de clientes identificados"
+          color="text-amber-400"
+          icon="👤"
+        />
+      </div>
+
+      {/* SECCIÓN DE OPERACIONES Y ESTADO DEL SISTEMA */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* PANEL DE ACCESOS RÁPIDOS */}
+        <section className="bg-zinc-900/40 border border-zinc-800 p-8 rounded-[3rem] backdrop-blur-xl">
+          <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-6">Atajos de Operación</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <QuickActionButton href="/ventas" label="Punto de Venta" desc="Nueva Venta" icon="🛍️" />
+            <QuickActionButton href="/clientes" label="Módulo Clientes" desc="Seguimiento CRM" icon="👥" />
+            <QuickActionButton href="/inventario/ingreso" label="Cargar Stock" desc="Ingreso Mercancía" icon="📥" />
+            <QuickActionButton href="/inventario/nuevo" label="Nuevo Item" desc="Crear Producto" icon="✨" />
           </div>
+        </section>
 
-          <nav className="flex-1 space-y-1">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase px-3 mb-3">Principal</p>
-            <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
-              <span className="text-lg">🏠</span> Dashboard
-            </a>
-            <a href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
-              <span className="text-lg">📊</span> Inventario
-            </a>
-            {/* ACTUALIZACIÓN: Ruta profesional de ingreso de mercancía */}
-            <a href="/inventario/ingreso" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white bg-zinc-900/50 border border-zinc-800">
-              <span className="text-lg">📦</span> Registrar Ingreso
-            </a>
-            <a href="/inventario/nuevo" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
-              <span className="text-lg">✨</span> Nuevo Producto
-            </a>
-          </nav>
+        {/* PANEL DE STATUS TÉCNICO */}
+        <section className="bg-indigo-600/5 border border-indigo-500/20 p-8 rounded-[3rem] flex flex-col justify-center text-center">
+          <div className="text-4xl mb-4">🚀</div>
+          <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Nail-Store v1.0.13</h3>
+          <p className="text-xs text-zinc-500 mt-2 max-w-xs mx-auto font-bold uppercase">
+            Sistema operativo. Todos los servicios de Supabase y Python están en línea y sincronizados.
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}
 
-          <div className="pt-6 border-t border-zinc-800">
-            <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/50 rounded-xl">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium text-zinc-400">Servidor Python Activo</span>
-            </div>
-          </div>
-        </aside>
+// --- SUB-COMPONENTES DE UI PARA EL DASHBOARD ---
 
-        {/* Navegación para Móvil (Solo visible en pantallas pequeñas) */}
-        <nav className="lg:hidden flex justify-around items-center bg-black border-b border-zinc-800 p-4 sticky top-0 z-50">
-          <a href="/" className="text-2xl">🏠</a>
-          <a href="/inventario" className="text-2xl">📊</a>
-          {/* ACTUALIZACIÓN: Ruta móvil centralizada */}
-          <a href="/inventario/ingreso" className="text-2xl bg-indigo-600 p-2 rounded-lg">📦</a>
-          <a href="/inventario/nuevo" className="text-2xl">✨</a>
-        </nav>
+/**
+ * MetricCard: Genera una tarjeta de indicador con estilo Dark.
+ */
+function MetricCard({ titulo, valor, sub, color, icon }: any) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] shadow-2xl hover:border-zinc-700 transition-all group">
+      <div className="flex justify-between items-start mb-4">
+        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{titulo}</span>
+        <span className="text-2xl group-hover:scale-125 transition-transform">{icon}</span>
+      </div>
+      <p className={`text-5xl font-black italic tracking-tighter ${color} mb-2`}>{valor}</p>
+      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">{sub}</p>
+    </div>
+  );
+}
 
-        {/* Contenido Principal */}
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-zinc-950 to-black pb-20 lg:pb-0">
-          {children}
-        </main>
-      </body>
-    </html>
+/**
+ * QuickActionButton: Botón de navegación rápida con iconos grandes.
+ */
+function QuickActionButton({ href, label, desc, icon }: any) {
+  return (
+    <a href={href} className="bg-black border border-zinc-800 p-5 rounded-3xl hover:bg-zinc-800 transition-all flex items-center gap-4 group active:scale-95">
+      <span className="text-2xl">{icon}</span>
+      <div className="text-left">
+        <p className="text-xs font-black text-white uppercase">{label}</p>
+        <p className="text-[9px] text-zinc-600 font-bold uppercase">{desc}</p>
+      </div>
+    </a>
   );
 }
