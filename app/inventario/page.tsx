@@ -11,7 +11,7 @@ import { apiService } from '@/services/apiService';
 
 export default function InventarioDetallado() {
   // -------------------------------------------------------------------------
-  // 1. ESTADOS DEL COMPONENTE
+  // 1. ESTADOS DEL COMPONENTE: Memoria reactiva de la interfaz
   // -------------------------------------------------------------------------
   const [productos, setProductos] = useState<any[]>([]);
   const [historial, setHistorial] = useState<any[]>([]);
@@ -19,26 +19,26 @@ export default function InventarioDetallado() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
-  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO
+  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO DE PRECIOS
   const [showAjuste, setShowAjuste] = useState(false);
   const [itemAjuste, setItemAjuste] = useState<any>(null);
   const [ajusteForm, setAjusteForm] = useState({ costo: 0, menor: 0, mayor: 0 });
   const [guardando, setGuardando] = useState(false);
 
-  // ESTADOS PARA FILTROS AVANZADOS Y GESTIÓN DE ESTADO
+  // ESTADOS PARA FILTROS AVANZADOS Y GESTIÓN DE ESTADO (BORRADO LÓGICO)
   const [showFiltros, setShowFiltros] = useState(false); 
   const [busqueda, setBusqueda] = useState(''); 
   const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); 
   const [filtroProveedor, setFiltroProveedor] = useState('TODOS'); 
   const [soloBajoStock, setSoloBajoStock] = useState(false); 
-  const [mostrarInactivos, setMostrarInactivos] = useState(false); // NUEVO: Interruptor para ver "basura" o inactivos
+  const [mostrarInactivos, setMostrarInactivos] = useState(false); // Switch maestro para ver "basura" o inactivos
 
   // -------------------------------------------------------------------------
-  // 2. CARGA DINÁMICA DE PRODUCTOS (SINCRONIZACIÓN)
+  // 2. CARGA DINÁMICA DE PRODUCTOS: Sincronización con el Backend v1.0.14
   // -------------------------------------------------------------------------
   async function cargarDatos() {
     try {
-      // Llamada al backend v1.0.14 pasando el flag de inactivos
+      // Se pasa el parámetro al backend para decidir si incluir productos archivados
       const data = await apiService.getProductosConMargen(mostrarInactivos);
       setProductos(data);
     } catch (error) {
@@ -48,11 +48,11 @@ export default function InventarioDetallado() {
     }
   }
 
-  // Recargar cuando cambie el interruptor de inactivos
+  // Recarga automática cuando el usuario cambia el filtro de inactivos
   useEffect(() => { cargarDatos(); }, [mostrarInactivos]);
 
   // -------------------------------------------------------------------------
-  // 3. LÓGICA DE FILTRADO INTELIGENTE
+  // 3. LÓGICA DE FILTRADO INTELIGENTE: Procesamiento en cliente para velocidad
   // -------------------------------------------------------------------------
   const categoriasUnicas = useMemo(() => 
     ['TODAS', ...Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))], 
@@ -78,20 +78,20 @@ export default function InventarioDetallado() {
   }, [productos, busqueda, filtroCategoria, filtroProveedor, soloBajoStock]);
 
   // -------------------------------------------------------------------------
-  // 4. LÓGICA DE GESTIÓN (EDICIÓN Y ESTADO)
+  // 4. LÓGICA DE GESTIÓN: Edición rápida y Borrado Lógico
   // -------------------------------------------------------------------------
   
-  // NUEVO: Función para alternar entre Activo e Inactivo (Borrado Lógico)
+  // Función para alternar entre Activo e Inactivo (Ocultar "Basura")
   const toggleEstado = async (id: string, estadoActual: boolean) => {
     try {
       await apiService.updateProducto(id, { activo: !estadoActual });
-      cargarDatos(); // Refrescar lista para ocultar si es necesario
+      cargarDatos(); // Refrescar lista para aplicar el borrado lógico en la vista
     } catch (error) {
       alert("Error al cambiar estado del producto");
     }
   };
 
-  // NUEVO: Función para corregir errores tipográficos en el nombre
+  // Función para corregir errores tipográficos en el nombre directamente
   const editarNombre = async (id: string, nombreActual: string) => {
     const nuevoNombre = prompt("CORREGIR NOMBRE DEL PRODUCTO:", nombreActual);
     if (nuevoNombre && nuevoNombre.trim() !== "" && nuevoNombre !== nombreActual) {
@@ -113,11 +113,7 @@ export default function InventarioDetallado() {
 
   const abrirAjuste = (p: any) => {
     setItemAjuste(p);
-    setAjusteForm({ 
-      costo: p.costo || 0, 
-      menor: p.precio || 0, 
-      mayor: p.precio_mayor || 0 
-    });
+    setAjusteForm({ costo: p.costo || 0, menor: p.precio || 0, mayor: p.precio_mayor || 0 });
     setShowAjuste(true);
   };
 
@@ -139,7 +135,7 @@ export default function InventarioDetallado() {
   };
 
   // -------------------------------------------------------------------------
-  // 5. LÓGICA DE TRAZABILIDAD
+  // 5. LÓGICA DE TRAZABILIDAD: Auditoría histórica de movimientos
   // -------------------------------------------------------------------------
   const verTrazabilidad = async (prod: any) => {
     try {
@@ -204,10 +200,10 @@ export default function InventarioDetallado() {
              >
               {showFiltros ? '✕ Cerrar Filtros' : '⚡ Filtros Avanzados'}
              </button>
-             {/* BOTÓN TOGGLE: VER INACTIVOS */}
+             {/* BOTÓN TOGGLE: VER INACTIVOS (BORRADO LÓGICO) */}
              <button 
               onClick={() => setMostrarInactivos(!mostrarInactivos)}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${mostrarInactivos ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}
+              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${mostrarInactivos ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' : 'bg-zinc-900 text-zinc-600'}`}
              >
               {mostrarInactivos ? '👁️ Viendo Inactivos' : '🙈 Ocultando Basura'}
              </button>
@@ -282,11 +278,11 @@ export default function InventarioDetallado() {
                     </td>
                     <td className="p-8 text-center">
                       <div className="flex justify-center gap-2">
-                        {/* ACCIÓN: EDITAR NOMBRE */}
+                        {/* ACCIÓN: EDITAR NOMBRE (CORRECCIONES) */}
                         <button onClick={() => editarNombre(p.id, p.nombre)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-indigo-600 transition-all shadow-lg" title="Corregir Nombre">✏️</button>
                         {/* ACCIÓN: AJUSTE DE PRECIO */}
                         <button onClick={() => abrirAjuste(p)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg" title="Ajustar Precios">🏷️</button>
-                        {/* ACCIÓN: DESACTIVAR/REPORTE */}
+                        {/* ACCIÓN: DESACTIVAR/REACTIVAR (BORRADO LÓGICO) */}
                         <button onClick={() => toggleEstado(p.id, p.activo)} className={`p-3 rounded-xl transition-all shadow-lg ${p.activo ? 'bg-zinc-800 text-zinc-500 hover:bg-red-600 hover:text-white' : 'bg-emerald-600 text-white'}`} title={p.activo ? "Archivar" : "Reactivar"}>
                           {p.activo ? '🗑️' : '✅'}
                         </button>
@@ -300,7 +296,7 @@ export default function InventarioDetallado() {
           </div>
         </div>
 
-        {/* PANEL DE TRAZABILIDAD (STicky) */}
+        {/* PANEL DE TRAZABILIDAD (STICKY) */}
         <div className="space-y-8">
           <section className="bg-zinc-900/60 border border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8 flex items-center gap-3"><span className="w-2 h-2 bg-indigo-400 rounded-full"></span> Trazabilidad del Ítem</h3>
