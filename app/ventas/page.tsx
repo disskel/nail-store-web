@@ -6,6 +6,12 @@ import { apiService } from '@/services/apiService';
 import NotaPedidoPrint from './components/NotaPedidoPrint';
 import ClienteModal from './components/ClienteModal';
 
+/**
+ * MÓDULO DE VENTAS (POS) - JEAN NAILS STORE
+ * Propósito: Gestionar ventas, vincular clientes y realizar arqueos multimodales.
+ * Incluye lógica de bloqueo de terminal y motor de impresión de Notas de Pedido.
+ */
+
 export default function ModuloVentas() {
   // --- 1. ESTADOS DE SESIÓN Y CARGA ---
   const [cargando, setCargando] = useState(true);
@@ -241,7 +247,7 @@ export default function ModuloVentas() {
         id_sesion: sesionActiva.id,
         monto_fisico_efectivo: montoFisico,
         monto_yape_contado: montoYape,
-        monto_plin_contado: montoPlin,
+        monto_plin_contado: montoPlin, // REQUERIDO POR VERCEL
         monto_transf_contado: montoTransf
       });
       window.location.reload(); // Forzamos recarga para bloquear terminal

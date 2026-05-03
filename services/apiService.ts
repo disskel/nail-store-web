@@ -90,7 +90,6 @@ export const apiService = {
   },
 
   // Obtiene productos con sus proveedores y costos (incluye costo_maximo)
-  // ACTUALIZACIÓN: Soporta parámetro para ver/ocultar inactivos
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
@@ -252,12 +251,12 @@ export const apiService = {
     return res.json();
   },
 
-  // ACTUALIZADO: Soporta arqueo multimodal para corroborar montos en Apps y Banco
+  // RESOLUCIÓN DE ERROR VERCEL: Se cambió monto_plin a monto_plin_contado para sincronizar con el Backend
   async cerrarCaja(data: { 
     id_sesion: string, 
     monto_fisico_efectivo: number, 
     monto_yape_contado: number, 
-    monto_plin: number, 
+    monto_plin_contado: number, 
     monto_transf_contado: number 
   }) {
     const res = await fetch(`${API_URL}/caja/cerrar`, {
