@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react'; // Añadimos useMemo para eficiencia de filtrado
+import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
+
+/**
+ * COMPONENTE: Inventario Detallado - JEAN NAILS STORE
+ * Versión 1.0.14: Incluye Edición de Nombre y Borrado Lógico.
+ * Propósito: Control maestro de existencias, auditoría de stock y gestión de catálogo.
+ */
 
 export default function InventarioDetallado() {
   // -------------------------------------------------------------------------
@@ -13,25 +19,27 @@ export default function InventarioDetallado() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
-  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO (Sincronización de UI)
+  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO
   const [showAjuste, setShowAjuste] = useState(false);
   const [itemAjuste, setItemAjuste] = useState<any>(null);
   const [ajusteForm, setAjusteForm] = useState({ costo: 0, menor: 0, mayor: 0 });
   const [guardando, setGuardando] = useState(false);
 
-  // --- NUEVOS ESTADOS PARA FILTROS AVANZADOS ---
-  const [showFiltros, setShowFiltros] = useState(false); // Controla la visibilidad del panel
-  const [busqueda, setBusqueda] = useState(''); // Texto de búsqueda (Nombre, SKU, Proveedor)
-  const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); // Filtro por chip de categoría
-  const [filtroProveedor, setFiltroProveedor] = useState('TODOS'); // Filtro por selección de proveedor
-  const [soloBajoStock, setSoloBajoStock] = useState(false); // Switch para reposición urgente
+  // ESTADOS PARA FILTROS AVANZADOS Y GESTIÓN DE ESTADO
+  const [showFiltros, setShowFiltros] = useState(false); 
+  const [busqueda, setBusqueda] = useState(''); 
+  const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); 
+  const [filtroProveedor, setFiltroProveedor] = useState('TODOS'); 
+  const [soloBajoStock, setSoloBajoStock] = useState(false); 
+  const [mostrarInactivos, setMostrarInactivos] = useState(false); // NUEVO: Interruptor para ver "basura" o inactivos
 
   // -------------------------------------------------------------------------
-  // 2. CARGA INICIAL DE PRODUCTOS (TRUJILLO CATÁLOGO)
+  // 2. CARGA DINÁMICA DE PRODUCTOS (SINCRONIZACIÓN)
   // -------------------------------------------------------------------------
   async function cargarDatos() {
     try {
-      const data = await apiService.getProductosParaIngreso();
+      // Llamada al backend v1.0.14 pasando el flag de inactivos
+      const data = await apiService.getProductosConMargen(mostrarInactivos);
       setProductos(data);
     } catch (error) {
       setMensaje('❌ ERROR AL SINCRONIZAR EL INVENTARIO');
@@ -40,15 +48,12 @@ export default function InventarioDetallado() {
     }
   }
 
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+  // Recargar cuando cambie el interruptor de inactivos
+  useEffect(() => { cargarDatos(); }, [mostrarInactivos]);
 
   // -------------------------------------------------------------------------
-  // 3. LÓGICA DE FILTRADO ULTRA VELOZ (FRONTEND)
+  // 3. LÓGICA DE FILTRADO INTELIGENTE
   // -------------------------------------------------------------------------
-  
-  // Obtenemos categorías y proveedores únicos para llenar los filtros automáticamente
   const categoriasUnicas = useMemo(() => 
     ['TODAS', ...Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))], 
   [productos]);
@@ -57,7 +62,6 @@ export default function InventarioDetallado() {
     ['TODOS', ...Array.from(new Set(productos.map(p => p.proveedor).filter(Boolean)))], 
   [productos]);
 
-  // Proceso de filtrado dinámico
   const productosFiltrados = useMemo(() => {
     return productos.filter(p => {
       const matchesTexto = 
@@ -67,16 +71,40 @@ export default function InventarioDetallado() {
       
       const matchesCategoria = filtroCategoria === 'TODAS' || p.categoria === filtroCategoria;
       const matchesProveedor = filtroProveedor === 'TODOS' || p.proveedor === filtroProveedor;
-      const matchesStock = !soloBajoStock || (p.stock || 0) < 10; // Consideramos bajo stock < 10 unidades
+      const matchesStock = !soloBajoStock || (p.stock || 0) < 10;
 
       return matchesTexto && matchesCategoria && matchesProveedor && matchesStock;
     });
   }, [productos, busqueda, filtroCategoria, filtroProveedor, soloBajoStock]);
 
   // -------------------------------------------------------------------------
-  // 4. LÓGICA DE AJUSTE RÁPIDO Y SEGURIDAD DE DATOS
+  // 4. LÓGICA DE GESTIÓN (EDICIÓN Y ESTADO)
   // -------------------------------------------------------------------------
   
+  // NUEVO: Función para alternar entre Activo e Inactivo (Borrado Lógico)
+  const toggleEstado = async (id: string, estadoActual: boolean) => {
+    try {
+      await apiService.updateProducto(id, { activo: !estadoActual });
+      cargarDatos(); // Refrescar lista para ocultar si es necesario
+    } catch (error) {
+      alert("Error al cambiar estado del producto");
+    }
+  };
+
+  // NUEVO: Función para corregir errores tipográficos en el nombre
+  const editarNombre = async (id: string, nombreActual: string) => {
+    const nuevoNombre = prompt("CORREGIR NOMBRE DEL PRODUCTO:", nombreActual);
+    if (nuevoNombre && nuevoNombre.trim() !== "" && nuevoNombre !== nombreActual) {
+      try {
+        await apiService.updateProducto(id, { nombre: nuevoNombre.trim().toUpperCase() });
+        cargarDatos();
+      } catch (error) {
+        alert("Error al actualizar el nombre");
+      }
+    }
+  };
+
+  // Lógica de Precios
   const parseInput = (val: string) => {
     if (val === '') return 0;
     const n = parseFloat(val);
@@ -132,7 +160,7 @@ export default function InventarioDetallado() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* MODAL DE AJUSTE RÁPIDO (Se mantiene igual) */}
+      {/* MODAL DE AJUSTE RÁPIDO DE PRECIOS */}
       {showAjuste && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
@@ -176,6 +204,13 @@ export default function InventarioDetallado() {
              >
               {showFiltros ? '✕ Cerrar Filtros' : '⚡ Filtros Avanzados'}
              </button>
+             {/* BOTÓN TOGGLE: VER INACTIVOS */}
+             <button 
+              onClick={() => setMostrarInactivos(!mostrarInactivos)}
+              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${mostrarInactivos ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}
+             >
+              {mostrarInactivos ? '👁️ Viendo Inactivos' : '🙈 Ocultando Basura'}
+             </button>
           </div>
         </div>
         <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl backdrop-blur-md">
@@ -188,58 +223,20 @@ export default function InventarioDetallado() {
       {showFiltros && (
         <div className="mb-10 p-8 bg-zinc-900/80 border border-zinc-800 rounded-[2.5rem] animate-in slide-in-from-top duration-500 shadow-2xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* BUSQUEDA GLOBAL */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Búsqueda Inteligente</label>
-              <input 
-                type="text" 
-                placeholder="Nombre, SKU o Marca..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-              />
+              <input type="text" placeholder="Nombre, SKU o Marca..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
             </div>
-
-            {/* SELECTOR DE PROVEEDOR */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Filtrar por Proveedor</label>
-              <select 
-                value={filtroProveedor}
-                onChange={(e) => setFiltroProveedor(e.target.value)}
-                className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 appearance-none"
-              >
+              <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 appearance-none">
                 {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
               </select>
             </div>
-
-            {/* BOTÓN DE PÁNICO (BAJO STOCK) */}
             <div className="flex flex-col justify-end">
-              <button 
-                onClick={() => setSoloBajoStock(!soloBajoStock)}
-                className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all border ${
-                  soloBajoStock ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'
-                }`}
-              >
+              <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all border ${soloBajoStock ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}>
                 {soloBajoStock ? '⚠️ Mostrando Solo Críticos' : '📦 Mostrar Todo el Stock'}
               </button>
-            </div>
-          </div>
-
-          {/* FILTRO POR CATEGORÍAS (CHIPS) */}
-          <div className="mt-8 pt-8 border-t border-zinc-800/50">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2 block mb-4">Categorías Rápidas</label>
-            <div className="flex flex-wrap gap-2">
-              {categoriasUnicas.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setFiltroCategoria(cat)}
-                  className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${
-                    filtroCategoria === cat ? 'bg-indigo-600 text-white shadow-lg' : 'bg-black border border-zinc-800 text-zinc-500 hover:bg-zinc-800'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
             </div>
           </div>
         </div>
@@ -255,6 +252,7 @@ export default function InventarioDetallado() {
             <table className="w-full text-left">
               <thead className="bg-black/40 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-zinc-800">
                 <tr>
+                  <th className="p-8">Estado</th>
                   <th className="p-8">Información del Producto</th>
                   <th className="p-8 text-center">Stock Actual</th>
                   <th className="p-8 text-right">Costo Maestro</th>
@@ -262,72 +260,63 @@ export default function InventarioDetallado() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {/* AHORA USAMOS PRODUCTOS FILTRADOS */}
                 {productosFiltrados.map((p) => (
-                  <tr key={p.id} className={`transition-all group ${productoSel?.id === p.id ? 'bg-indigo-600/10' : 'hover:bg-white/5'}`}>
+                  <tr key={p.id} className={`transition-all group ${!p.activo ? 'opacity-30 grayscale' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/10' : 'hover:bg-white/5'}`}>
                     <td className="p-8">
-                      <div className="font-black text-white text-lg tracking-tight uppercase">{p.nombre}</div>
+                       <div className={`w-2 h-2 rounded-full ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+                    </td>
+                    <td className="p-8">
+                      <div className="font-black text-white text-lg tracking-tight uppercase leading-tight">{p.nombre}</div>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded font-bold uppercase">{p.categoria}</span>
                         <span className="text-[10px] text-zinc-500 font-bold uppercase">📦 {p.proveedor}</span>
                       </div>
                     </td>
                     <td className="p-8 text-center">
-                      <div className={`inline-block px-5 py-2 rounded-2xl font-black text-sm shadow-inner ${
-                        (p.stock || 0) <= 0 ? 'bg-red-500/20 text-red-500 animate-pulse' : 
-                        (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 
-                        'bg-emerald-500/20 text-emerald-400'
-                      }`}>
+                      <div className={`inline-block px-5 py-2 rounded-2xl font-black text-sm shadow-inner ${ (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400' }`}>
                         {p.stock || 0} UNID
                       </div>
                     </td>
                     <td className="p-8 text-right">
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="font-mono font-black text-white text-xl">S/ {Number(p.costo || 0).toFixed(2)}</div>
-                        {Number(p.costo_maximo || 0) > Number(p.costo || 0) && (
-                          <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-in zoom-in">
-                            <span className="text-[8px] text-emerald-500 font-black uppercase">¡Mejor Precio!</span>
-                            <span className="text-[10px] text-zinc-600 font-bold line-through">S/ {Number(p.costo_maximo || 0).toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className="text-[9px] font-black text-zinc-500 uppercase tracking-widest opacity-60">Techo: S/ {Number(p.costo_maximo || p.costo || 0).toFixed(2)}</div>
-                      </div>
+                      <div className="font-mono font-black text-white text-xl">S/ {Number(p.costo || 0).toFixed(2)}</div>
                     </td>
                     <td className="p-8 text-center">
-                      <div className="flex justify-center gap-3">
-                        <button onClick={() => abrirAjuste(p)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg">🏷️</button>
-                        <button onClick={() => verTrazabilidad(p)} className={`p-3 rounded-xl transition-all shadow-lg ${productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-indigo-600 hover:text-white'}`}>🔍</button>
+                      <div className="flex justify-center gap-2">
+                        {/* ACCIÓN: EDITAR NOMBRE */}
+                        <button onClick={() => editarNombre(p.id, p.nombre)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-indigo-600 transition-all shadow-lg" title="Corregir Nombre">✏️</button>
+                        {/* ACCIÓN: AJUSTE DE PRECIO */}
+                        <button onClick={() => abrirAjuste(p)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg" title="Ajustar Precios">🏷️</button>
+                        {/* ACCIÓN: DESACTIVAR/REPORTE */}
+                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`p-3 rounded-xl transition-all shadow-lg ${p.activo ? 'bg-zinc-800 text-zinc-500 hover:bg-red-600 hover:text-white' : 'bg-emerald-600 text-white'}`} title={p.activo ? "Archivar" : "Reactivar"}>
+                          {p.activo ? '🗑️' : '✅'}
+                        </button>
+                        <button onClick={() => verTrazabilidad(p)} className={`p-3 rounded-xl transition-all shadow-lg ${productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-indigo-600'}`}>🔍</button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {productosFiltrados.length === 0 && (
-              <div className="p-20 text-center text-zinc-600 font-black uppercase text-xs tracking-widest">No se encontraron productos con estos filtros</div>
-            )}
           </div>
         </div>
 
-        {/* COLUMNA 3: PANEL DE TRAZABILIDAD (Sin cambios) */}
+        {/* PANEL DE TRAZABILIDAD (STicky) */}
         <div className="space-y-8">
           <section className="bg-zinc-900/60 border border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8 flex items-center gap-3"><span className="w-2 h-2 bg-indigo-400 rounded-full"></span> Trazabilidad del Ítem</h3>
             {productoSel ? (
               <div className="space-y-8 animate-in slide-in-from-right duration-500">
-                <div className="pb-6 border-b border-zinc-800"><div className="text-2xl font-black text-white uppercase leading-tight tracking-tighter">{productoSel.nombre}</div><p className="text-[10px] text-zinc-500 font-bold uppercase mt-2">Últimos movimientos registrados</p></div>
+                <div className="pb-6 border-b border-zinc-800"><div className="text-2xl font-black text-white uppercase tracking-tighter">{productoSel.nombre}</div></div>
                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
-                  {historial.length > 0 ? (
-                    historial.map((m, i) => (
-                      <div key={i} className="p-5 bg-black/40 rounded-[1.5rem] border border-zinc-800/50 flex justify-between items-center group hover:border-zinc-700 transition-all">
-                        <div className="space-y-1"><div className={`text-[10px] font-black tracking-widest ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'}`}>{m.tipo_movimiento}</div><div className="text-xs font-black text-zinc-300">{new Date(m.fecha).toLocaleDateString()}</div></div>
-                        <div className="text-right"><div className={`text-xl font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-white' : 'text-zinc-400'}`}>{m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}</div><div className="text-[10px] text-zinc-500 font-black tracking-tighter">S/ {Number(m.precio_momento || 0).toFixed(2)}</div></div>
-                      </div>
-                    ))
-                  ) : (<div className="text-center py-10 text-zinc-600 font-bold text-xs uppercase tracking-widest">Sin movimientos previos</div>)}
+                  {historial.map((m, i) => (
+                    <div key={i} className="p-5 bg-black/40 rounded-[1.5rem] border border-zinc-800/50 flex justify-between items-center group hover:border-zinc-700 transition-all">
+                      <div className="space-y-1"><div className={`text-[10px] font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'}`}>{m.tipo_movimiento}</div><div className="text-xs font-black text-zinc-300">{new Date(m.fecha).toLocaleDateString()}</div></div>
+                      <div className="text-xl font-black text-white">{m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ) : (<div className="text-center py-32 space-y-4"><div className="text-5xl opacity-20">📈</div><p className="text-zinc-600 font-black text-xs uppercase tracking-widest leading-loose">Seleccione un producto<br/>para auditar su stock</p></div>)}
+            ) : (<div className="text-center py-32 opacity-20"><div className="text-5xl mb-4">📈</div><p className="text-[10px] font-black uppercase">Seleccione un producto</p></div>)}
           </section>
         </div>
       </div>

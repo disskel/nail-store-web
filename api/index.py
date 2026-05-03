@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 app = FastAPI(
     title="Nail-Store API",
     description="Backend robusto para gestión de inventarios, clientes y auditoría de caja multimodal",
-    version="1.0.13" # ACTUALIZADO: Arqueo multimodal y CRM de Clientes
+    version="1.0.14" # ACTUALIZADO: Edición de productos y Borrado Lógico
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
@@ -165,6 +165,11 @@ class ProductoCreateRequest(BaseModel):
     precio_mayor: Optional[Any] = 0.0
     stock_actual: Optional[Any] = 0
 
+class ProductoUpdateRequest(BaseModel):
+    """Modelo para actualización selectiva de nombre y borrado lógico"""
+    nombre: Optional[str] = None
+    activo: Optional[bool] = None
+
 # -----------------------------------------------------------------------------
 # 4. ENDPOINTS DE SISTEMA Y SALUD
 # -----------------------------------------------------------------------------
@@ -185,28 +190,32 @@ def health_check():
 
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
-def obtener_margenes():
-    """Calcula márgenes incluyendo todos los indicadores de precio para Trujillo."""
+def obtener_margenes(mostrar_inactivos: bool = False):
+    """Calcula márgenes. Permite filtrar productos inactivos (Borrado Lógico)."""
     try:
-        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección
-        response = supabase.table("productos").select(
-            "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
+        query = supabase.table("productos").select(
+            "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, activo, "
             "categorias(nombre), proveedores(nombre)"
-        ).execute()
+        )
+        
+        # Filtro de seguridad: por defecto ocultamos los inactivos
+        if not mostrar_inactivos:
+            query = query.eq("activo", True)
+            
+        response = query.execute()
         
         resultado = []
         for p in response.data:
-            # Aseguramos que siempre existan valores numéricos para evitar errores visuales
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
             p_mayor = float(p.get("precio_mayor") or 0.0)
             stock = int(p.get("stock_actual") or 0)
+            activo_status = p.get("activo", True)
             
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
-            # Cálculo de margen protegido contra división por cero
             if precio > 0:
                 margen_porcentaje = ((precio - costo_rep) / precio) * 100
                 resultado.append({
@@ -219,6 +228,7 @@ def obtener_margenes():
                     "precio": precio,
                     "precio_mayor": p_mayor, 
                     "stock": stock,
+                    "activo": activo_status,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
                 })
             else:
@@ -232,6 +242,7 @@ def obtener_margenes():
                     "precio": precio,
                     "precio_mayor": p_mayor, 
                     "stock": stock,
+                    "activo": activo_status,
                     "margen_porcentaje": 0.0
                 })
         return resultado
@@ -243,7 +254,6 @@ def obtener_margenes():
 def crear_producto(req: ProductoCreateRequest):
     """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
     try:
-        # Validación de reglas de negocio Trujillo
         if not req.id_proveedor or str(req.id_proveedor).strip() == "":
             raise HTTPException(status_code=400, detail="El Proveedor es obligatorio")
         if not req.id_categoria or str(req.id_categoria).strip() == "":
@@ -255,20 +265,20 @@ def crear_producto(req: ProductoCreateRequest):
 
         data = {
             "sku": req.sku, 
-            "nombre": req.nombre, 
+            "nombre": req.nombre.upper(), # Siempre en mayúsculas
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria, 
             "costo_unidad": costo_limpio, 
             "costo_maximo": costo_limpio, 
             "precio_menor": p_menor,
             "precio_mayor": p_mayor, 
-            "stock_actual": 0 # BLOQUEO: Inicia en 0 para forzar Registrar Ingreso
+            "stock_actual": 0,
+            "activo": True
         }
         res = supabase.table("productos").insert(data).execute()
         
         if res.data and len(res.data) > 0:
             new_id = res.data[0]['id']
-            # Historial inicial obligatorio
             supabase.table("historial_precios").insert({
                 "id_producto": new_id, 
                 "costo_anterior": 0.0, 
@@ -280,6 +290,22 @@ def crear_producto(req: ProductoCreateRequest):
         return {"status": "success", "data": res.data[0] if res.data else data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
+
+@app.patch("/api/productos/{producto_id}")
+def actualizar_producto(producto_id: str, req: ProductoUpdateRequest):
+    """Permite corregir el nombre o desactivar el producto (Borrado Lógico)."""
+    try:
+        update_data = {}
+        if req.nombre is not None: update_data["nombre"] = req.nombre.upper()
+        if req.activo is not None: update_data["activo"] = req.activo
+
+        res = supabase.table("productos").update(update_data).eq("id", producto_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+            
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/productos/{producto_id}/precios")
 @app.put("/productos/{producto_id}/precios")
@@ -304,7 +330,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         supabase.table("historial_precios").insert({
             "id_producto": producto_id, 
             "costo_anterior": float(prod_actual.data.get('costo_unidad') or 0.0),
-            "costo_nuevo": float(req.costo_nuevo), 
+            "costo_nuevo": float(req.costo_unidad), 
             "precio_nuevo_menor": float(req.precio_menor),
             "precio_nuevo_mayor": float(req.precio_mayor)
         }).execute()
@@ -384,7 +410,7 @@ def listar_categorias():
 @app.post("/categorias")
 def crear_categoria(req: CategoriaRequest):
     try:
-        data = {"nombre": req.nombre, "descripcion": req.descripcion, "activo": True}
+        data = {"nombre": req.nombre.upper(), "descripcion": req.descripcion, "activo": True}
         res = supabase.table("categorias").insert(data).execute()
         return {"status": "success", "data": res.data[0] if res.data else data}
     except Exception as e:
@@ -398,9 +424,9 @@ def crear_categoria(req: CategoriaRequest):
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard():
     try:
-        res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
-        # Protección contra valores nulos en el cálculo del valor total
-        v_total = sum(float(p.get("costo_unitario") or p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
+        # Solo sumamos valor de productos activos
+        res = supabase.table("productos").select("costo_unidad, stock_actual").eq("activo", True).execute()
+        v_total = sum(float(p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
@@ -422,7 +448,7 @@ def listar_proveedores():
 @app.post("/proveedores")
 def crear_proveedor(prov: ProveedorRequest):
     try:
-        data = {"nombre": prov.nombre, "contacto": prov.contacto, "activo": True}
+        data = {"nombre": prov.nombre.upper(), "contacto": prov.contacto, "activo": True}
         response = supabase.table("proveedores").insert(data).execute()
         return {"status": "success", "data": response.data[0] if response.data else data}
     except Exception as e:

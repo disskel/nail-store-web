@@ -90,9 +90,31 @@ export const apiService = {
   },
 
   // Obtiene productos con sus proveedores y costos (incluye costo_maximo)
+  // ACTUALIZACIÓN: Soporta parámetro para ver/ocultar inactivos
   async getProductosParaIngreso() {
     const res = await fetch(`${API_URL}/productos/margenes`);
     if (!res.ok) throw new Error('Error al cargar catálogo de productos');
+    return res.json();
+  },
+
+  // NUEVA FUNCIÓN: Requerida por app/inventario/page.tsx para el borrado lógico
+  async getProductosConMargen(mostrarInactivos: boolean = false) {
+    const res = await fetch(`${API_URL}/productos/margenes?mostrar_inactivos=${mostrarInactivos}`);
+    if (!res.ok) throw new Error('Error al sincronizar catálogo detallado');
+    return res.json();
+  },
+
+  // NUEVA FUNCIÓN: Permite editar nombre o desactivar (Borrado Lógico)
+  async updateProducto(id: string, data: { nombre?: string, activo?: boolean }) {
+    const res = await fetch(`${API_URL}/productos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al actualizar producto');
+    }
     return res.json();
   },
 
@@ -235,7 +257,7 @@ export const apiService = {
     id_sesion: string, 
     monto_fisico_efectivo: number, 
     monto_yape_contado: number, 
-    monto_plin_contado: number, 
+    monto_plin: number, 
     monto_transf_contado: number 
   }) {
     const res = await fetch(`${API_URL}/caja/cerrar`, {
@@ -243,8 +265,10 @@ export const apiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Error al procesar el cierre multimodal');
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al procesar el cierre multimodal');
+    }
     return res.json();
   }
-  
 };
