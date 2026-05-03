@@ -223,7 +223,7 @@ export const apiService = {
     return res.json();
   },
 
-  // Obtiene el resumen detallado para visualización total de dinero (Caja + Apps)[cite: 19]
+  // Obtiene el resumen detallado para visualización total de dinero (Caja + Apps)
   async getResumenCaja(id: string) {
     const res = await fetch(`${API_URL}/caja/resumen/${id}`);
     if (!res.ok) throw new Error('Error al obtener resumen de caja');

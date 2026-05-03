@@ -148,7 +148,8 @@ export default function ModuloVentas() {
     setClienteData({ 
       id: null, // Indicamos que no es un ID existente
       nombre_razon_social: "VARIOS / PÚBLICO GENERAL", 
-      numero_documento: "00000000" 
+      numero_documento: "00000000",
+      tipo_documento: "VARIOS" // SOLUCIÓN AL ERROR 422: Campo obligatorio en el Backend
     });
   };
 

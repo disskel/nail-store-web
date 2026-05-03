@@ -188,7 +188,7 @@ def health_check():
 def obtener_margenes():
     """Calcula márgenes incluyendo todos los indicadores de precio para Trujillo."""
     try:
-        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección[cite: 20]
+        # CORRECCIÓN: Se añadió "precio_mayor" a la cadena de selección
         response = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, "
             "categorias(nombre), proveedores(nombre)"
@@ -196,7 +196,7 @@ def obtener_margenes():
         
         resultado = []
         for p in response.data:
-            # Aseguramos que siempre existan valores numéricos para evitar errores visuales[cite: 20]
+            # Aseguramos que siempre existan valores numéricos para evitar errores visuales
             costo_rep = float(p.get("costo_unidad") or 0.0)
             costo_max = float(p.get("costo_maximo") or costo_rep) 
             precio = float(p.get("precio_menor") or 0.0)
@@ -399,7 +399,7 @@ def crear_categoria(req: CategoriaRequest):
 def obtener_resumen_dashboard():
     try:
         res = supabase.table("productos").select("costo_unidad, stock_actual").execute()
-        # Protección contra valores nulos en el cálculo del valor total[cite: 20]
+        # Protección contra valores nulos en el cálculo del valor total
         v_total = sum(float(p.get("costo_unitario") or p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
     except Exception as e:
@@ -446,13 +446,13 @@ def abrir_caja(req: AperturaCajaRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)[cite: 13, 20]
+# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)[cite: 13]
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
-    """Registra transacción, vincula cliente y gestiona correlativos formales[cite: 13, 14, 20]."""
+    """Registra transacción, vincula cliente y gestiona correlativos formales[cite: 13, 14]."""
     try:
         # 1. Resolución de Cliente (Identificar o Crear)[cite: 14]
         target_cliente_id = venta.id_cliente
@@ -527,7 +527,7 @@ def procesar_venta(venta: VentaRequest):
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest):
-    """Aumenta stock y garantiza el registro histórico completo[cite: 20]."""
+    """Aumenta stock y garantiza el registro histórico completo."""
     try:
         prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
         if not prod_res.data:
@@ -621,7 +621,7 @@ def obtener_reporte_completo():
         raise HTTPException(status_code=500, detail=f"Error en reporte: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 14. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO MULTIMODAL[cite: 19, 22]
+# 14. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO MULTIMODAL
 # -----------------------------------------------------------------------------
 
 @app.get("/api/caja/estado-actual")
@@ -643,9 +643,9 @@ def obtener_estado_caja():
 
 @app.get("/api/caja/resumen/{sesion_id}")
 def obtener_resumen_caja(sesion_id: str):
-    """Calcula totales acumulados para corroborar con el banco y caja física[cite: 19, 22]."""
+    """Calcula totales acumulados para corroborar con el banco y caja física."""
     try:
-        # 1. Obtener datos de la sesión para el monto inicial[cite: 20]
+        # 1. Obtener datos de la sesión para el monto inicial
         sesion = supabase.table("sesiones_caja").select("monto_inicial").eq("id", sesion_id).single().execute()
         if not sesion.data: raise HTTPException(status_code=404, detail="Sesión no encontrada")
         
@@ -680,13 +680,13 @@ def obtener_resumen_caja(sesion_id: str):
 
 @app.post("/api/caja/cerrar")
 def cerrar_caja(req: CierreCajaRequest):
-    """Finaliza el turno y guarda auditoría detallada de cada método[cite: 22]."""
+    """Finaliza el turno y guarda auditoría detallada de cada método."""
     try:
-        # 1. Obtener el resumen actualizado[cite: 20]
+        # 1. Obtener el resumen actualizado
         resumen = obtener_resumen_caja(req.id_sesion)
         esp_efectivo = resumen["saldo_esperado_efectivo"]
         
-        # 2. Calcular descuadres por cada método[cite: 22]
+        # 2. Calcular descuadres por cada método
         dif_efectivo = req.monto_fisico_efectivo - esp_efectivo
         dif_yape = req.monto_yape_contado - resumen["ventas_por_metodo"]["YAPE"]
         dif_plin = req.monto_plin_contado - resumen["ventas_por_metodo"]["PLIN"]
@@ -694,7 +694,7 @@ def cerrar_caja(req: CierreCajaRequest):
 
         total_diferencia = dif_efectivo + dif_yape + dif_plin + dif_transf
 
-        # 3. Actualizar Sesión Maestra[cite: 20]
+        # 3. Actualizar Sesión Maestra
         supabase.table("sesiones_caja").update({
             "monto_final_contado": req.monto_fisico_efectivo,
             "monto_final_sistema": esp_efectivo,

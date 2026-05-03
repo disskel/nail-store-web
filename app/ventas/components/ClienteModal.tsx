@@ -65,13 +65,14 @@ export default function ClienteModal({ isOpen, onClose, onConfirm, procesandoVen
     }
   };
 
-  // 2. ATAJO: SELECCIÓN RÁPIDA DE PÚBLICO GENERAL (VARIOS)[cite: 14]
+  // 2. ATAJO: SELECCIÓN RÁPIDA DE PÚBLICO GENERAL (VARIOS)
   const seleccionarVarios = () => {
     onConfirm({
       id: null,
       nombre_razon_social: "VARIOS / PÚBLICO GENERAL",
       numero_documento: "00000000",
-      direccion: "TRUJILLO"
+      direccion: "TRUJILLO",
+      tipo_documento: "VARIOS" // SOLUCIÓN AL ERROR 422: Campo obligatorio en el Backend
     });
   };
 
@@ -164,7 +165,7 @@ export default function ClienteModal({ isOpen, onClose, onConfirm, procesandoVen
             </div>
           )}
 
-          {/* ACCIÓN FINAL: PROCESAR VENTA + NOTA DE PEDIDO[cite: 13, 18, 20] */}
+          {/* ACCIÓN FINAL: PROCESAR VENTA + NOTA DE PEDIDO */}
           <button 
             disabled={!clienteEncontrado || procesandoVenta}
             onClick={() => onConfirm(clienteEncontrado)}

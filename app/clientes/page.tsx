@@ -50,7 +50,7 @@ export default function ModuloClientes() {
     setHistorialCompras([]);
     setCargandoHistorial(true);
     try {
-      // Obtiene todas las Notas de Pedido vinculadas a este ID[cite: 23]
+      // Obtiene todas las Notas de Pedido vinculadas a este ID
       const historial = await apiService.getHistorialCliente(cliente.id);
       setHistorialCompras(historial);
     } catch (error) {
@@ -136,7 +136,7 @@ export default function ModuloClientes() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: HOJA DE VIDA / SEGUIMIENTO (1/3)[cite: 23] */}
+        {/* COLUMNA DERECHA: HOJA DE VIDA / SEGUIMIENTO (1/3) */}
         <div className="space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative">
             {!clienteSeleccionado ? (
@@ -170,7 +170,7 @@ export default function ModuloClientes() {
 
                 <hr className="border-zinc-800" />
 
-                {/* HISTORIAL DE COMPRAS[cite: 13, 23] */}
+                {/* HISTORIAL DE COMPRAS */}
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
                     Historial de Notas de Pedido
