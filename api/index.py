@@ -50,11 +50,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # -----------------------------------------------------------------------------
-# 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)[cite: 13]
+# 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)
 # -----------------------------------------------------------------------------
 
 def monto_a_letras(monto: float) -> str:
-    """Convierte el total numérico a texto formal para la Nota de Pedido[cite: 13]."""
+    """Convierte el total numérico a texto formal para la Nota de Pedido."""
     unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
     decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"]
     especiales = {11: "ONCE", 12: "DOCE", 13: "TRECE", 14: "CATORCE", 15: "QUINCE"}
@@ -94,7 +94,7 @@ def monto_a_letras(monto: float) -> str:
 # -----------------------------------------------------------------------------
 
 class ClienteRequest(BaseModel):
-    """Modelo para el registro y búsqueda de clientes[cite: 14]"""
+    """Modelo para el registro y búsqueda de clientes"""
     tipo_documento: str # DNI, RUC, VARIOS
     numero_documento: str
     nombre_razon_social: str
@@ -114,7 +114,7 @@ class VentaRequest(BaseModel):
     medio_pago: Optional[str] = "EFECTIVO"
     observaciones: Optional[str] = None
     descuento: Optional[float] = 0.0 
-    # CAMPOS PARA NOTA DE PEDIDO[cite: 14]
+    # CAMPOS PARA NOTA DE PEDIDO
     id_cliente: Optional[str] = None 
     cliente_data: Optional[ClienteRequest] = None 
 
@@ -314,12 +314,12 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 6. MÓDULO CRM DE CLIENTES (TRUJILLO SEGUIMIENTO)[cite: 14]
+# 6. MÓDULO CRM DE CLIENTES (TRUJILLO SEGUIMIENTO)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/clientes")
 def listar_clientes():
-    """Devuelve la lista completa de clientes para el nuevo menú de seguimiento[cite: 14]."""
+    """Devuelve la lista completa de clientes para el nuevo menú de seguimiento."""
     try:
         res = supabase.table("clientes").select("*").order("nombre_razon_social").execute()
         return res.data
@@ -328,7 +328,7 @@ def listar_clientes():
 
 @app.get("/api/clientes/{numero}")
 def buscar_cliente(numero: str):
-    """Localiza un cliente registrado por su DNI o RUC[cite: 14]."""
+    """Localiza un cliente registrado por su DNI o RUC."""
     try:
         res = supabase.table("clientes").select("*").eq("numero_documento", numero).execute()
         if res.data and len(res.data) > 0:
@@ -352,7 +352,7 @@ def historial_compras_cliente(id_cliente: str):
 
 @app.post("/api/clientes")
 def crear_cliente(req: ClienteRequest):
-    """Registra un nuevo cliente con formato en mayúsculas para el PDF[cite: 14]."""
+    """Registra un nuevo cliente con formato en mayúsculas para el PDF."""
     try:
         data = {
             "tipo_documento": req.tipo_documento,
@@ -446,15 +446,15 @@ def abrir_caja(req: AperturaCajaRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)[cite: 13]
+# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest):
-    """Registra transacción, vincula cliente y gestiona correlativos formales[cite: 13, 14]."""
+    """Registra transacción, vincula cliente y gestiona correlativos formales."""
     try:
-        # 1. Resolución de Cliente (Identificar o Crear)[cite: 14]
+        # 1. Resolución de Cliente (Identificar o Crear)
         target_cliente_id = venta.id_cliente
         if not target_cliente_id and venta.cliente_data:
             existente = buscar_cliente(venta.cliente_data.numero_documento)
@@ -467,7 +467,7 @@ def procesar_venta(venta: VentaRequest):
             varios = supabase.table("clientes").select("id").eq("tipo_documento", "VARIOS").single().execute()
             target_cliente_id = varios.data['id']
 
-        # 2. Generación de Correlativo Secuencial (P001-XXXXXXX)[cite: 13]
+        # 2. Generación de Correlativo Secuencial (P001-XXXXXXX)
         correlativo_final = None
         if venta.tipo_documento == "NOTA_VENTA":
             corr_data = supabase.table("correlativos").select("*").eq("tipo_documento", "NOTA_PEDIDO").single().execute()
@@ -510,7 +510,7 @@ def procesar_venta(venta: VentaRequest):
                 "id_venta": id_venta_db
             }).execute()
 
-        # 6. Respuesta para el Frontend (Preparación de Impresión)[cite: 13]
+        # 6. Respuesta para el Frontend (Preparación de Impresión)
         return {
             "status": "success", 
             "id_venta": id_venta_db,

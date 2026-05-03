@@ -2,30 +2,36 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
+// IMPORTACIÓN DEL COMPONENTE DE FORMULARIO PARA REGISTRO/EDICIÓN
+import ClienteForm from './components/ClienteForm';
 
 /**
- * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM)
- * Propósito: Listar clientes, realizar búsquedas por DNI/Nombre y
- * visualizar la "Hoja de Vida" de compras de cada usuario.
+ * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM) - VERSIÓN COMPLETA
+ * Propósito: Listar clientes registrados, realizar búsquedas dinámicas,
+ * registrar nuevos perfiles y visualizar el historial de ventas (Hoja de Vida).
  */
 
 export default function ModuloClientes() {
-  // --- 1. ESTADOS DE CARGA Y DATOS ---
+  // --- 1. ESTADOS DE CARGA Y DATOS GLOBALES ---
   const [clientes, setClientes] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
-  // --- 2. ESTADOS PARA VISTA DE DETALLE (SEGUIMIENTO) ---
+  // --- 2. ESTADOS PARA VISTA DE DETALLE (TRAZABILIDAD) ---
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any>(null);
   const [historialCompras, setHistorialCompras] = useState<any[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
-  // --- 3. CARGA INICIAL DE CLIENTES ---
+  // --- 3. ESTADO PARA CONTROL DE MODAL DE REGISTRO ---
+  const [showForm, setShowForm] = useState(false);
+
+  // --- 4. CARGA INICIAL DE CLIENTES DESDE EL BACKEND ---
   async function cargarDatos() {
     try {
       setCargando(true);
-      const data = await apiService.getClientes(); // Consumo de nuevo endpoint en v1.0.13
+      // Consumo de endpoint en backend v1.0.13
+      const data = await apiService.getClientes(); 
       setClientes(data);
     } catch (error) {
       setMensaje({ texto: '❌ ERROR AL CARGAR LISTADO DE CLIENTES', tipo: 'error' });
@@ -34,9 +40,10 @@ export default function ModuloClientes() {
     }
   }
 
+  // Disparo automático de carga al montar el componente
   useEffect(() => { cargarDatos(); }, []);
 
-  // --- 4. FILTRADO INTELIGENTE (FRONTEND) ---
+  // --- 5. FILTRADO INTELIGENTE (OPTIMIZADO EN FRONTEND) ---
   const clientesFiltrados = useMemo(() => {
     return clientes.filter(c => 
       c.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -44,13 +51,13 @@ export default function ModuloClientes() {
     );
   }, [busqueda, clientes]);
 
-  // --- 5. LÓGICA DE SEGUIMIENTO DE COMPRAS ---
+  // --- 6. LÓGICA DE SEGUIMIENTO: HOJA DE VIDA DEL CLIENTE ---
   const verDetalleCliente = async (cliente: any) => {
     setClienteSeleccionado(cliente);
     setHistorialCompras([]);
     setCargandoHistorial(true);
     try {
-      // Obtiene todas las Notas de Pedido vinculadas a este ID
+      // Obtiene todas las ventas previas vinculadas al ID único en Supabase
       const historial = await apiService.getHistorialCliente(cliente.id);
       setHistorialCompras(historial);
     } catch (error) {
@@ -60,6 +67,15 @@ export default function ModuloClientes() {
     }
   };
 
+  // --- 7. MANEJADORES DE ÉXITO PARA REGISTROS ---
+  const manejarExitoRegistro = () => {
+    setShowForm(false);
+    cargarDatos(); // Refrescar lista para incluir al nuevo cliente
+    setMensaje({ texto: '✅ OPERACIÓN REALIZADA CON ÉXITO', tipo: 'success' });
+    setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
+  };
+
+  // Pantalla de carga mientras se sincroniza con Trujillo
   if (cargando) return (
     <div className="flex h-screen items-center justify-center bg-zinc-950 text-emerald-500 font-black tracking-widest uppercase italic animate-pulse">
       Cargando Base de Clientes...
@@ -69,6 +85,14 @@ export default function ModuloClientes() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
+      {/* MODAL DEL FORMULARIO (SE DISPARA AL PRESIONAR "NUEVO CLIENTE") */}
+      {showForm && (
+        <ClienteForm 
+          onSuccess={manejarExitoRegistro} 
+          onCancel={() => setShowForm(false)} 
+        />
+      )}
+
       {/* CABECERA DEL MÓDULO */}
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -78,15 +102,23 @@ export default function ModuloClientes() {
           </p>
         </div>
         
-        <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
-          <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
-          <p className="text-2xl text-white font-black">{clientes.length}</p>
+        <div className="flex items-center gap-6">
+          <button 
+            onClick={() => setShowForm(true)}
+            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all active:scale-95"
+          >
+            ➕ Nuevo Cliente
+          </button>
+          <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
+            <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
+            <p className="text-2xl text-white font-black">{clientes.length}</p>
+          </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
-        {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (2/3) */}
+        {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3 DE LA PANTALLA) */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl">
             <input 
@@ -97,6 +129,7 @@ export default function ModuloClientes() {
             />
           </section>
 
+          {/* LISTA DE TARJETAS DE CLIENTES CON SCROLL PERSONALIZADO */}
           <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
             {clientesFiltrados.map(c => (
               <button 
@@ -130,25 +163,25 @@ export default function ModuloClientes() {
             ))}
             {clientesFiltrados.length === 0 && (
               <div className="py-20 text-center text-zinc-700 font-black uppercase italic tracking-widest">
-                No se encontraron coincidencias
+                No se encontraron coincidencias en la base de datos
               </div>
             )}
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: HOJA DE VIDA / SEGUIMIENTO (1/3) */}
+        {/* COLUMNA DERECHA: FICHA DE SEGUIMIENTO (OCUPA 1/3 DE LA PANTALLA) */}
         <div className="space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative">
             {!clienteSeleccionado ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-30">
                 <div className="text-6xl">👤</div>
                 <p className="text-xs font-black uppercase tracking-widest text-zinc-500">
-                  Seleccione un cliente para ver su seguimiento
+                  Seleccione un cliente para ver su historial de compras
                 </p>
               </div>
             ) : (
               <div className="animate-in fade-in duration-500 space-y-8">
-                {/* INFO DE CONTACTO RÁPIDA */}
+                {/* FICHA DE CONTACTO RÁPIDA */}
                 <div className="space-y-2">
                   <h2 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-500">
                     Ficha de Seguimiento
@@ -161,29 +194,25 @@ export default function ModuloClientes() {
                         <span className="text-lg">📱</span>
                         <span className="text-sm font-bold">{clienteSeleccionado.celular || 'Sin celular'}</span>
                      </div>
-                     <div className="flex items-center gap-3 text-zinc-400">
-                        <span className="text-lg">📩</span>
-                        <span className="text-xs font-medium">{clienteSeleccionado.contacto_nombre || 'Sin contacto alterno'}</span>
-                     </div>
                   </div>
                 </div>
 
                 <hr className="border-zinc-800" />
 
-                {/* HISTORIAL DE COMPRAS */}
+                {/* HISTORIAL CRONOLÓGICO DE NOTAS DE PEDIDO */}
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                    Historial de Notas de Pedido
+                    Últimas Notas de Pedido
                   </h3>
                   
                   <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
                     {cargandoHistorial ? (
-                      <p className="text-center py-10 text-[10px] font-black text-zinc-700 animate-pulse">CARGANDO HISTORIAL...</p>
+                      <p className="text-center py-10 text-[10px] font-black text-zinc-700 animate-pulse">RECUPERANDO HISTORIAL...</p>
                     ) : historialCompras.map((compra, idx) => (
                       <div key={idx} className="p-4 bg-black/40 border border-zinc-800 rounded-2xl space-y-2">
                         <div className="flex justify-between items-start">
                           <span className="text-[10px] font-black text-white italic">
-                            {compra.correlativo_nota || 'PEDIDO S/N'}
+                            {compra.correlativo_nota || 'S/N'}
                           </span>
                           <span className={`text-[8px] font-black px-2 py-0.5 rounded ${
                             compra.estado === 'COMPLETADA' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
@@ -199,14 +228,11 @@ export default function ModuloClientes() {
                             S/ {Number(compra.monto_neto).toFixed(2)}
                           </p>
                         </div>
-                        <p className="text-[8px] text-zinc-500 font-bold uppercase">
-                          Pago: {compra.medio_pago}
-                        </p>
                       </div>
                     ))}
                     {!cargandoHistorial && historialCompras.length === 0 && (
                       <p className="text-center py-10 text-[9px] font-bold text-zinc-700 uppercase italic">
-                        No registra compras anteriores
+                        El cliente no registra compras previas
                       </p>
                     )}
                   </div>
@@ -223,7 +249,7 @@ export default function ModuloClientes() {
         </div>
       </div>
 
-      {/* NOTIFICACIONES */}
+      {/* SISTEMA DE NOTIFICACIONES TOAST (UI FEEDBACK) */}
       {mensaje.texto && (
         <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${
           mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'
