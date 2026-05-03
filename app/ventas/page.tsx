@@ -301,190 +301,128 @@ export default function ModuloVentas() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* COMPONENTE DE IMPRESIÓN (OCULTO) */}
-      {datosImpresion && <NotaPedidoPrint data={datosImpresion} />}
-
-      {/* MODAL DE SELECCIÓN DE CLIENTE (PASO OBLIGATORIO) */}
-      {showClienteModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Identificar Cliente</h2>
-                <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-1">Requerido para Nota de Pedido</p>
-              </div>
-              <button onClick={() => setShowClienteModal(false)} className="text-zinc-500 hover:text-white transition-colors">✕</button>
-            </div>
-
-            <div className="space-y-6">
-              {/* BUSCADOR RÁPIDO */}
-              <div className="flex gap-2">
-                <input 
-                  autoFocus
-                  placeholder="DNI / RUC" 
-                  value={clienteDoc} 
-                  onChange={e => setClienteDoc(e.target.value)}
-                  className="flex-1 bg-black border border-zinc-800 p-5 rounded-2xl text-xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                />
-                <button 
-                  onClick={buscarClienteRapido}
-                  className="px-6 bg-zinc-800 rounded-2xl hover:bg-zinc-700 transition-colors"
-                >
-                  {buscandoCliente ? '...' : '🔍'}
-                </button>
-              </div>
-
-              {/* BOTÓN GENÉRICO */}
-              <button 
-                onClick={seleccionarPublicoGeneral}
-                className="w-full py-3 bg-indigo-600/10 border border-indigo-500/30 text-indigo-400 font-black rounded-xl uppercase text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all"
-              >
-                👥 Seleccionar Público General (Varios)
-              </button>
-
-              {/* FORMULARIO DE DATOS (AUTO-RELLENABLE) */}
-              {clienteData && (
-                <div className="p-6 bg-black/40 border border-emerald-500/20 rounded-2xl space-y-4 animate-in slide-in-from-top duration-300">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Nombre / Razón Social</label>
-                    <input 
-                      placeholder="ESCRIBA EL NOMBRE..." 
-                      value={clienteData.nombre_razon_social}
-                      onChange={e => setClienteData({...clienteData, nombre_razon_social: e.target.value.toUpperCase()})}
-                      className="w-full bg-transparent border-b border-zinc-800 p-2 text-sm font-black text-emerald-400 outline-none uppercase"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Dirección</label>
-                      <input 
-                        placeholder="TRUJILLO..." 
-                        value={clienteData.direccion || ''}
-                        onChange={e => setClienteData({...clienteData, direccion: e.target.value.toUpperCase()})}
-                        className="w-full bg-transparent border-b border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none uppercase"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Celular</label>
-                      <input 
-                        placeholder="999..." 
-                        value={clienteData.celular || ''}
-                        onChange={e => setClienteData({...clienteData, celular: e.target.value})}
-                        className="w-full bg-transparent border-b border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button 
-                disabled={procesandoVenta}
-                onClick={finalizarTransaccion}
-                className="w-full py-6 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all"
-              >
-                {procesandoVenta ? 'PROCESANDO...' : '🚀 CONFIRMAR NOTA DE PEDIDO'}
-              </button>
-            </div>
-          </div>
+      {/* COMPONENTE DE IMPRESIÓN (VISIBLE SOLO AL IMPRIMIR) */}
+      {datosImpresion && (
+        <div className="hidden print:block print:absolute print:inset-0 print:z-[500] print:bg-white">
+           <NotaPedidoPrint data={datosImpresion} />
         </div>
       )}
 
-      {/* MODAL DE ARQUEO MULTIMODAL (CIERRE) */}
-      {showCierre && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
-          <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl">
-            <h2 className="text-4xl font-black text-white text-center uppercase italic mb-10 tracking-tighter">Arqueo de Caja y Bancos</h2>
-            
-            <div className="grid grid-cols-2 gap-10">
-              {/* COLUMNA A: SALDOS EN SISTEMA */}
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">Valores en Sistema</p>
-                <div className="space-y-3 p-6 bg-black rounded-[2rem] border border-zinc-800">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-500 uppercase">Efectivo + Inicial:</span> 
-                    <span className="text-white font-black">S/ {resumenSesion?.saldo_esperado_efectivo.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-500 uppercase">Ventas Yape:</span> 
-                    <span className="text-emerald-400 font-black">S/ {resumenSesion?.ventas_por_metodo.YAPE.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-zinc-500 uppercase">Ventas Plin:</span> 
-                    <span className="text-indigo-400 font-black">S/ {resumenSesion?.ventas_por_metodo.PLIN.toFixed(2)}</span>
-                  </div>
-                  <div className="border-t border-zinc-800 pt-3 flex justify-between text-xl">
-                    <span className="text-zinc-400 font-black">TOTAL:</span> 
-                    <span className="text-white font-black italic">S/ {resumenSesion?.total_general_caja_bancos.toFixed(2)}</span>
-                  </div>
+      {/* MODAL DE SELECCIÓN DE CLIENTE (OCULTO EN IMPRESIÓN) */}
+      <div className="print:hidden">
+        {showClienteModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+            <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Identificar Cliente</h2>
+                  <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-1">Requerido para Nota de Pedido</p>
                 </div>
+                <button onClick={() => setShowClienteModal(false)} className="text-zinc-500 hover:text-white transition-colors">✕</button>
               </div>
 
-              {/* COLUMNA B: CONTEO FÍSICO (APP/EFECTIVO) */}
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest ml-4">Conteo Real (Manual)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="number" placeholder="EFECTIVO" onChange={e => setMontoFisico(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
-                  <input type="number" placeholder="APP YAPE" onChange={e => setMontoYape(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
-                  <input type="number" placeholder="APP PLIN" onChange={e => setMontoPlin(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
-                  <input type="number" placeholder="BANCO" onChange={e => setMontoTransf(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
+              <div className="space-y-6">
+                {/* BUSCADOR RÁPIDO */}
+                <div className="flex gap-2">
+                  <input autoFocus placeholder="DNI / RUC" value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} className="flex-1 bg-black border border-zinc-800 p-5 rounded-2xl text-xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
+                  <button onClick={buscarClienteRapido} className="px-6 bg-zinc-800 rounded-2xl hover:bg-zinc-700 transition-colors">{buscandoCliente ? '...' : '🔍'}</button>
                 </div>
-                <button 
-                  onClick={ejecutarCierre}
-                  className="w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 transition-all"
-                >
-                  Finalizar Turno y Bloquear
-                </button>
+
+                {/* BOTÓN GENÉRICO */}
+                <button onClick={seleccionarPublicoGeneral} className="w-full py-3 bg-indigo-600/10 border border-indigo-500/30 text-indigo-400 font-black rounded-xl uppercase text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all">👥 Seleccionar Público General (Varios)</button>
+
+                {/* FORMULARIO DE DATOS (AUTO-RELLENABLE) */}
+                {clienteData && (
+                  <div className="p-6 bg-black/40 border border-emerald-500/20 rounded-2xl space-y-4 animate-in slide-in-from-top duration-300">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Nombre / Razón Social</label>
+                      <input placeholder="ESCRIBA EL NOMBRE..." value={clienteData.nombre_razon_social} onChange={e => setClienteData({...clienteData, nombre_razon_social: e.target.value.toUpperCase()})} className="w-full bg-transparent border-b border-zinc-800 p-2 text-sm font-black text-emerald-400 outline-none uppercase" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Dirección</label>
+                        <input placeholder="TRUJILLO..." value={clienteData.direccion || ''} onChange={e => setClienteData({...clienteData, direccion: e.target.value.toUpperCase()})} className="w-full bg-transparent border-b border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Celular</label>
+                        <input placeholder="999..." value={clienteData.celular || ''} onChange={e => setClienteData({...clienteData, celular: e.target.value})} className="w-full bg-transparent border-b border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button disabled={procesandoVenta} onClick={finalizarTransaccion} className="w-full py-6 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all">{procesandoVenta ? 'PROCESANDO...' : '🚀 CONFIRMAR NOTA DE PEDIDO'}</button>
               </div>
             </div>
-            <button onClick={() => setShowCierre(false)} className="w-full mt-8 text-zinc-500 font-bold uppercase text-[9px] tracking-tighter hover:text-white transition-colors">Volver al Panel de Ventas</button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* CABECERA CON MONITOREO DE CAJA Y BANCOS */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* MODAL DE ARQUEO MULTIMODAL (CIERRE) (OCULTO EN IMPRESIÓN) */}
+      <div className="print:hidden">
+        {showCierre && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
+            <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl">
+              <h2 className="text-4xl font-black text-white text-center uppercase italic mb-10 tracking-tighter">Arqueo de Caja y Bancos</h2>
+              
+              <div className="grid grid-cols-2 gap-10">
+                {/* COLUMNA A: SALDOS EN SISTEMA */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">Valores en Sistema</p>
+                  <div className="space-y-3 p-6 bg-black rounded-[2rem] border border-zinc-800">
+                    <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Efectivo + Inicial:</span> <span className="text-white font-black">S/ {resumenSesion?.saldo_esperado_efectivo.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Ventas Yape:</span> <span className="text-emerald-400 font-black">S/ {resumenSesion?.ventas_por_metodo.YAPE.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Ventas Plin:</span> <span className="text-indigo-400 font-black">S/ {resumenSesion?.ventas_por_metodo.PLIN.toFixed(2)}</span></div>
+                    <div className="border-t border-zinc-800 pt-3 flex justify-between text-xl"><span className="text-zinc-400 font-black">TOTAL:</span> <span className="text-white font-black italic">S/ {resumenSesion?.total_general_caja_bancos.toFixed(2)}</span></div>
+                  </div>
+                </div>
+
+                {/* COLUMNA B: CONTEO FÍSICO (APP/EFECTIVO) */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest ml-4">Conteo Real (Manual)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="number" placeholder="EFECTIVO" onChange={e => setMontoFisico(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="number" placeholder="APP YAPE" onChange={e => setMontoYape(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="number" placeholder="APP PLIN" onChange={e => setMontoPlin(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
+                    <input type="number" placeholder="BANCO" onChange={e => setMontoTransf(parseFloat(e.target.value) || 0)} className="p-4 bg-black border border-zinc-800 rounded-2xl text-white text-center font-black outline-none focus:ring-1 focus:ring-emerald-500" />
+                  </div>
+                  <button onClick={ejecutarCierre} className="w-full py-5 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 transition-all">Finalizar Turno y Bloquear</button>
+                </div>
+              </div>
+              <button onClick={() => setShowCierre(false)} className="w-full mt-8 text-zinc-500 font-bold uppercase text-[9px] tracking-tighter hover:text-white transition-colors">Volver al Panel de Ventas</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CABECERA CON MONITOREO DE CAJA Y BANCOS (OCULTA EN IMPRESIÓN) */}
+      <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
         <div>
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Punto de Venta</h1>
           <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Caja Activa • Trujillo Centro</p>
         </div>
-        
         <div className="flex gap-4 items-center">
           {/* VISUALIZACIÓN DE DINERO TOTAL (REQUERIMIENTO) */}
           <div className="bg-zinc-900/50 border border-zinc-800 px-8 py-5 rounded-3xl text-right border-indigo-500/30 backdrop-blur-md">
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Total en Sistema (INC. INICIAL)</p>
             <p className="text-2xl text-white font-black italic tracking-tighter">S/ {Number(resumenSesion?.total_general_caja_bancos || 0).toFixed(2)}</p>
           </div>
-          <button 
-            onClick={() => setShowCierre(true)} 
-            className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-red-600/20 hover:border-red-500/30 transition-all text-2xl shadow-xl" 
-            title="Arqueo y Cierre Multimodal"
-          >
-            🔐
-          </button>
+          <button onClick={() => setShowCierre(true)} className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-red-600/20 hover:border-red-500/30 transition-all text-2xl shadow-xl" title="Arqueo y Cierre Multimodal">🔐</button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      {/* CUERPO POS (OCULTO EN IMPRESIÓN) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 print:hidden">
         
         {/* COLUMNA IZQUIERDA: BUSCADOR */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
-            <input 
-              autoFocus
-              placeholder="ESCRIBA EL NOMBRE DEL PRODUCTO..." 
-              value={busqueda}
-              onChange={(e) => setFiltro(e.target.value)}
-              className="w-full p-6 bg-black border border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white text-lg placeholder:text-zinc-700 uppercase transition-all shadow-inner"
-            />
+            <input autoFocus placeholder="ESCRIBA EL NOMBRE DEL PRODUCTO..." value={busqueda} onChange={(e) => setFiltro(e.target.value)} className="w-full p-6 bg-black border border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white text-lg placeholder:text-zinc-700 uppercase transition-all shadow-inner" />
           </section>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {productosFiltrados.map(p => (
-              <button 
-                key={p.id} 
-                onClick={() => agregarAlCarrito(p)}
-                className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all active:scale-95 group shadow-lg"
-              >
+              <button key={p.id} onClick={() => agregarAlCarrito(p)} className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all active:scale-95 group shadow-lg">
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
                   <span className="text-[10px] font-black text-zinc-500 bg-black px-2 py-1 rounded-lg border border-zinc-800">STOCK: {p.stock}</span>
@@ -499,9 +437,7 @@ export default function ModuloVentas() {
         {/* COLUMNA DERECHA: CARRITO Y DISPARADOR DE MODAL */}
         <div className="space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl relative">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta
-            </h2>
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta</h2>
 
             <div className="flex-1 space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
               {carrito.map(item => (
@@ -530,25 +466,12 @@ export default function ModuloVentas() {
             <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6">
               <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-zinc-800/50">
                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Descuento Global</p>
-                <input 
-                  type="number" 
-                  step="0.01" 
-                  value={descuento === 0 ? '' : descuento} 
-                  onChange={e => { const val = parseFloat(e.target.value) || 0; setDescuento(val > subtotalCarrito ? subtotalCarrito : val); }} 
-                  className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none" 
-                  placeholder="0.00" 
-                />
+                <input type="number" step="0.01" value={descuento === 0 ? '' : descuento} onChange={e => { const val = parseFloat(e.target.value) || 0; setDescuento(val > subtotalCarrito ? subtotalCarrito : val); }} className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none" placeholder="0.00" />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
-                  <button 
-                    key={metodo} 
-                    onClick={() => setMedioPago(metodo)} 
-                    className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}
-                  >
-                    {metodo}
-                  </button>
+                  <button key={metodo} onClick={() => setMedioPago(metodo)} className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}>{metodo}</button>
                 ))}
               </div>
 
@@ -557,24 +480,15 @@ export default function ModuloVentas() {
                 <p className="text-5xl font-black text-white italic tracking-tighter">S/ {totalFinal.toFixed(2)}</p>
               </div>
               
-              <button 
-                disabled={carrito.length === 0 || procesandoVenta} 
-                onClick={() => setShowClienteModal(true)} 
-                className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}
-              >
-                {procesandoVenta ? 'ESPERE...' : '🚀 GENERAR PEDIDO'}
-              </button>
+              <button disabled={carrito.length === 0 || procesandoVenta} onClick={() => setShowClienteModal(true)} className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}>{procesandoVenta ? 'ESPERE...' : '🚀 GENERAR PEDIDO'}</button>
             </div>
           </section>
         </div>
       </div>
 
+      {/* NOTIFICACIONES */}
       {mensaje.texto && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${
-          mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'
-        }`}>
-          {mensaje.texto.toUpperCase()}
-        </div>
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>{mensaje.texto.toUpperCase()}</div>
       )}
     </div>
   );

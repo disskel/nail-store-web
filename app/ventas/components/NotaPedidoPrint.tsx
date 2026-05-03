@@ -4,21 +4,21 @@ import React from 'react';
 
 /**
  * COMPONENTE DE IMPRESIÓN PROFESIONAL - NOTA DE PEDIDO
+ * Propósito: Generar el documento físico final para el cliente.
  * Diseñado para cumplir con el formato de JEAN NAILS STORE.
- * CORRECCIÓN: Se migran los atributos 'width' a objetos 'style' para compatibilidad con TypeScript.
  */
 
 interface NotaPedidoPrintProps {
   data: {
-    items: any[];
-    cliente: any;
-    correlativo: string;
-    total_letras: string;
-    subtotal: number;
-    descuento_global: number;
-    total_pagar: number;
-    fecha: string;
-    vendedor: string;
+    items: any[];           // Lista de productos vendidos
+    cliente: any;           // Datos del sujeto identificado
+    correlativo: string;     // Número de serie (ej: P001-000001)
+    total_letras: string;    // Monto convertido a texto formal
+    subtotal: number;       // Suma bruta antes de descuentos
+    descuento_global: number; // Monto restado del subtotal
+    total_pagar: number;     // Monto neto final en soles
+    fecha: string;          // Fecha de emisión
+    vendedor: string;       // Nombre del cajero/administrador
   };
 }
 
@@ -40,13 +40,16 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
     <div className="nota-pedido-container">
       {/* ESTILOS CSS EXCLUSIVOS PARA IMPRESIÓN */}
       <style jsx>{`
-        /* Ocultar en la interfaz web para que no interfiera con el POS */
+        /* Ocultar en la interfaz web para que no interfiera con el panel POS */
         @media screen {
           .nota-pedido-container { display: none; }
         }
 
         /* Configuración específica para el motor de impresión del navegador */
         @media print {
+          /* Limpieza de cabeceras de página del navegador (URL, Título) */
+          @page { margin: 0; }
+          
           body * { visibility: hidden; }
           .nota-pedido-container, .nota-pedido-container * { visibility: visible; }
           
@@ -55,71 +58,75 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
             left: 0;
             top: 0;
             width: 100%;
-            padding: 0.5cm;
+            padding: 0.8cm;
             color: black !important;
             background: white !important;
-            font-family: 'Courier New', Courier, monospace; /* Fuente tipo factura clásica */
+            font-family: 'Courier New', Courier, monospace; /* Fuente clásica de auditoría */
             font-size: 11px;
-            line-height: 1.2;
+            line-height: 1.3;
           }
 
-          .header-table { width: 100%; margin-bottom: 15px; }
-          .empresa-info h1 { font-size: 18px; margin: 0; font-weight: 900; }
-          .empresa-info p { margin: 1px 0; font-size: 9px; }
+          .header-table { width: 100%; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px; }
+          .empresa-info h1 { font-size: 22px; margin: 0; font-weight: 900; letter-spacing: -1px; }
+          .empresa-info p { margin: 2px 0; font-size: 10px; text-transform: uppercase; }
 
           .recuadro-documento {
-            border: 1.5px solid black;
-            padding: 8px;
+            border: 2px solid black;
+            padding: 12px;
             text-align: center;
-            border-radius: 8px;
+            border-radius: 12px;
+            background: #fff;
           }
 
           .seccion-cliente {
             border: 1px solid #000;
-            padding: 10px;
-            margin-bottom: 15px;
-            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 8px;
           }
 
           .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
           }
           .items-table th {
-            border-top: 1px solid black;
-            border-bottom: 1px solid black;
-            padding: 5px 2px;
+            border-top: 2px solid black;
+            border-bottom: 2px solid black;
+            padding: 8px 4px;
             text-align: left;
-            font-weight: bold;
+            font-weight: 900;
             text-transform: uppercase;
+            background: #f9f9f9;
           }
           .items-table td {
-            padding: 4px 2px;
-            border-bottom: 0.5px dashed #eee;
+            padding: 6px 4px;
+            border-bottom: 1px solid #eee;
           }
 
           .totales-grid {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
+            padding-top: 10px;
           }
 
-          .monto-letras { font-weight: bold; font-style: italic; width: 65%; font-size: 10px; }
+          .monto-letras { font-weight: bold; width: 60%; font-size: 10px; text-transform: uppercase; }
           
-          .totales-calculo { width: 30%; }
-          .fila-total { display: flex; justify-content: space-between; padding: 1px 0; }
+          .totales-calculo { width: 35%; }
+          .fila-total { display: flex; justify-content: space-between; padding: 2px 0; }
           .total-final { 
-            border-top: 1.5px solid black; 
-            margin-top: 3px; 
-            padding-top: 3px; 
-            font-size: 12px; 
+            border-top: 2px solid black; 
+            margin-top: 5px; 
+            padding-top: 5px; 
+            font-size: 14px; 
             font-weight: 900; 
           }
 
           .text-right { text-align: right; }
           .text-center { text-align: center; }
-          .bold { font-weight: bold; }
+          .bold { font-weight: 900; }
+          .uppercase { text-transform: uppercase; }
         }
       `}</style>
 
@@ -128,20 +135,20 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
         <tbody>
           <tr>
             <td style={{ width: '15%' }}>
-              <img src={INFO_EMPRESA.logo_url} alt="Logo" style={{ width: '80px', height: 'auto' }} />
+              <img src={INFO_EMPRESA.logo_url} alt="Logo" style={{ width: '90px', height: 'auto' }} />
             </td>
-            <td style={{ width: '55%', paddingLeft: '10px' }} className="empresa-info">
+            <td style={{ width: '50%', paddingLeft: '15px' }} className="empresa-info">
               <h1>{INFO_EMPRESA.nombre}</h1>
               <p className="bold">SISTEMA PROFESIONAL PARA UÑAS</p>
               <p>{INFO_EMPRESA.direccion}</p>
               <p>WHATSAPP: {INFO_EMPRESA.telefono}</p>
               <p>INSTAGRAM: @{INFO_EMPRESA.instagram}</p>
             </td>
-            <td style={{ width: '30%' }}>
+            <td style={{ width: '35%' }}>
               <div className="recuadro-documento">
-                <p className="bold">R.U.C. {INFO_EMPRESA.ruc}</p>
-                <p className="bold" style={{ margin: '4px 0', background: '#f0f0f0', padding: '2px' }}>NOTA DE PEDIDO</p>
-                <p className="bold">{data.correlativo}</p>
+                <p className="bold" style={{ fontSize: '14px' }}>R.U.C. {INFO_EMPRESA.ruc}</p>
+                <p className="bold" style={{ margin: '6px 0', background: '#000', color: '#fff', padding: '4px' }}>NOTA DE PEDIDO</p>
+                <p className="bold" style={{ fontSize: '16px' }}>{data.correlativo}</p>
               </div>
             </td>
           </tr>
@@ -151,13 +158,13 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
       {/* SECCIÓN DATOS DEL CLIENTE */}
       <div className="seccion-cliente">
         <table style={{ width: '100%' }}>
-          <tbody>
+          <tbody className="uppercase">
             <tr>
-              <td style={{ width: '70%' }}><span className="bold">SEÑOR(ES):</span> {data.cliente.nombre_razon_social}</td>
+              <td style={{ width: '70%', paddingBottom: '5px' }}><span className="bold">SEÑOR(ES):</span> {data.cliente.nombre_razon_social}</td>
               <td style={{ width: '30%' }}><span className="bold">DNI/RUC:</span> {data.cliente.numero_documento}</td>
             </tr>
             <tr>
-              <td><span className="bold">DIRECCIÓN:</span> {data.cliente.direccion || 'TRUJILLO'}</td>
+              <td style={{ paddingBottom: '5px' }}><span className="bold">DIRECCIÓN:</span> {data.cliente.direccion || 'TRUJILLO'}</td>
               <td><span className="bold">FECHA:</span> {data.fecha}</td>
             </tr>
             <tr>
@@ -168,7 +175,7 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
         </table>
       </div>
 
-      {/* TABLA DE DETALLE DE PRODUCTOS (CORREGIDA PARA TS) */}
+      {/* TABLA DE DETALLE DE PRODUCTOS */}
       <table className="items-table">
         <thead>
           <tr>
@@ -181,10 +188,10 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
         </thead>
         <tbody>
           {data.items.map((item, index) => (
-            <tr key={index}>
+            <tr key={index} className="uppercase">
               <td>{item.codigo}</td>
               <td className="text-center">{item.cantidad}</td>
-              <td>{item.descripcion.toUpperCase()}</td>
+              <td>{item.descripcion}</td>
               <td className="text-right">{Number(item.precio_unitario).toFixed(2)}</td>
               <td className="text-right">{Number(item.total).toFixed(2)}</td>
             </tr>
@@ -195,8 +202,8 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
       {/* RESUMEN DE TOTALES */}
       <div className="totales-grid">
         <div className="monto-letras">
-          <p>{data.total_letras}</p>
-          <p style={{ marginTop: '15px', fontSize: '8px', fontStyle: 'normal' }}>Vendedor: {data.vendedor}</p>
+          <p className="bold">{data.total_letras}</p>
+          <p style={{ marginTop: '25px', fontSize: '9px', fontStyle: 'normal' }}>VENDEDOR: {data.vendedor.toUpperCase()}</p>
         </div>
         
         <div className="totales-calculo">
@@ -220,8 +227,9 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
       </div>
 
       {/* PIE DE PÁGINA */}
-      <div className="text-center" style={{ marginTop: '30px', borderTop: '1px dashed #000', paddingTop: '8px' }}>
-        <p style={{ fontSize: '8px' }}>Gracias por su preferencia - Jean Nails Store Trujillo</p>
+      <div className="text-center" style={{ marginTop: '40px', borderTop: '1px dashed #000', paddingTop: '10px' }}>
+        <p style={{ fontSize: '9px', fontWeight: 'bold' }}>¡GRACIAS POR TU PREFERENCIA!</p>
+        <p style={{ fontSize: '8px' }}>Jean Nails Store Trujillo - La Libertad</p>
       </div>
     </div>
   );
