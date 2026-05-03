@@ -1,5 +1,22 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+/**
+ * FUNCIÓN AUXILIAR DE SEGURIDAD (PORTERO FRONTERA)
+ * Propósito: Recuperar el token de sesión activa de Supabase para enviarlo al Backend.
+ * Garantiza que cada fetch lleve el 'pasaporte' del usuario logueado[cite: 11].
+ */
+const getHeaders = () => {
+  // En aplicaciones Next.js con Supabase Auth, la sesión suele persistir en localStorage
+  const sessionStr = localStorage.getItem('sb-yymmnn-auth-token'); // Ajustar según el ID de tu proyecto
+  const session = sessionStr ? JSON.parse(sessionStr) : null;
+  const token = session?.access_token;
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}` // Inyección del Token JWT para el validador de Python[cite: 11]
+  };
+};
+
 export const apiService = {
   // -------------------------------------------------------------------------
   // 1. MANTENEDOR DE CATEGORÍAS
