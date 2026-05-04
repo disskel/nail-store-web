@@ -88,6 +88,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/">🏠</Link>
           <Link href="/ventas">🛍️</Link>
           <Link href="/clientes">👤</Link>
+          <Link href="/inventario">📊</Link>
+          <Link href="/compras">📦</Link>
+          <Link href="/inventario/nuevo">✨</Link>
           <button onClick={handleLogout} className="text-xl">🚪</button>
         </nav>
 
