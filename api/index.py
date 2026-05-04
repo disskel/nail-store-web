@@ -59,17 +59,32 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =============================================================================
 
 async def validar_token(authorization: str = Header(None)):
-    if not authorization or " " not in authorization:
-        raise HTTPException(status_code=401, detail="TOKEN NO ENCONTRADO")
+    """
+    Inyección de dependencia de seguridad. Verifica que el cajero tenga una
+    sesión activa. Si el token es inválido o falta, bloquea la API (Error 401).
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=401, 
+            detail="ACCESO DENEGADO: NO SE ENCONTRÓ TOKEN DE SESIÓN"
+        )
+    
     try:
+        # El token llega como 'Bearer eyJhbG...'
         token = authorization.split(" ")[1]
-        # CORRECCIÓN CRÍTICA: Accedemos al atributo .user para validar
-        response = supabase.auth.get_user(token)
-        if not response.user:
-            raise HTTPException(status_code=401, detail="SESIÓN INVÁLIDA")
-        return response.user
+        
+        # Validación en tiempo real contra el servidor de identidades de Supabase
+        user = supabase.auth.get_user(token)
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="SESIÓN NO VÁLIDA")
+            
+        return user
     except Exception:
-        raise HTTPException(status_code=401, detail="SESIÓN EXPIRADA")
+        raise HTTPException(
+            status_code=401, 
+            detail="SESIÓN EXPIRADA: POR FAVOR, INICIE SESIÓN NUEVAMENTE"
+        )
 
 # -----------------------------------------------------------------------------
 # 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)
