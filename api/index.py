@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.19",
-    version="1.0.19", # CORREGIDO: Coma agregada para evitar el error 500
+    description="Motor de gestión con Seguridad SSR v1.0.21",
+    version="1.0.21"
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
@@ -59,32 +59,17 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =============================================================================
 
 async def validar_token(authorization: str = Header(None)):
-    """
-    Inyección de dependencia de seguridad. Verifica que el cajero tenga una
-    sesión activa. Si el token es inválido o falta, bloquea la API (Error 401).
-    """
-    if not authorization:
-        raise HTTPException(
-            status_code=401, 
-            detail="ACCESO DENEGADO: NO SE ENCONTRÓ TOKEN DE SESIÓN"
-        )
-    
+    if not authorization or " " not in authorization:
+        raise HTTPException(status_code=401, detail="TOKEN NO ENCONTRADO")
     try:
-        # El token llega como 'Bearer eyJhbG...'
         token = authorization.split(" ")[1]
-        
-        # Validación en tiempo real contra el servidor de identidades de Supabase
-        user = supabase.auth.get_user(token)
-        
-        if not user:
-            raise HTTPException(status_code=401, detail="SESIÓN NO VÁLIDA")
-            
-        return user
+        # CORRECCIÓN CRÍTICA: Accedemos al atributo .user para validar
+        response = supabase.auth.get_user(token)
+        if not response.user:
+            raise HTTPException(status_code=401, detail="SESIÓN INVÁLIDA")
+        return response.user
     except Exception:
-        raise HTTPException(
-            status_code=401, 
-            detail="SESIÓN EXPIRADA: POR FAVOR, INICIE SESIÓN NUEVAMENTE"
-        )
+        raise HTTPException(status_code=401, detail="SESIÓN EXPIRADA")
 
 # -----------------------------------------------------------------------------
 # 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)
