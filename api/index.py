@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Capa de Seguridad SSR v1.0.16",
-    version="1.0.16",
+    description="Motor de gestión con Seguridad SSR v1.0.18",
+    version="1.0.18"
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
@@ -381,6 +381,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user
 # -----------------------------------------------------------------------------
 
 @app.get("/api/clientes")
+@app.get("/clientes")
 def listar_clientes(user = Depends(validar_token)):
     """Devuelve la lista completa de clientes para el nuevo menú de seguimiento."""
     try:
@@ -414,6 +415,7 @@ def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/clientes")
+@app.post("/clientes")
 def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
     """Registra un nuevo cliente con formato en mayúsculas para el PDF."""
     try:
