@@ -6,7 +6,7 @@ import { apiService } from '@/services/apiService';
 /**
  * COMPONENTE: Dashboard Principal - JEAN NAILS STORE
  * Propósito: Centralizar los indicadores clave de rendimiento (KPIs).
- * Versión: 1.0.17 - Capa de Seguridad SSR Integrada.
+ * Versión: 1.0.18 - Sincronización Optimizada mediante apiService.
  */
 
 export default function Dashboard() {
@@ -24,32 +24,17 @@ export default function Dashboard() {
       setCargando(true);
       
       /**
-       * CORRECCIÓN DE SEGURIDAD:
-       * Para obtener el resumen, ahora usamos un fetch que incluya los headers.
-       * Si no has agregado 'getResumenDashboard' a tu apiService.ts, 
-       * aquí lo llamamos manualmente pero con seguridad.
+       * SINCRONIZACIÓN CENTRALIZADA:
+       * Utilizamos Promise.all para ejecutar ambas peticiones en paralelo.
+       * Ahora usamos 'getResumenDashboard' que ya gestiona los tokens de seguridad[cite: 12].
        */
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-      
-      // Recuperamos el token manualmente del localStorage para esta petición rápida
-      const sessionStr = typeof window !== 'undefined' ? localStorage.getItem('supabase-session') : null;
-      const session = sessionStr ? JSON.parse(sessionStr) : null;
-      const token = session?.access_token;
-
       const [resumenInv, listaClientes] = await Promise.all([
-        fetch(`${API_URL}/dashboard/resumen`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }).then(res => {
-          if (!res.ok) throw new Error("No autorizado");
-          return res.json();
-        }),
-        apiService.getClientes() // Esta ya usa seguridad internamente
+        apiService.getResumenDashboard(),
+        apiService.getClientes()
       ]);
 
       // --- 3. ACTUALIZACIÓN DEL ESTADO ---
+      // Los datos se mapean directamente desde las respuestas del Backend[cite: 13].
       setStats({
         valorInventario: resumenInv.valor_total_inventario || 0,
         totalProductos: resumenInv.total_items || 0,
@@ -62,8 +47,10 @@ export default function Dashboard() {
     }
   }
 
+  // Hook para disparar la carga de datos al montar el componente
   useEffect(() => { cargarEstadisticas(); }, []);
 
+  // Pantalla de carga profesional mientras se validan los tokens en Trujillo
   if (cargando) return (
     <div className="flex h-screen items-center justify-center bg-zinc-950 text-pink-500 font-black uppercase italic animate-pulse">
       Sincronizando Dashboard con Trujillo...
@@ -77,11 +64,11 @@ export default function Dashboard() {
       <header className="mb-12">
         <h1 className="text-6xl font-black text-white tracking-tighter uppercase italic">Panel de Control</h1>
         <p className="text-pink-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2 italic">
-          Gestión Inteligente • Jean Nails Store v1.0.17
+          Gestión Inteligente • Jean Nails Store v1.0.18
         </p>
       </header>
 
-      {/* REJILLA DE INDICADORES (Bento Grid) */}
+      {/* REJILLA DE INDICADORES (Bento Grid)[cite: 13] */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <MetricCard 
           titulo="Capital en Stock" 
@@ -106,7 +93,7 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ACCESOS RÁPIDOS */}
+      {/* SECCIÓN DE ACCESOS RÁPIDOS[cite: 13] */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section className="bg-zinc-900/40 border border-zinc-800 p-8 rounded-[3rem] backdrop-blur-xl">
           <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-6">Operaciones Críticas</h2>
@@ -118,8 +105,9 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* INDICADOR DE STATUS OPERATIVO[cite: 13] */}
         <section className="bg-pink-600/5 border border-pink-500/20 p-8 rounded-[3rem] flex flex-col justify-center text-center">
-          <div className="text-4xl mb-4">🔐</div>
+          <div className="text-4xl mb-4">🚀</div>
           <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Terminal Asegurada</h3>
           <p className="text-xs text-zinc-500 mt-2 max-w-xs mx-auto font-bold uppercase">
             Sesión protegida mediante SSR. Todas las transacciones en Trujillo están siendo encriptadas y auditadas.
@@ -130,7 +118,7 @@ export default function Dashboard() {
   );
 }
 
-// --- SUB-COMPONENTES ---
+// --- SUB-COMPONENTES DE INTERFAZ[cite: 13] ---
 
 function MetricCard({ titulo, valor, sub, color, icon }: any) {
   return (
