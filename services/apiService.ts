@@ -329,5 +329,17 @@ export const apiService = {
       throw new Error(error.detail || 'Error al procesar el cierre multimodal');
     }
     return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // 8. MÓDULO DE DASHBOARD E INDICADORES (NUEVO - PROTEGIDO)
+  // -------------------------------------------------------------------------
+
+  async getResumenDashboard() {
+    const res = await fetch(`${API_URL}/dashboard/resumen`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al cargar métricas del dashboard');
+    return res.json();
   }
 };
