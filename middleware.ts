@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 /**
  * MIDDLEWARE DE SEGURIDAD SSR - JEAN NAILS STORE
- * Protege rutas privadas sincronizando cookies de sesión.
+ * Propósito: Proteger las rutas privadas y gestionar la persistencia de sesión.
+ * Redirige a la raíz ('/') si el usuario ya está autenticado.
  */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -30,20 +31,30 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Verificamos el estado de la sesión en tiempo real
   const { data: { session } } = await supabase.auth.getSession();
   const isLoginPage = request.nextUrl.pathname === '/login';
 
+  // REGLA 1: Si NO hay sesión activa y no está en el login, mandarlo a /login
   if (!session && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
+  // REGLA 2: Si SÍ hay sesión y está en el login, mandarlo a la página principal ('/')
+  // CAMBIO REALIZADO: Se eliminó la redirección a '/dashboard'.
   if (session && isLoginPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * VIGILANCIA DE RUTAS:
+     * Protege todo el sistema excepto archivos estáticos, imágenes y la API interna.
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

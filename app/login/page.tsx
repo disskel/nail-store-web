@@ -35,7 +35,7 @@ export default function LoginPage() {
       if (data.session) {
         // Sincronización con el apiService para el Backend Python
         await apiService.handleSession(data.session);
-        router.push('/dashboard');
+        router.push('/');
         router.refresh();
       }
     } catch (err: any) {
