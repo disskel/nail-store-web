@@ -94,7 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <button onClick={handleLogout} className="text-xl">🚪</button>
         </nav>
 
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-zinc-950 to-black pb-20 lg:pb-0">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-zinc-950 to-black pt-20 lg:pt-0 pb-20 lg:pb-0">
           {children}
         </main>
       </body>
