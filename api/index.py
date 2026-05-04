@@ -523,7 +523,7 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
         # 1. Resolución de Cliente (Identificar o Crear)
         target_cliente_id = venta.id_cliente
         if not target_cliente_id and venta.cliente_data:
-            existente = buscar_cliente(venta.cliente_data.numero_documento)
+            existente = buscar_cliente(venta.cliente_data.numero_documento, user)
             if existente: target_cliente_id = existente['id']
             else:
                 nuevo = crear_cliente(venta.cliente_data)
@@ -755,7 +755,7 @@ def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
     """Finaliza el turno y guarda auditoría detallada de cada método."""
     try:
         # 1. Obtener el resumen actualizado
-        resumen = obtener_resumen_caja(req.id_sesion)
+        resumen = obtener_resumen_caja(req.id_sesion, user)
         esp_efectivo = resumen["saldo_esperado_efectivo"]
         
         # 2. Calcular descuadres por cada método
