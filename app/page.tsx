@@ -102,6 +102,7 @@ export default function Dashboard() {
             <QuickActionButton href="/clientes" label="Clientes" desc="Gestión de Cartera" icon="👥" />
             <QuickActionButton href="/inventario/ingreso" label="Entradas" desc="Cargar Almacén" icon="📥" />
             <QuickActionButton href="/inventario/nuevo" label="Catálogo" desc="Crear Producto" icon="✨" />
+            <QuickActionButton href="/inventario" label="Catálogo" desc="Crear Producto" icon="📊" />
           </div>
         </section>
 
