@@ -284,7 +284,6 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en márgenes: {str(e)}")
 
-@app.post("/api/productos")
 @app.post("/productos")
 def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
     """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
@@ -326,7 +325,7 @@ def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
-@app.patch("/api/productos/{producto_id}")
+@app.patch("/productos/{producto_id}")
 def actualizar_producto(producto_id: str, req: ProductoUpdateRequest, user = Depends(validar_token)):
     """Permite corregir el nombre o desactivar el producto (Borrado Lógico)."""
     try:
@@ -342,7 +341,6 @@ def actualizar_producto(producto_id: str, req: ProductoUpdateRequest, user = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.put("/api/productos/{producto_id}/precios")
 @app.put("/productos/{producto_id}/precios")
 def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user = Depends(validar_token)):
     """Ajusta precios y registra la trazabilidad siempre."""
@@ -387,7 +385,7 @@ def listar_clientes(user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/clientes/{numero}")
+@app.get("/clientes/{numero}")
 def buscar_cliente(numero: str, user = Depends(validar_token)):
     """Localiza un cliente registrado por su DNI o RUC."""
     try:
@@ -398,7 +396,7 @@ def buscar_cliente(numero: str, user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/clientes/{id_cliente}/historial")
+@app.get("/clientes/{id_cliente}/historial")
 def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
     """Consulta todas las notas de pedido previas de un cliente específico."""
     try:
@@ -411,7 +409,6 @@ def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/clientes")
 @app.post("/clientes")
 def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
     """Registra un nuevo cliente con formato en mayúsculas para el PDF."""
@@ -433,7 +430,6 @@ def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
 # 7. MÓDULO DE CATEGORÍAS (Mantenimiento Completo)
 # -----------------------------------------------------------------------------
 
-@app.get("/api/categorias")
 @app.get("/categorias")
 def listar_categorias(user = Depends(validar_token)):
     try:
@@ -442,7 +438,6 @@ def listar_categorias(user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/categorias")
 @app.post("/categorias")
 def crear_categoria(req: CategoriaRequest, user = Depends(validar_token)):
     try:
@@ -470,7 +465,6 @@ def obtener_resumen_dashboard(user = Depends(validar_token)):
 # 9. MÓDULO DE PROVEEDORES
 # -----------------------------------------------------------------------------
 
-@app.get("/api/proveedores")
 @app.get("/proveedores")
 def listar_proveedores(user = Depends(validar_token)):
     try:
@@ -479,7 +473,6 @@ def listar_proveedores(user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/proveedores")
 @app.post("/proveedores")
 def crear_proveedor(prov: ProveedorRequest, user = Depends(validar_token)):
     try:
@@ -493,7 +486,6 @@ def crear_proveedor(prov: ProveedorRequest, user = Depends(validar_token)):
 # 10. MÓDULO DE CAJA
 # -----------------------------------------------------------------------------
 
-@app.post("/api/caja/abrir")
 @app.post("/caja/abrir")
 def abrir_caja(req: AperturaCajaRequest, user = Depends(validar_token)):
     try:
@@ -584,7 +576,6 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
 # 12. MÓDULO DE INVENTARIO (ENTRADAS / COMPRAS)
 # -----------------------------------------------------------------------------
 
-@app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
 def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
     """Aumenta stock y garantiza el registro histórico completo."""
@@ -632,7 +623,7 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
 # 13. MÓDULO DE TRAZABILIDAD Y CONTEXTO
 # -----------------------------------------------------------------------------
 
-@app.get("/api/productos/{producto_id}/historial-ingresos")
+@app.get("/productos/{producto_id}/historial-ingresos")
 def obtener_historial_ingresos_especifico(producto_id: str, user = Depends(validar_token)):
     try:
         res = supabase.table("historial_precios")\
@@ -645,7 +636,7 @@ def obtener_historial_ingresos_especifico(producto_id: str, user = Depends(valid
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/productos/{producto_id}/historial")
+@app.get("/productos/{producto_id}/historial")
 def obtener_historial_producto(producto_id: str, user = Depends(validar_token)):
     try:
         res = supabase.table("movimientos_inventario")\
@@ -657,7 +648,7 @@ def obtener_historial_producto(producto_id: str, user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/productos/reporte-completo")
+@app.get("/productos/reporte-completo")
 def obtener_reporte_completo(user = Depends(validar_token)):
     try:
         response = supabase.table("productos").select(
@@ -684,7 +675,7 @@ def obtener_reporte_completo(user = Depends(validar_token)):
 # 14. GESTIÓN DE SESIÓN DE CAJA Y ARQUEO MULTIMODAL
 # -----------------------------------------------------------------------------
 
-@app.get("/api/caja/estado-actual")
+@app.get("/caja/estado-actual")
 def obtener_estado_caja(user = Depends(validar_token)):
     """Busca si existe una sesión abierta actualmente."""
     try:
@@ -701,7 +692,7 @@ def obtener_estado_caja(user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/caja/resumen/{sesion_id}")
+@app.get("/caja/resumen/{sesion_id}")
 def obtener_resumen_caja(sesion_id: str, user = Depends(validar_token)):
     """Calcula totales acumulados para corroborar con el banco y caja física."""
     try:
@@ -738,7 +729,7 @@ def obtener_resumen_caja(sesion_id: str, user = Depends(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/caja/cerrar")
+@app.post("/caja/cerrar")
 def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
     """Finaliza el turno y guarda auditoría detallada de cada método."""
     try:
