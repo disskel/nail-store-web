@@ -188,105 +188,92 @@ export default function InventarioDetallado() {
         </div>
       )}
 
-      {/* CABECERA DE CONTROL */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      {/* CABECERA RESPONSIVA */}
+      <header className="mb-8 flex flex-col gap-6">
         <div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Control de Existencias</h1>
-          <div className="flex items-center gap-4 mt-2">
-             <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em]">Auditoría y Trazabilidad Nail-Store</p>
-             <button 
-              onClick={() => setShowFiltros(!showFiltros)}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${showFiltros ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
-             >
-              {showFiltros ? '✕ Cerrar Filtros' : '⚡ Filtros Avanzados'}
+          <h1 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">Inventario</h1>
+          <div className="flex flex-wrap gap-2 mt-4">
+             <button onClick={() => setShowFiltros(!showFiltros)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${showFiltros ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+              {showFiltros ? '✕ Filtros' : '⚡ Filtros'}
              </button>
-             {/* BOTÓN TOGGLE: VER INACTIVOS (BORRADO LÓGICO) */}
-             <button 
-              onClick={() => setMostrarInactivos(!mostrarInactivos)}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${mostrarInactivos ? 'bg-amber-500 text-white shadow-lg shadow-amber-900/20' : 'bg-zinc-900 text-zinc-600'}`}
-             >
-              {mostrarInactivos ? '👁️ Viendo Inactivos' : '🙈 Ocultando Basura'}
+             <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${mostrarInactivos ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
+              {mostrarInactivos ? '👁️ Inactivos' : '🙈 Activos'}
              </button>
           </div>
         </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl backdrop-blur-md">
-          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest text-right">Resultados</p>
-          <p className="text-2xl font-black text-white text-right">{productosFiltrados.length} / {productos.length} ÍTEMS</p>
+        <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
+          <p className="text-[10px] text-zinc-500 font-black uppercase">Resultados</p>
+          <p className="text-xl font-black text-white">{productosFiltrados.length} ÍTEMS</p>
         </div>
       </header>
 
-      {/* PANEL DE FILTROS DESPLEGABLE */}
+      {/* PANEL DE FILTROS MÓVIL */}
       {showFiltros && (
-        <div className="mb-10 p-8 bg-zinc-900/80 border border-zinc-800 rounded-[2.5rem] animate-in slide-in-from-top duration-500 shadow-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Búsqueda Inteligente</label>
-              <input type="text" placeholder="Nombre, SKU o Marca..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
-            </div>
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-2">Filtrar por Proveedor</label>
-              <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 appearance-none">
-                {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col justify-end">
-              <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all border ${soloBajoStock ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}>
-                {soloBajoStock ? '⚠️ Mostrando Solo Críticos' : '📦 Mostrar Todo el Stock'}
-              </button>
-            </div>
-          </div>
+        <div className="mb-8 p-6 bg-zinc-900 border border-zinc-800 rounded-3xl space-y-4">
+          <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold" />
+          <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold">
+            {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
+          </select>
+          <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] border ${soloBajoStock ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black border-zinc-800 text-zinc-500'}`}>
+            {soloBajoStock ? '⚠️ Solo Críticos' : '📦 Todo el Stock'}
+          </button>
         </div>
       )}
 
-      {mensaje && (
-        <div className="mb-8 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl text-red-500 font-black text-center uppercase animate-pulse">{mensaje}</div>
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
-        <div className="xl:col-span-2 space-y-6">
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl backdrop-blur-xl">
-            <table className="w-full text-left">
-              <thead className="bg-black/40 text-[10px] font-black uppercase tracking-widest text-zinc-500 border-b border-zinc-800">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2">
+          <div className="bg-zinc-900/40 border border-zinc-800 rounded-[2rem] overflow-hidden">
+            <table className="w-full">
+              {/* HEADERS: Ocultos en móvil */}
+              <thead className="hidden md:table-header-group bg-black/40 text-[10px] font-black uppercase text-zinc-500">
                 <tr>
-                  <th className="p-8">Estado</th>
-                  <th className="p-8">Información del Producto</th>
-                  <th className="p-8 text-center">Stock Actual</th>
-                  <th className="p-8 text-right">Costo Maestro</th>
-                  <th className="p-8 text-center">Gestión</th>
+                  <th className="p-6">Producto</th>
+                  <th className="p-6 text-center">Stock</th>
+                  <th className="p-6 text-right">Costo</th>
+                  <th className="p-6 text-center">Gestión</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
                 {productosFiltrados.map((p) => (
-                  <tr key={p.id} className={`transition-all group ${!p.activo ? 'opacity-30 grayscale' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/10' : 'hover:bg-white/5'}`}>
-                    <td className="p-8">
-                       <div className={`w-2 h-2 rounded-full ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`}></div>
-                    </td>
-                    <td className="p-8">
-                      <div className="font-black text-white text-lg tracking-tight uppercase leading-tight">{p.nombre}</div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded font-bold uppercase">{p.categoria}</span>
-                        <span className="text-[10px] text-zinc-500 font-bold uppercase">📦 {p.proveedor}</span>
+                  <tr key={p.id} className={`flex flex-col md:table-row transition-all ${!p.activo ? 'opacity-30' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/10' : 'hover:bg-white/5'}`}>
+                    
+                    {/* INFO PRINCIPAL */}
+                    <td className="p-4 md:p-6">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+                        <div>
+                          <div className="font-black text-white text-base md:text-lg uppercase leading-tight">{p.nombre}</div>
+                          <div className="flex gap-2 mt-2">
+                            <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-1 rounded font-bold uppercase">{p.categoria}</span>
+                            <span className="text-[9px] text-zinc-500 font-bold uppercase mt-1">📦 {p.proveedor}</span>
+                          </div>
+                        </div>
                       </div>
                     </td>
-                    <td className="p-8 text-center">
-                      <div className={`inline-block px-5 py-2 rounded-2xl font-black text-sm shadow-inner ${ (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400' }`}>
+
+                    {/* STOCK: Estilo diferente en móvil */}
+                    <td className="px-4 md:p-6 md:text-center flex justify-between md:table-cell border-t border-zinc-800/30 md:border-none py-3">
+                      <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Stock Actual</span>
+                      <div className={`px-4 py-1 rounded-xl font-black text-xs ${ (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400' }`}>
                         {p.stock || 0} UNID
                       </div>
                     </td>
-                    <td className="p-8 text-right">
-                      <div className="font-mono font-black text-white text-xl">S/ {Number(p.costo || 0).toFixed(2)}</div>
+
+                    {/* COSTO: Estilo diferente en móvil */}
+                    <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3">
+                      <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Costo Maestro</span>
+                      <div className="font-mono font-black text-white text-lg">S/ {Number(p.costo || 0).toFixed(2)}</div>
                     </td>
-                    <td className="p-8 text-center">
-                      <div className="flex justify-center gap-2">
-                        {/* ACCIÓN: EDITAR NOMBRE (CORRECCIONES) */}
-                        <button onClick={() => editarNombre(p.id, p.nombre)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-indigo-600 transition-all shadow-lg" title="Corregir Nombre">✏️</button>
-                        {/* ACCIÓN: AJUSTE DE PRECIO */}
-                        <button onClick={() => abrirAjuste(p)} className="p-3 bg-zinc-800 text-white rounded-xl hover:bg-emerald-600 transition-all shadow-lg" title="Ajustar Precios">🏷️</button>
-                        {/* ACCIÓN: DESACTIVAR/REACTIVAR (BORRADO LÓGICO) */}
-                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`p-3 rounded-xl transition-all shadow-lg ${p.activo ? 'bg-zinc-800 text-zinc-500 hover:bg-red-600 hover:text-white' : 'bg-emerald-600 text-white'}`} title={p.activo ? "Archivar" : "Reactivar"}>
+
+                    {/* ACCIONES: Siempre visibles y centradas */}
+                    <td className="p-4 md:p-6 text-center border-t border-zinc-800 md:border-none">
+                      <div className="flex justify-center md:justify-center gap-3">
+                        <button onClick={() => editarNombre(p.id, p.nombre)} className="flex-1 md:flex-none p-3 bg-zinc-800 text-white rounded-xl active:scale-90 transition-transform">✏️</button>
+                        <button onClick={() => abrirAjuste(p)} className="flex-1 md:flex-none p-3 bg-zinc-800 text-white rounded-xl active:scale-90">🏷️</button>
+                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`flex-1 md:flex-none p-3 rounded-xl ${p.activo ? 'bg-zinc-800 text-zinc-500' : 'bg-emerald-600 text-white'}`}>
                           {p.activo ? '🗑️' : '✅'}
                         </button>
-                        <button onClick={() => verTrazabilidad(p)} className={`p-3 rounded-xl transition-all shadow-lg ${productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-indigo-600'}`}>🔍</button>
+                        <button onClick={() => verTrazabilidad(p)} className={`flex-1 md:flex-none p-3 rounded-xl ${productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>🔍</button>
                       </div>
                     </td>
                   </tr>
