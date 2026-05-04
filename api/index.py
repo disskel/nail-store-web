@@ -13,9 +13,13 @@ from dotenv import load_dotenv
 # load_dotenv() # Comentado para producción en Vercel
 
 app = FastAPI(
-    title="Nail-Store API",
-    description="Backend robusto para gestión de inventarios, clientes y auditoría de caja multimodal",
-    version="1.0.14" # ACTUALIZADO: Edición de productos y Borrado Lógico
+    title="Nail-Store API Pro",
+    description="Motor de gestión empresarial con Capa de Seguridad SSR v1.0.16",
+    version="1.0.16",
+    contact={
+        "name": "Soporte Técnico Trujillo",
+        "email": "jeannailsstore@gmail.com"
+    }
 )
 
 # MIDDLEWARE DE DIAGNÓSTICO (Crucial para ver el tráfico en Vercel)
@@ -62,7 +66,7 @@ async def validar_token(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(
             status_code=401, 
-            detail="ACCESO RESTRINGIDO: NO SE DETECTÓ SESIÓN ACTIVA"
+            detail="ACCESO DENEGADO: NO SE ENCONTRÓ TOKEN DE SESIÓN"
         )
     
     try:
@@ -223,7 +227,7 @@ def health_check():
 
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
-def obtener_margenes(mostrar_inactivos: bool = False):
+def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_token)):
     """Calcula márgenes. Permite filtrar productos inactivos (Borrado Lógico)."""
     try:
         query = supabase.table("productos").select(
@@ -284,7 +288,7 @@ def obtener_margenes(mostrar_inactivos: bool = False):
 
 @app.post("/api/productos")
 @app.post("/productos")
-def crear_producto(req: ProductoCreateRequest):
+def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
     """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
     try:
         if not req.id_proveedor or str(req.id_proveedor).strip() == "":
@@ -325,7 +329,7 @@ def crear_producto(req: ProductoCreateRequest):
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
 @app.patch("/api/productos/{producto_id}")
-def actualizar_producto(producto_id: str, req: ProductoUpdateRequest):
+def actualizar_producto(producto_id: str, req: ProductoUpdateRequest, user = Depends(validar_token)):
     """Permite corregir el nombre o desactivar el producto (Borrado Lógico)."""
     try:
         update_data = {}
@@ -342,7 +346,7 @@ def actualizar_producto(producto_id: str, req: ProductoUpdateRequest):
 
 @app.put("/api/productos/{producto_id}/precios")
 @app.put("/productos/{producto_id}/precios")
-def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
+def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user = Depends(validar_token)):
     """Ajusta precios y registra la trazabilidad siempre."""
     try:
         prod_actual = supabase.table("productos").select("costo_unidad, costo_maximo, nombre").eq("id", producto_id).single().execute()
@@ -377,7 +381,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest):
 # -----------------------------------------------------------------------------
 
 @app.get("/api/clientes")
-def listar_clientes():
+def listar_clientes(user = Depends(validar_token)):
     """Devuelve la lista completa de clientes para el nuevo menú de seguimiento."""
     try:
         res = supabase.table("clientes").select("*").order("nombre_razon_social").execute()
@@ -386,7 +390,7 @@ def listar_clientes():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/clientes/{numero}")
-def buscar_cliente(numero: str):
+def buscar_cliente(numero: str, user = Depends(validar_token)):
     """Localiza un cliente registrado por su DNI o RUC."""
     try:
         res = supabase.table("clientes").select("*").eq("numero_documento", numero).execute()
@@ -397,7 +401,7 @@ def buscar_cliente(numero: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/clientes/{id_cliente}/historial")
-def historial_compras_cliente(id_cliente: str):
+def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
     """Consulta todas las notas de pedido previas de un cliente específico."""
     try:
         res = supabase.table("ventas")\
@@ -410,7 +414,7 @@ def historial_compras_cliente(id_cliente: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/clientes")
-def crear_cliente(req: ClienteRequest):
+def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
     """Registra un nuevo cliente con formato en mayúsculas para el PDF."""
     try:
         data = {
@@ -432,7 +436,7 @@ def crear_cliente(req: ClienteRequest):
 
 @app.get("/api/categorias")
 @app.get("/categorias")
-def listar_categorias():
+def listar_categorias(user = Depends(validar_token)):
     try:
         res = supabase.table("categorias").select("*").eq("activo", True).execute()
         return res.data
@@ -441,7 +445,7 @@ def listar_categorias():
 
 @app.post("/api/categorias")
 @app.post("/categorias")
-def crear_categoria(req: CategoriaRequest):
+def crear_categoria(req: CategoriaRequest, user = Depends(validar_token)):
     try:
         data = {"nombre": req.nombre.upper(), "descripcion": req.descripcion, "activo": True}
         res = supabase.table("categorias").insert(data).execute()
@@ -455,7 +459,7 @@ def crear_categoria(req: CategoriaRequest):
 
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
-def obtener_resumen_dashboard():
+def obtener_resumen_dashboard(user = Depends(validar_token)):
     try:
         # Solo sumamos valor de productos activos
         res = supabase.table("productos").select("costo_unidad, stock_actual").eq("activo", True).execute()
@@ -470,7 +474,7 @@ def obtener_resumen_dashboard():
 
 @app.get("/api/proveedores")
 @app.get("/proveedores")
-def listar_proveedores():
+def listar_proveedores(user = Depends(validar_token)):
     try:
         response = supabase.table("proveedores").select("*").eq("activo", True).execute()
         return response.data
@@ -479,7 +483,7 @@ def listar_proveedores():
 
 @app.post("/api/proveedores")
 @app.post("/proveedores")
-def crear_proveedor(prov: ProveedorRequest):
+def crear_proveedor(prov: ProveedorRequest, user = Depends(validar_token)):
     try:
         data = {"nombre": prov.nombre.upper(), "contacto": prov.contacto, "activo": True}
         response = supabase.table("proveedores").insert(data).execute()
@@ -493,7 +497,7 @@ def crear_proveedor(prov: ProveedorRequest):
 
 @app.post("/api/caja/abrir")
 @app.post("/caja/abrir")
-def abrir_caja(req: AperturaCajaRequest):
+def abrir_caja(req: AperturaCajaRequest, user = Depends(validar_token)):
     try:
         res = supabase.table("sesiones_caja").insert({
             "monto_inicial": req.monto_inicial, 
@@ -510,7 +514,7 @@ def abrir_caja(req: AperturaCajaRequest):
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
-def procesar_venta(venta: VentaRequest):
+def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
     """Registra transacción, vincula cliente y gestiona correlativos formales."""
     try:
         # 1. Resolución de Cliente (Identificar o Crear)
@@ -585,7 +589,7 @@ def procesar_venta(venta: VentaRequest):
 
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
-def registrar_ingreso(req: IngresoRequest):
+def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
     """Aumenta stock y garantiza el registro histórico completo."""
     try:
         prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
@@ -632,7 +636,7 @@ def registrar_ingreso(req: IngresoRequest):
 # -----------------------------------------------------------------------------
 
 @app.get("/api/productos/{producto_id}/historial-ingresos")
-def obtener_historial_ingresos_especifico(producto_id: str):
+def obtener_historial_ingresos_especifico(producto_id: str, user = Depends(validar_token)):
     try:
         res = supabase.table("historial_precios")\
             .select("fecha_cambio, costo_nuevo, precio_nuevo_menor, precio_nuevo_mayor")\
@@ -645,7 +649,7 @@ def obtener_historial_ingresos_especifico(producto_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/productos/{producto_id}/historial")
-def obtener_historial_producto(producto_id: str):
+def obtener_historial_producto(producto_id: str, user = Depends(validar_token)):
     try:
         res = supabase.table("movimientos_inventario")\
             .select("*")\
@@ -657,7 +661,7 @@ def obtener_historial_producto(producto_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/productos/reporte-completo")
-def obtener_reporte_completo():
+def obtener_reporte_completo(user = Depends(validar_token)):
     try:
         response = supabase.table("productos").select(
             "nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, proveedores(nombre)"
@@ -684,7 +688,7 @@ def obtener_reporte_completo():
 # -----------------------------------------------------------------------------
 
 @app.get("/api/caja/estado-actual")
-def obtener_estado_caja():
+def obtener_estado_caja(user = Depends(validar_token)):
     """Busca si existe una sesión abierta actualmente."""
     try:
         res = supabase.table("sesiones_caja")\
@@ -701,7 +705,7 @@ def obtener_estado_caja():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/caja/resumen/{sesion_id}")
-def obtener_resumen_caja(sesion_id: str):
+def obtener_resumen_caja(sesion_id: str, user = Depends(validar_token)):
     """Calcula totales acumulados para corroborar con el banco y caja física."""
     try:
         # 1. Obtener datos de la sesión para el monto inicial
@@ -738,7 +742,7 @@ def obtener_resumen_caja(sesion_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/caja/cerrar")
-def cerrar_caja(req: CierreCajaRequest):
+def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
     """Finaliza el turno y guarda auditoría detallada de cada método."""
     try:
         # 1. Obtener el resumen actualizado
