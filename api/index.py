@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Header, Depends # AGREGADO: Header y Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Any # Any para robustez frente a NaN
+from typing import List, Optional, Any
 from supabase import create_client, Client
 import os
 import time
@@ -224,7 +224,6 @@ def health_check():
 # 5. MÓDULO DE PRODUCTOS E INVENTARIO
 # -----------------------------------------------------------------------------
 
-@app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_token)):
     """Calcula márgenes. Permite filtrar productos inactivos (Borrado Lógico)."""
