@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.18",
-    version="1.0.18", # CORREGIDO: Coma agregada
+    description="Motor de gestión empresarial con Seguridad SSR v1.0.19",
+    version="1.0.19", # CORREGIDO: Coma agregada para evitar el error 500
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
@@ -211,7 +211,6 @@ class ProductoUpdateRequest(BaseModel):
 # 4. ENDPOINTS DE SISTEMA Y SALUD
 # -----------------------------------------------------------------------------
 
-@app.get("/api/health")
 @app.get("/health")
 def health_check():
     """Verifica la disponibilidad del servidor y el estado de la conexión DB."""
@@ -380,7 +379,6 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user
 # 6. MÓDULO CRM DE CLIENTES (TRUJILLO SEGUIMIENTO)
 # -----------------------------------------------------------------------------
 
-@app.get("/api/clientes")
 @app.get("/clientes")
 def listar_clientes(user = Depends(validar_token)):
     """Devuelve la lista completa de clientes para el nuevo menú de seguimiento."""
@@ -459,7 +457,6 @@ def crear_categoria(req: CategoriaRequest, user = Depends(validar_token)):
 # 8. MÓDULO DE DASHBOARD
 # -----------------------------------------------------------------------------
 
-@app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard(user = Depends(validar_token)):
     try:
@@ -514,7 +511,6 @@ def abrir_caja(req: AperturaCajaRequest, user = Depends(validar_token)):
 # 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)
 # -----------------------------------------------------------------------------
 
-@app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
 def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
     """Registra transacción, vincula cliente y gestiona correlativos formales."""
