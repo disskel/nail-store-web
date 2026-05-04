@@ -33,6 +33,12 @@ export const apiService = {
     }
   },
 
+  async logout() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('supabase-session');
+    }
+  },
+
   // -------------------------------------------------------------------------
   // 1. MANTENEDOR DE CATEGORÍAS (PROTEGIDO)
   // -------------------------------------------------------------------------
