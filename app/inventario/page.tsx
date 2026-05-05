@@ -229,7 +229,7 @@ export default function InventarioDetallado() {
                 <tr>
                   <th className="p-6">Producto</th>
                   <th className="p-6 text-center">Stock</th>
-                  <th className="p-6 text-right">Costo</th>
+                  <th className="p-6 text-right">Costo / Precio</th>
                   <th className="p-6 text-center">Gestión</th>
                 </tr>
               </thead>
