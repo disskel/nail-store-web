@@ -379,6 +379,7 @@ export default function ModuloVentas() {
                     <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Efectivo + Inicial:</span> <span className="text-white font-black">S/ {resumenSesion?.saldo_esperado_efectivo.toFixed(2)}</span></div>
                     <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Ventas Yape:</span> <span className="text-emerald-400 font-black">S/ {resumenSesion?.ventas_por_metodo.YAPE.toFixed(2)}</span></div>
                     <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Ventas Plin:</span> <span className="text-indigo-400 font-black">S/ {resumenSesion?.ventas_por_metodo.PLIN.toFixed(2)}</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-zinc-500 uppercase">Ventas Transf:</span> <span className="text-indigo-400 font-black">S/ {resumenSesion?.ventas_por_metodo.TRANSFERENCIA.toFixed(2)}</span></div>
                     <div className="border-t border-zinc-800 pt-3 flex justify-between text-xl"><span className="text-zinc-400 font-black">TOTAL:</span> <span className="text-white font-black italic">S/ {resumenSesion?.total_general_caja_bancos.toFixed(2)}</span></div>
                   </div>
                 </div>
