@@ -70,21 +70,21 @@ async def validar_token(authorization: str = Header(None)):
         )
     
     try:
-        # El token llega como 'Bearer eyJhbG...'
         token = authorization.split(" ")[1]
         
-        # Validación en tiempo real contra el servidor de identidades de Supabase
-        user = supabase.auth.get_user(token)
+        # 1. Obtenemos la respuesta completa
+        response = supabase.auth.get_user(token)
+        
+        # 2. Extraemos el usuario del objeto UserResponse
+        user = response.user 
         
         if not user:
-            raise HTTPException(status_code=401, detail="SESIÓN NO VÁLIDA")
+            raise HTTPException(status_code=401, detail="SESIÓN INVÁLIDA")
             
-        return user
-    except Exception:
-        raise HTTPException(
-            status_code=401, 
-            detail="SESIÓN EXPIRADA: POR FAVOR, INICIE SESIÓN NUEVAMENTE"
-        )
+        return user # Ahora retornamos el objeto de usuario limpio
+    except Exception as e:
+        print(f"Error de seguridad en Trujillo: {str(e)}")
+        raise HTTPException(status_code=401, detail="SESIÓN EXPIRADA")
 
 # -----------------------------------------------------------------------------
 # 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)
