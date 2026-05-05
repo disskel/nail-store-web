@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, Header, Depends # AGREGADO: Header y Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Literal
 from supabase import create_client, Client
 import os
 import time
@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.19",
-    version="1.0.19", # CORREGIDO: Coma agregada para evitar el error 500
+    description="Motor de gestión empresarial con Seguridad SSR v1.0.21",
+    version="1.0.21", # CORREGIDO: Coma agregada para evitar el error 500
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
