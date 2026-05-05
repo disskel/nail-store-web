@@ -125,15 +125,20 @@ export default function RegistrarIngreso() {
   const descargarReporteExcel = async () => {
     setExportando(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? process.env.NEXT_PUBLIC_API_URL : `${process.env.NEXT_PUBLIC_API_URL}/api`;
-      const response = await fetch(`${baseUrl}/productos/reporte-completo`);
-      const data = await response.json();
+      // LLAMADA SEGURA: Ahora usa apiService que incluye el token JWT
+      const data = await apiService.getReporteCompleto();
+      
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario Nail-Store");
-      XLSX.writeFile(workbook, `Inventario_NailStore.xlsx`);
-    } catch (error: any) { setMensaje({ texto: '❌ ERROR AL EXPORTAR', tipo: 'error' }); } 
-    finally { setExportando(false); }
+      XLSX.writeFile(workbook, `Inventario_NailStore_${new Date().toLocaleDateString()}.xlsx`);
+      
+      setMensaje({ texto: '✅ REPORTE EXPORTADO', tipo: 'success' });
+    } catch (error: any) { 
+      setMensaje({ texto: '❌ ERROR 401: NO AUTORIZADO', tipo: 'error' }); 
+    } finally { 
+      setExportando(false); 
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

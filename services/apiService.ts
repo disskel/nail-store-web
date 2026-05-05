@@ -13,7 +13,7 @@ const getHeaders = () => {
 
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}` 
+    'Authorization': `Bearer ${token}`
   };
 };
 
@@ -347,5 +347,19 @@ export const apiService = {
     });
     if (!res.ok) throw new Error('Error al cargar métricas del dashboard');
     return res.json();
-  }
+  },
+
+  // -------------------------------------------------------------------------
+  // 9. PRODUCTOS Y REPORTES (ACTUALIZADO)
+  // -------------------------------------------------------------------------
+  
+  // NUEVA FUNCIÓN: Soporte para descarga de Excel seguro[cite: 17]
+  async getReporteCompleto() {
+    const res = await fetch(`${API_URL}/productos/reporte-completo`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('No autorizado para reportes');
+    return res.json();
+  },
+  
 };
