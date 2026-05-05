@@ -29,7 +29,7 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
   // ===========================================================================
   const INFO_EMPRESA = {
     nombre: "JEAN NAILS STORE",
-    ruc: "20610962611",
+    //ruc: "20610962611",
     direccion: "C.C. BOULEVAR SEGUNDO PISO STAND P5",
     telefono: "934459220",
     instagram: "Jean_Store_Nails",
@@ -146,7 +146,8 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
             </td>
             <td style={{ width: '35%' }}>
               <div className="recuadro-documento">
-                <p className="bold" style={{ fontSize: '14px' }}>R.U.C. {INFO_EMPRESA.ruc}</p>
+                {/*<p className="bold" style={{ fontSize: '14px' }}>R.U.C. {INFO_EMPRESA.ruc}</p>*/}
+                <p className="bold" style={{ fontSize: '14px' }}>DOCUMENTO DE PAGO</p>
                 <p className="bold" style={{ margin: '6px 0', background: '#000', color: '#fff', padding: '4px' }}>NOTA DE PEDIDO</p>
                 <p className="bold" style={{ fontSize: '16px' }}>{data.correlativo}</p>
               </div>
