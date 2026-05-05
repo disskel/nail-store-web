@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.21",
-    version="1.0.21", # CORREGIDO: Coma agregada para evitar el error 500
+    description="Motor de gestión empresarial con Seguridad SSR v1.0.29",
+    version="1.0.29", # CORREGIDO: Coma agregada para evitar el error 500
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
@@ -789,3 +789,51 @@ def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
         }}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 15. NUEVO: MÓDULO DE HISTORIAL Y AUDITORÍA (Garantía Trujillo Centro)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/caja/historial")
+@app.get("/caja/historial")
+def listar_historial_cajas(user = Depends(validar_token)):
+    """
+    Consulta la Vista SQL 'vista_historial_cajas' para obtener el resumen 
+    financiero de todos los turnos cerrados.
+    """
+    try:
+        # Consumimos la vista que une sesiones, cierres y ventas digitales
+        res = supabase.table("vista_historial_cajas").select("*").execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al cargar vista de historial: {str(e)}")
+
+@app.get("/api/caja/reporte-productos/{sesion_id}")
+@app.get("/caja/reporte-productos/{sesion_id}")
+def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token)):
+    """
+    Genera el reporte detallado de productos vendidos en un turno específico.
+    Incluye identificación del cliente y totales por ítem.
+    """
+    try:
+        # Realizamos un JOIN triple: Movimientos -> Productos y Movimientos -> Ventas -> Clientes[cite: 4]
+        res = supabase.table("movimientos_inventario")\
+            .select("cantidad, precio_momento, productos(nombre, sku), ventas(id_cliente, clientes(nombre_razon_social))")\
+            .eq("id_sesion_caja", sesion_id)\
+            .eq("tipo_movimiento", "SALIDA")\
+            .execute()
+            
+        reporte = []
+        for m in res.data:
+            reporte.append({
+                "sku": m.get("productos", {}).get("sku"),
+                "producto": m.get("productos", {}).get("nombre"),
+                "cantidad": m["cantidad"],
+                "precio_venta": float(m["precio_momento"] or 0.0),
+                "total": float(m["cantidad"] * (m["precio_momento"] or 0.0)),
+                "cliente": m.get("ventas", {}).get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL")
+            })
+            
+        return reporte
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en reporte de productos: {str(e)}")

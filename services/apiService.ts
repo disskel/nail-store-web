@@ -361,5 +361,33 @@ export const apiService = {
     if (!res.ok) throw new Error('No autorizado para reportes');
     return res.json();
   },
+
+  // -------------------------------------------------------------------------
+  // 10. MÓDULO DE HISTORIAL DE CAJAS Y AUDITORÍA (NUEVO - v1.0.29)
+  // -------------------------------------------------------------------------
+  
+  /**
+   * Obtiene la lista resumida de todos los turnos cerrados.
+   * Utiliza la Vista SQL consolidada para ver Saldos Iniciales/Finales.
+   */
+  async getHistorialCajas() {
+    const res = await fetch(`${API_URL}/caja/historial`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al cargar el historial de cajas');
+    return res.json();
+  },
+
+  /**
+   * Genera el desglose de productos vendidos en un turno específico.
+   * Requerido para el botón "REPORTE" que solicitó el usuario.
+   */
+  async getReporteProductosPorTurno(sesionId: string) {
+    const res = await fetch(`${API_URL}/caja/reporte-productos/${sesionId}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al generar reporte detallado del turno');
+    return res.json();
+  },
   
 };

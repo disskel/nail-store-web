@@ -59,6 +59,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-lg">👤</span> Clientes
             </Link>
 
+            {/* NUEVO ACCESO: GESTIÓN DE CAJAS (AUDITORÍA FINANCIERA) */}
+            <Link href="/cajas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+              <span className="text-lg">🔐</span> Historial Cajas
+            </Link>
+
             <Link href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
               <span className="text-lg">📊</span> Inventario
             </Link>
@@ -88,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/">🏠</Link>
           <Link href="/ventas">🛍️</Link>
           <Link href="/clientes">👤</Link>
+          <Link href="/cajas">🔐</Link> {/* NUEVO ÍCONO MÓVIL */}
           <Link href="/inventario">📊</Link>
           <Link href="/compras">📦</Link>
           <Link href="/inventario/nuevo">✨</Link>
