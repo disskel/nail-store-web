@@ -259,20 +259,27 @@ export default function InventarioDetallado() {
                       </div>
                     </td>
 
-                    {/* COSTO Y PRECIO: Ajustado para ver la venta de forma pequeña */}
-                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3">
-                    {/* Etiqueta visible solo en celulares */}
-                    <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Valores (Costo/Venta)</span>
+                    {/* COLUMNA FINANCIERA: Costo vs Precios (Menor/Mayor) */}
+                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3 border-t border-zinc-800/30 md:border-none">
+                    {/* Etiqueta para celulares */}
+                    <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Análisis Financiero</span>
                     
-                    <div className="flex flex-col md:items-end">
-                      {/* El Costo se mantiene resaltado y en blanco */}
+                    <div className="flex flex-col md:items-end gap-1">
+                      {/* Costo Maestro (Principal) */}
                       <div className="font-mono font-black text-white text-lg leading-none">
                         S/ {Number(p.costo || 0).toFixed(2)}
                       </div>
                       
-                      {/* El Precio se muestra debajo/al costado de forma muy pequeña y gris */}
-                      <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-                        P. Venta: S/ {Number(p.precio || 0).toFixed(2)}
+                      {/* Precios de Venta (Secundarios) */}
+                      <div className="flex flex-col md:items-end gap-0.5">
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">
+                          <span className="text-amber-500/80 mr-1">MEN:</span> 
+                          <span className="text-zinc-300">S/ {Number(p.precio || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">
+                          <span className="text-indigo-400/80 mr-1">MAY:</span> 
+                          <span className="text-zinc-300">S/ {Number(p.precio_mayor || 0).toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
                   </td>
