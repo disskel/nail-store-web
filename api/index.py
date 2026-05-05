@@ -148,7 +148,7 @@ class VentaRequest(BaseModel):
     items: List[ItemVenta]
     tipo_documento: str  # "NOTA_VENTA" o "PROFORMA"
     id_sesion_caja: str
-    medio_pago: Optional[str] = "EFECTIVO"
+    medio_pago: Literal['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'] = "EFECTIVO"
     observaciones: Optional[str] = None
     descuento: Optional[float] = 0.0 
     # CAMPOS PARA NOTA DE PEDIDO
