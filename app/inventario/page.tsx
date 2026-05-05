@@ -259,11 +259,23 @@ export default function InventarioDetallado() {
                       </div>
                     </td>
 
-                    {/* COSTO: Estilo diferente en móvil */}
-                    <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3">
-                      <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Costo Maestro</span>
-                      <div className="font-mono font-black text-white text-lg">S/ {Number(p.costo || 0).toFixed(2)}</div>
-                    </td>
+                    {/* COSTO Y PRECIO: Ajustado para ver la venta de forma pequeña */}
+                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3">
+                    {/* Etiqueta visible solo en celulares */}
+                    <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Valores (Costo/Venta)</span>
+                    
+                    <div className="flex flex-col md:items-end">
+                      {/* El Costo se mantiene resaltado y en blanco */}
+                      <div className="font-mono font-black text-white text-lg leading-none">
+                        S/ {Number(p.costo || 0).toFixed(2)}
+                      </div>
+                      
+                      {/* El Precio se muestra debajo/al costado de forma muy pequeña y gris */}
+                      <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
+                        P. Venta: S/ {Number(p.precio || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  </td>
 
                     {/* ACCIONES: Siempre visibles y centradas */}
                     <td className="p-4 md:p-6 text-center border-t border-zinc-800 md:border-none">
