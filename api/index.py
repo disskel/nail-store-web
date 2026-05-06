@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.29",
-    version="1.0.29", # CORREGIDO: Coma agregada para evitar el error 500
+    description="Motor de gestión empresarial con Seguridad SSR v1.0.32",
+    version="1.0.32", # CORREGIDO: Coma agregada para evitar el error 500
     contact={
         "name": "Soporte Técnico Trujillo",
         "email": "jeannailsstore@gmail.com"
