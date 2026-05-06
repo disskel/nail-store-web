@@ -191,7 +191,7 @@ export default function HistorialCajas() {
                   <td className={`p-8 text-center font-mono font-black text-sm transition-all`} title={esFaltante ? "Faltante Detectado (Dinero no encontrado)" : esSobrante ? "Sobrante Detectado (Caja excedida)" : "Caja Cuadrada"}>
                     <div className={`px-4 py-2 rounded-xl inline-block ${
                       esFaltante ? 'bg-red-500/10 text-red-500 border border-red-500/20 shadow-lg shadow-red-500/10' : 
-                      esSobrante ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 
+                       esSobrante ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 
                       'text-zinc-500'
                     }`}>
                       {esSobrante ? '+' : ''} S/ {diferencia.toFixed(2)}
