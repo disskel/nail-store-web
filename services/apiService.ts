@@ -389,5 +389,20 @@ export const apiService = {
     if (!res.ok) throw new Error('Error al generar reporte detallado del turno');
     return res.json();
   },
+
+  /**
+   * Recupera los datos completos de una venta (cabecera + productos + cliente)
+   * para poder realizar la reimpresión de la Nota de Pedido.
+   */
+  async getDetalleVenta(idVenta: string) {
+    const res = await fetch(`${API_URL}/ventas/${idVenta}/detalle-completo`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || 'Error al recuperar detalle de la venta');
+    }
+    return res.json();
+  },
   
 };

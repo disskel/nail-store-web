@@ -837,3 +837,31 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token)):
         return reporte
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reporte de productos: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 16. REIMPRESIÓN: RECUPERAR DATOS COMPLETOS DE UNA VENTA
+# -----------------------------------------------------------------------------
+
+@app.get("/api/ventas/{id_venta}/detalle-completo")
+@app.get("/ventas/{id_venta}/detalle-completo")
+def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_token)):
+    """
+    Recupera cabecera, items y datos del cliente para volver a imprimir.
+    """
+    try:
+        # 1. Traemos la cabecera y datos del cliente
+        venta = supabase.table("ventas")\
+            .select("*, clientes(*)")\
+            .eq("id", id_venta).single().execute()
+            
+        # 2. Traemos los productos vendidos en esa boleta específica
+        items = supabase.table("movimientos_inventario")\
+            .select("cantidad, precio_momento, productos(nombre, sku)")\
+            .eq("id_venta", id_venta).execute()
+            
+        return {
+            "venta": venta.data,
+            "items": items.data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
