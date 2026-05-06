@@ -791,52 +791,73 @@ def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 15. NUEVO: MÓDULO DE HISTORIAL Y AUDITORÍA (Garantía Trujillo Centro)
+# 15. GESTIÓN DE HISTORIAL Y REPORTES (ACTUALIZADO: AGRUPAMIENTO POR NOTA)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/caja/historial")
 @app.get("/caja/historial")
 def listar_historial_cajas(user = Depends(validar_token)):
-    """
-    Consulta la Vista SQL 'vista_historial_cajas' para obtener el resumen 
-    financiero de todos los turnos cerrados.
-    """
+    """Consulta la Vista SQL para el resumen financiero de turnos."""
     try:
-        # Consumimos la vista que une sesiones, cierres y ventas digitales
         res = supabase.table("vista_historial_cajas").select("*").execute()
         return res.data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al cargar vista de historial: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en vista historial: {str(e)}")
 
 @app.get("/api/caja/reporte-productos/{sesion_id}")
 @app.get("/caja/reporte-productos/{sesion_id}")
 def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token)):
     """
-    Genera el reporte detallado de productos vendidos en un turno específico.
-    Incluye identificación del cliente y totales por ítem.
+    Genera un reporte agrupado por Nota de Venta. 
+    Propósito: Permitir reimpresiones intuitivas por bloque de productos.
     """
     try:
-        # Realizamos un JOIN triple: Movimientos -> Productos y Movimientos -> Ventas -> Clientes[cite: 4]
+        # 1. Ampliamos la consulta para traer la 'llave' (id_venta) y el Correlativo formal
         res = supabase.table("movimientos_inventario")\
-            .select("cantidad, precio_momento, productos(nombre, sku), ventas(id_cliente, clientes(nombre_razon_social))")\
+            .select("cantidad, precio_momento, id_venta, "
+                    "productos(nombre, sku), "
+                    "ventas(id, correlativo_nota, id_cliente, clientes(nombre_razon_social))")\
             .eq("id_sesion_caja", sesion_id)\
             .eq("tipo_movimiento", "SALIDA")\
             .execute()
             
-        reporte = []
+        # 2. Diccionario temporal para agrupar los productos por su ID de venta
+        ventas_agrupadas = {}
+        
         for m in res.data:
-            reporte.append({
+            id_v = m.get("id_venta")
+            venta_info = m.get("ventas", {})
+            
+            # Si es la primera vez que vemos esta venta, creamos su cabecera
+            if id_v not in ventas_agrupadas:
+                ventas_agrupadas[id_v] = {
+                    "id_venta": id_v,
+                    "correlativo": venta_info.get("correlativo_nota", "SIN CORRELATIVO"),
+                    "cliente": venta_info.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL"),
+                    "productos": [],
+                    "total_nota": 0.0
+                }
+            
+            # Calculamos el subtotal de este producto específico
+            subtotal_item = float(m["cantidad"] * (m["precio_momento"] or 0.0))
+            
+            # Añadimos el producto a su grupo correspondiente
+            ventas_agrupadas[id_v]["productos"].append({
                 "sku": m.get("productos", {}).get("sku"),
-                "producto": m.get("productos", {}).get("nombre"),
+                "nombre": m.get("productos", {}).get("nombre"),
                 "cantidad": m["cantidad"],
                 "precio_venta": float(m["precio_momento"] or 0.0),
-                "total": float(m["cantidad"] * (m["precio_momento"] or 0.0)),
-                "cliente": m.get("ventas", {}).get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL")
+                "total_item": subtotal_item
             })
             
-        return reporte
+            # Sumamos al total de la nota
+            ventas_agrupadas[id_v]["total_nota"] += subtotal_item
+
+        # 3. Retornamos una lista limpia de 'Notas de Venta' en lugar de productos sueltos
+        return list(ventas_agrupadas.values())
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en reporte de productos: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agrupamiento: {str(e)}")
 
 # -----------------------------------------------------------------------------
 # 16. REIMPRESIÓN: RECUPERAR DATOS COMPLETOS DE UNA VENTA
