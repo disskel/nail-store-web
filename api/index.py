@@ -5,6 +5,7 @@ from typing import List, Optional, Any, Literal
 from supabase import create_client, Client
 import os
 import time
+from datetime import datetime
 from dotenv import load_dotenv
 
 # -----------------------------------------------------------------------------
@@ -14,10 +15,10 @@ from dotenv import load_dotenv
 
 app = FastAPI(
     title="Nail-Store API Pro",
-    description="Motor de gestión empresarial con Seguridad SSR v1.0.32",
-    version="1.0.32", # CORREGIDO: Coma agregada para evitar el error 500
+    description="Motor de gestión empresarial con Seguridad SSR v1.0.33",
+    version="1.0.33", # CORREGIDO: Coma agregada para evitar el error 500
     contact={
-        "name": "Soporte Técnico Trujillo",
+        "name": "Soporte Técnico KACS",
         "email": "jeannailsstore@gmail.com"
     }
 )
@@ -129,6 +130,15 @@ def monto_a_letras(monto: float) -> str:
 # 3. MODELOS DE DATOS (PYDANTIC)
 # Fundamento: Validación estricta de tipos para evitar inconsistencias en la DB
 # -----------------------------------------------------------------------------
+
+class GastoRequest(BaseModel):
+    """Modelo para el registro de egresos operativos (Alquiler, Luz, etc.)"""
+    descripcion: str
+    monto: float
+    categoria: Literal['ALQUILER', 'LUZ', 'AGUA', 'PERSONAL', 'MOVILIDAD', 'OTROS']
+    metodo_pago: Optional[str] = "EFECTIVO"
+    fecha_gasto: Optional[str] = None # Formato ISO opcional
+    id_sesion_caja: Optional[str] = None # Vinculación opcional a un turno
 
 class ClienteRequest(BaseModel):
     """Modelo para el registro y búsqueda de clientes"""
@@ -886,3 +896,52 @@ def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_toke
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# 17. NUEVO: MÓDULO DE GASTOS Y UTILIDADES (OPERACIONES DE NEGOCIO)
+# Propósito: Calcular la rentabilidad real descontando gastos operativos.
+# -----------------------------------------------------------------------------
+
+@app.post("/api/gastos")
+@app.post("/gastos")
+def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
+    """
+    Registra un egreso operativo en la base de datos.
+    Si se vincula a una sesión de caja, afecta el arqueo final.
+    """
+    try:
+        data = {
+            "descripcion": req.descripcion.upper(),
+            "monto": req.monto,
+            "categoria": req.categoria,
+            "metodo_pago": req.metodo_pago,
+            "id_sesion_caja": req.id_sesion_caja
+        }
+        if req.fecha_gasto:
+            data["fecha_gasto"] = req.fecha_gasto
+
+        res = supabase.table("gastos_operativos").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al registrar gasto: {str(e)}")
+
+@app.get("/api/reportes/utilidad")
+@app.get("/reportes/utilidad")
+def obtener_reporte_utilidad(desde: str, hasta: str, user = Depends(validar_token)):
+    """
+    Consulta la Vista SQL 'vista_reporte_utilidad' para obtener el balance.
+    Fórmula: Utilidad Neta = (Ventas - Costo Mercadería) - Gastos Operativos.
+    """
+    try:
+        # Consultamos la vista filtrando por el rango de fechas proporcionado
+        res = supabase.table("vista_reporte_utilidad")\
+            .select("*")\
+            .gte("fecha", desde)\
+            .lte("fecha", hasta)\
+            .order("fecha", desc=True)\
+            .execute()
+            
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en reporte financiero: {str(e)}")

@@ -404,5 +404,47 @@ export const apiService = {
     }
     return res.json();
   },
-  
+
+  // -------------------------------------------------------------------------
+  // 11. MÓDULO DE GASTOS OPERATIVOS Y UTILIDAD REAL (NUEVO - v1.0.33)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Registra un egreso administrativo (Luz, Alquiler, Personal, etc.)
+   * Envía los datos al backend para afectar la rentabilidad neta.
+   */
+  async registrarGasto(data: {
+    descripcion: string,
+    monto: number,
+    categoria: string,
+    metodo_pago?: string,
+    id_sesion_caja?: string | null
+  }) {
+    const res = await fetch(`${API_URL}/gastos`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Fallo al registrar gasto operativo');
+    }
+    return res.json();
+  },
+
+  /**
+   * Obtiene el balance financiero entre Ingresos, Costos y Egresos.
+   * Cruza la información de la Vista SQL 'vista_reporte_utilidad'.
+   */
+  async getReporteUtilidad(desde: string, hasta: string) {
+    const res = await fetch(`${API_URL}/reportes/utilidad?desde=${desde}&hasta=${hasta}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al generar reporte de utilidades');
+    }
+    return res.json();
+  },
+    
 };
