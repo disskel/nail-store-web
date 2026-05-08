@@ -225,16 +225,16 @@ export default function RegistrarIngreso() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-[9px] font-black text-zinc-500 uppercase ml-4">Unidades</label>
-                      <input required type="number" min="1" value={formData.cantidad} onChange={e => manejarCambioUnidadOCosto(parseInt(e.target.value) || 0, formData.costo_nuevo)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl font-black text-2xl text-center text-white" />
+                      <input required type="number" min="1" value={formData.cantidad == 0 ? '' : formData.cantidad} onChange={e => manejarCambioUnidadOCosto(parseInt(e.target.value) || 0, formData.costo_nuevo)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl font-black text-2xl text-center text-white" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[9px] font-black text-zinc-500 uppercase ml-4">Costo Unit (S/)</label>
-                      <input required type="number" step="0.01" value={formData.costo_nuevo} onChange={e => manejarCambioUnidadOCosto(formData.cantidad, parseNum(e.target.value))} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl font-black text-2xl text-center text-emerald-400" />
+                      <input required type="number" step="0.01" value={formData.costo_nuevo === 0 ? '' : formData.costo_nuevo} onChange={e => manejarCambioUnidadOCosto(formData.cantidad, parseNum(e.target.value))} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl font-black text-2xl text-center text-emerald-400" />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-emerald-500/50 uppercase ml-4">Costo Total Lote (S/)</label>
-                    <input required type="number" step="0.01" value={formData.costo_total_lote} onChange={e => manejarCambioTotalLote(parseNum(e.target.value))} className="w-full p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl font-black text-4xl text-center text-emerald-500 outline-none" />
+                    <input required type="number" step="0.01" value={formData.costo_total_lote === 0 ? '' : formData.costo_total_lote} onChange={e => manejarCambioTotalLote(parseNum(e.target.value))} className="w-full p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl font-black text-4xl text-center text-emerald-500 outline-none" />
                   </div>
                 </div>
               </section>
@@ -248,16 +248,16 @@ export default function RegistrarIngreso() {
                    <div className="p-4 bg-black/40 rounded-2xl border border-zinc-800">
                       <div className="flex justify-between items-center mb-2 px-2">
                         <label className="text-[9px] font-black text-zinc-500 uppercase">Margen Menor (%)</label>
-                        <input type="number" value={formData.margen_menor} onChange={e => manejarCambioMargen('menor', parseNum(e.target.value))} className="w-16 bg-transparent text-right font-black text-amber-500 outline-none" />
+                        <input type="number" value={formData.margen_menor === 0 ? '' : formData.margen_menor} onChange={e => manejarCambioMargen('menor', parseNum(e.target.value))} className="w-16 bg-transparent text-right font-black text-amber-500 outline-none" />
                       </div>
-                      <input type="number" step="0.01" value={formData.precio_menor_nuevo} onChange={e => recalcarMargenDesdePrecio('menor', parseNum(e.target.value))} className="w-full bg-transparent text-center text-3xl font-black text-white outline-none" />
+                      <input type="number" step="0.01" value={formData.precio_menor_nuevo === 0 ? '' : formData.precio_menor_nuevo} onChange={e => recalcarMargenDesdePrecio('menor', parseNum(e.target.value))} className="w-full bg-transparent text-center text-3xl font-black text-white outline-none" />
                    </div>
                    <div className="p-4 bg-black/40 rounded-2xl border border-zinc-800">
                       <div className="flex justify-between items-center mb-2 px-2">
                         <label className="text-[9px] font-black text-zinc-500 uppercase">Margen Mayor (%)</label>
-                        <input type="number" value={formData.margen_mayor} onChange={e => manejarCambioMargen('mayor', parseNum(e.target.value))} className="w-16 bg-transparent text-right font-black text-amber-500 outline-none" />
+                        <input type="number" value={formData.margen_mayor === 0 ? '' : formData.margen_mayor} onChange={e => manejarCambioMargen('mayor', parseNum(e.target.value))} className="w-16 bg-transparent text-right font-black text-amber-500 outline-none" />
                       </div>
-                      <input type="number" step="0.01" value={formData.precio_mayor_nuevo} onChange={e => recalcarMargenDesdePrecio('mayor', parseNum(e.target.value))} className="w-full bg-transparent text-center text-3xl font-black text-white outline-none" />
+                      <input type="number" step="0.01" value={formData.precio_mayor_nuevo === 0 ? '' : formData.precio_mayor_nuevo} onChange={e => recalcarMargenDesdePrecio('mayor', parseNum(e.target.value))} className="w-full bg-transparent text-center text-3xl font-black text-white outline-none" />
                    </div>
                 </div>
               </section>
