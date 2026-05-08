@@ -7,9 +7,9 @@ import NotaPedidoPrint from './components/NotaPedidoPrint';
 import ClienteModal from './components/ClienteModal';
 
 /**
- * MÓDULO DE VENTAS (POS) - JEAN NAILS STORE
+ * MÓDULO DE VENTAS (POS) - JEAN NAILS STORE (v1.0.33)
  * Propósito: Gestionar ventas, vincular clientes y realizar arqueos multimodales.
- * Incluye lógica de bloqueo de terminal y motor de impresión de Notas de Pedido.
+ * Actualización: Layout horizontal expandido para optimizar vista en escritorio.
  */
 
 export default function ModuloVentas() {
@@ -326,18 +326,12 @@ export default function ModuloVentas() {
                 </div>
                 <button onClick={() => setShowClienteModal(false)} className="text-zinc-500 hover:text-white transition-colors">✕</button>
               </div>
-
               <div className="space-y-6">
-                {/* BUSCADOR RÁPIDO */}
                 <div className="flex gap-2">
                   <input autoFocus placeholder="DNI / RUC" value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} className="flex-1 bg-black border border-zinc-800 p-5 rounded-2xl text-xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
                   <button onClick={buscarClienteRapido} className="px-6 bg-zinc-800 rounded-2xl hover:bg-zinc-700 transition-colors">{buscandoCliente ? '...' : '🔍'}</button>
                 </div>
-
-                {/* BOTÓN GENÉRICO */}
                 <button onClick={seleccionarPublicoGeneral} className="w-full py-3 bg-indigo-600/10 border border-indigo-500/30 text-indigo-400 font-black rounded-xl uppercase text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all">👥 Seleccionar Público General (Varios)</button>
-
-                {/* FORMULARIO DE DATOS (AUTO-RELLENABLE) */}
                 {clienteData && (
                   <div className="p-6 bg-black/40 border border-emerald-500/20 rounded-2xl space-y-4 animate-in slide-in-from-top duration-300">
                     <div className="space-y-1">
@@ -356,23 +350,17 @@ export default function ModuloVentas() {
                     </div>
                   </div>
                 )}
-
                 <button disabled={procesandoVenta} onClick={finalizarTransaccion} className="w-full py-6 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all">{procesandoVenta ? 'PROCESANDO...' : '🚀 CONFIRMAR NOTA DE PEDIDO'}</button>
               </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* MODAL DE ARQUEO MULTIMODAL (CIERRE) (OCULTO EN IMPRESIÓN) */}
-      <div className="print:hidden">
         {showCierre && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6">
             <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl">
               <h2 className="text-4xl font-black text-white text-center uppercase italic mb-10 tracking-tighter">Arqueo de Caja y Bancos</h2>
-              
               <div className="grid grid-cols-2 gap-10">
-                {/* COLUMNA A: SALDOS EN SISTEMA */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-4">Valores en Sistema</p>
                   <div className="space-y-3 p-6 bg-black rounded-[2rem] border border-zinc-800">
@@ -383,8 +371,6 @@ export default function ModuloVentas() {
                     <div className="border-t border-zinc-800 pt-3 flex justify-between text-xl"><span className="text-zinc-400 font-black">TOTAL:</span> <span className="text-white font-black italic">S/ {resumenSesion?.total_general_caja_bancos.toFixed(2)}</span></div>
                   </div>
                 </div>
-
-                {/* COLUMNA B: CONTEO FÍSICO (APP/EFECTIVO) */}
                 <div className="space-y-4">
                   <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest ml-4">Conteo Real (Manual)</p>
                   <div className="grid grid-cols-2 gap-3">
@@ -402,14 +388,13 @@ export default function ModuloVentas() {
         )}
       </div>
 
-      {/* CABECERA CON MONITOREO DE CAJA Y BANCOS (OCULTA EN IMPRESIÓN) */}
+      {/* CABECERA */}
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
         <div>
           <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Punto de Venta</h1>
           <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Caja Activa • Trujillo Centro</p>
         </div>
         <div className="flex gap-4 items-center">
-          {/* VISUALIZACIÓN DE DINERO TOTAL (REQUERIMIENTO) */}
           <div className="bg-zinc-900/50 border border-zinc-800 px-8 py-5 rounded-3xl text-right border-indigo-500/30 backdrop-blur-md">
             <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Total en Sistema (INC. INICIAL)</p>
             <p className="text-2xl text-white font-black italic tracking-tighter">S/ {Number(resumenSesion?.total_general_caja_bancos || 0).toFixed(2)}</p>
@@ -418,76 +403,109 @@ export default function ModuloVentas() {
         </div>
       </header>
 
-      {/* CUERPO POS (OCULTO EN IMPRESIÓN) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 print:hidden">
+      {/* CONTENEDOR PRINCIPAL: BUSCADOR IZQUIERDA, CARRITO DERECHA (ANCHO) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 print:hidden">
         
-        {/* COLUMNA IZQUIERDA: BUSCADOR */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* BUSCADOR Y RESULTADOS (COL: 4) */}
+        <div className="lg:col-span-4 space-y-6">
           <section className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-[2.5rem] backdrop-blur-xl">
-            <input autoFocus placeholder="ESCRIBA EL NOMBRE DEL PRODUCTO..." value={busqueda} onChange={(e) => setFiltro(e.target.value)} className="w-full p-6 bg-black border border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white text-lg placeholder:text-zinc-700 uppercase transition-all shadow-inner" />
+            <input autoFocus placeholder="BUSCAR PRODUCTO..." value={busqueda} onChange={(e) => setFiltro(e.target.value)} className="w-full p-6 bg-black border border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white text-lg placeholder:text-zinc-700 uppercase transition-all shadow-inner" />
           </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
             {productosFiltrados.map(p => (
-              <button key={p.id} onClick={() => agregarAlCarrito(p)} className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all active:scale-95 group shadow-lg">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.categoria}</span>
-                  <span className="text-[10px] font-black text-zinc-500 bg-black px-2 py-1 rounded-lg border border-zinc-800">STOCK: {p.stock}</span>
+              <button key={p.id} onClick={() => agregarAlCarrito(p)} className="p-5 bg-zinc-900/40 border border-zinc-800 rounded-3xl text-left hover:border-indigo-500/50 transition-all active:scale-95 group shadow-lg">
+                <div className="flex justify-between items-center mb-2">
+                   <h3 className="font-black text-white text-sm leading-tight uppercase">{p.nombre}</h3>
+                   <span className="text-[10px] font-black text-zinc-500 bg-black px-2 py-1 rounded-lg border border-zinc-800">STK: {p.stock}</span>
                 </div>
-                <h3 className="font-black text-white text-lg leading-tight uppercase group-hover:text-indigo-400 transition-colors">{p.nombre}</h3>
-                <p className="mt-4 text-2xl font-black text-white italic">S/ {Number(p.precio).toFixed(2)}</p>
+                <p className="text-xl font-black text-emerald-400 italic">S/ {Number(p.precio).toFixed(2)}</p>
               </button>
             ))}
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: CARRITO Y DISPARADOR DE MODAL */}
-        <div className="space-y-6">
-          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[650px] shadow-2xl relative">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-3"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta</h2>
-
-            <div className="flex-1 space-y-4 overflow-y-auto max-h-[350px] pr-2 custom-scrollbar">
-              {carrito.map(item => (
-                <div key={item.id} className="p-5 bg-black/40 border border-zinc-800/50 rounded-3xl relative">
-                  <button onClick={() => eliminarDelCarrito(item.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors">✕</button>
-                  <p className="text-[11px] font-black text-white uppercase leading-tight pr-6">{item.nombre}</p>
-                  
-                  {/* SELECTOR DE PRECIO (MENOR/MAYOR) */}
-                  <div className="flex gap-2 mt-4">
-                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MENOR</button>
-                    <button onClick={() => cambiarTipoPrecio(item.id)} className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>P. MAYOR</button>
-                  </div>
-
-                  <div className="flex justify-between items-center bg-black/60 p-3 mt-4 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => actualizarCantidad(item.id, item.cantidad - 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">-</button>
-                      <span className="w-8 text-center font-black text-white">{item.cantidad}</span>
-                      <button onClick={() => actualizarCantidad(item.id, item.cantidad + 1)} className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-zinc-400 hover:bg-zinc-700">+</button>
-                    </div>
-                    <p className="font-mono font-black text-white italic">S/ {(item.precioSeleccionado * item.cantidad).toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
+        {/* --- EL CARRITO HORIZONTAL (COL: 8) --- */}
+        <div className="lg:col-span-8">
+          <section className="bg-zinc-900 border border-zinc-800 rounded-[3rem] p-10 min-h-[700px] flex flex-col shadow-2xl relative">
+            <div className="flex justify-between items-center mb-10">
+               <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Resumen de Venta</h2>
+               <span className="text-[10px] font-black text-zinc-600 uppercase">{carrito.length} ÍTEMS REGISTRADOS</span>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6">
-              <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-zinc-800/50">
-                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Descuento Global</p>
-                <input type="number" step="0.01" value={descuento === 0 ? '' : descuento} onChange={e => { const val = parseFloat(e.target.value) || 0; setDescuento(val > subtotalCarrito ? subtotalCarrito : val); }} className="w-24 bg-black border border-zinc-800 rounded-xl p-2 text-right font-black text-amber-500 outline-none" placeholder="0.00" />
-              </div>
+            {/* TABLA HORIZONTAL PARA EVITAR SCROLL */}
+            <div className="flex-1 overflow-y-auto max-h-[480px] pr-2 custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-[9px] font-black text-zinc-500 uppercase tracking-widest border-b border-zinc-800 pb-4">
+                    <th className="pb-4">Descripción</th>
+                    <th className="pb-4 text-center">Tipo Precio</th>
+                    <th className="pb-4 text-center">Cantidad</th>
+                    <th className="pb-4 text-right">Unitario</th>
+                    <th className="pb-4 text-right">Total Item</th>
+                    <th className="pb-4 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/40">
+                  {carrito.map(item => (
+                    <tr key={item.id} className="group hover:bg-white/5 transition-all">
+                      <td className="py-5 pr-4">
+                        <p className="text-xs font-black text-white uppercase leading-tight">{item.nombre}</p>
+                        <p className="text-[9px] text-zinc-600 font-bold uppercase mt-1">{item.categoria}</p>
+                      </td>
+                      <td className="py-5">
+                        <div className="flex gap-1 justify-center">
+                          <button onClick={() => cambiarTipoPrecio(item.id)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white' : 'bg-black text-zinc-600 border border-zinc-800'}`}>MENOR</button>
+                          <button onClick={() => cambiarTipoPrecio(item.id)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black transition-all ${item.esPrecioMayor ? 'bg-amber-600 text-white' : 'bg-black text-zinc-600 border border-zinc-800'}`}>MAYOR</button>
+                        </div>
+                      </td>
+                      <td className="py-5">
+                        <div className="flex items-center justify-center gap-3">
+                          <button onClick={() => actualizarCantidad(item.id, item.cantidad - 1)} className="w-7 h-7 bg-black rounded-lg flex items-center justify-center font-bold text-zinc-600 hover:text-white transition-colors">-</button>
+                          <span className="w-6 text-center font-black text-white text-sm">{item.cantidad}</span>
+                          <button onClick={() => actualizarCantidad(item.id, item.cantidad + 1)} className="w-7 h-7 bg-black rounded-lg flex items-center justify-center font-bold text-zinc-600 hover:text-white transition-colors">+</button>
+                        </div>
+                      </td>
+                      <td className="py-5 text-right font-mono text-zinc-500 text-xs">S/ {item.precioSeleccionado.toFixed(2)}</td>
+                      <td className="py-5 text-right font-black text-white italic text-sm">S/ {(item.precioSeleccionado * item.cantidad).toFixed(2)}</td>
+                      <td className="py-5 text-right pl-4">
+                        <button onClick={() => eliminarDelCarrito(item.id)} className="text-zinc-700 hover:text-red-500 transition-colors">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {carrito.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center py-20 opacity-20">
+                   <span className="text-6xl mb-4">🛒</span>
+                   <p className="text-[10px] font-black uppercase tracking-widest">Carrito de Ventas Vacío</p>
+                </div>
+              )}
+            </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
-                  <button key={metodo} onClick={() => setMedioPago(metodo)} className={`py-3 rounded-xl text-[10px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}>{metodo}</button>
-                ))}
-              </div>
+            {/* SECCIÓN FINAL DE TOTALES (HORIZONTAL) */}
+            <div className="mt-auto pt-8 border-t border-zinc-800">
+               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-end">
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase ml-2">Dcto Global</p>
+                    <input type="number" value={descuento === 0 ? '' : descuento} onChange={e => { const val = parseFloat(e.target.value) || 0; setDescuento(val > subtotalCarrito ? subtotalCarrito : val); }} className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-right font-black text-amber-500 outline-none text-sm" placeholder="0.00" />
+                  </div>
 
-              <div className="flex justify-between items-end px-2">
-                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total Final</p>
-                <p className="text-5xl font-black text-white italic tracking-tighter">S/ {totalFinal.toFixed(2)}</p>
-              </div>
-              
-              <button disabled={carrito.length === 0 || procesandoVenta} onClick={() => setShowClienteModal(true)} className={`w-full py-7 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}>{procesandoVenta ? 'ESPERE...' : '🚀 GENERAR PEDIDO'}</button>
+                  <div className="lg:col-span-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map(metodo => (
+                        <button key={metodo} onClick={() => setMedioPago(metodo)} className={`py-3 rounded-xl text-[9px] font-black transition-all ${medioPago === metodo ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-black text-zinc-500 border border-zinc-800'}`}>{metodo}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Total Final</p>
+                    <p className="text-5xl font-black text-white italic tracking-tighter">S/ {totalFinal.toFixed(2)}</p>
+                  </div>
+
+                  <button disabled={carrito.length === 0 || procesandoVenta} onClick={() => setShowClienteModal(true)} className={`w-full py-6 rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl transition-all active:scale-95 ${carrito.length === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'}`}>{procesandoVenta ? '...' : '🚀 GENERAR PEDIDO'}</button>
+               </div>
             </div>
           </section>
         </div>
@@ -495,7 +513,7 @@ export default function ModuloVentas() {
 
       {/* NOTIFICACIONES */}
       {mensaje.texto && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>{mensaje.texto.toUpperCase()}</div>
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-xs border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>{mensaje.texto.toUpperCase()}</div>
       )}
     </div>
   );
