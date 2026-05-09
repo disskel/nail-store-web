@@ -123,7 +123,7 @@ export default function NuevoProducto() {
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-500 relative transition-colors duration-300">
       
-      {/* MODAL DE MAESTROS (BITEMÁTICO) */}
+      {/* MODAL DE MAESTROS (ADAPTADO A MODO CLARO) */}
       {showModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-md p-4 transition-colors">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl transition-colors">
@@ -134,13 +134,13 @@ export default function NuevoProducto() {
               <input 
                 placeholder="Nombre..."
                 value={modalData.name}
-                onChange={e => setModalData({...modalData, name: e.target.value})}
+                onChange={e => setModalData({...modalData, name: e.target.value.toUpperCase()})}
                 className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-zinc-900 dark:text-white font-medium placeholder:text-zinc-300 dark:placeholder:text-zinc-800"
               />
               <input 
                 placeholder={showModal.tipo === 'cat' ? "Descripción..." : "Contacto..."}
                 value={modalData.info}
-                onChange={e => setModalData({...modalData, info: e.target.value})}
+                onChange={e => setModalData({...modalData, info: e.target.value.toUpperCase()})}
                 className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-zinc-900 dark:text-white font-medium placeholder:text-zinc-300 dark:placeholder:text-zinc-800"
               />
               <div className="flex gap-4 pt-6">
@@ -173,7 +173,7 @@ export default function NuevoProducto() {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         
         <div className="lg:col-span-2 space-y-10">
-          {/* SECCIÓN 1: INFORMACIÓN BÁSICA (DERECHA/MODO CLARO ADAPTADO) */}
+          {/* SECCIÓN 1: INFORMACIÓN BÁSICA (CAMBIO DINÁMICO) */}
           <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-8 flex items-center gap-3 transition-colors">
               <span className="w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full"></span> Información del Item
@@ -181,16 +181,16 @@ export default function NuevoProducto() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Nombre Comercial</label>
-                <input required placeholder="Ej: Esmalte Gel" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-800" />
+                <input required placeholder="Ej: Esmalte Gel" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-200 dark:placeholder:text-zinc-800" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Código SKU / EAN</label>
-                <input required placeholder="NS-000" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-300 dark:placeholder:text-zinc-800" />
+                <input required placeholder="NS-000" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-200 dark:placeholder:text-zinc-800" />
               </div>
             </div>
           </section>
 
-          {/* SECCIÓN 2: FINANZAS */}
+          {/* SECCIÓN 2: FINANZAS (CAMBIO DINÁMICO) */}
           <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <h3 className="text-sm font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-8 flex items-center gap-3 transition-colors">
               <span className="w-1.5 h-1.5 bg-emerald-600 dark:bg-emerald-400 rounded-full"></span> Finanzas y Márgenes
@@ -198,22 +198,22 @@ export default function NuevoProducto() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Costo (S/)</label>
-                <input required type="number" step="0.01" value={formData.costo_unidad} onChange={e => setFormData({...formData, costo_unidad: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.costo_unidad === 0 ? '' : formData.costo_unidad} onChange={e => setFormData({...formData, costo_unidad: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Menor (S/)</label>
-                <input required type="number" step="0.01" value={formData.precio_menor} onChange={e => setFormData({...formData, precio_menor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.precio_menor === 0 ? '' : formData.precio_menor} onChange={e => setFormData({...formData, precio_menor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Mayor (S/)</label>
-                <input required type="number" step="0.01" value={formData.precio_mayor} onChange={e => setFormData({...formData, precio_mayor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
+                <input required type="number" step="0.01" value={formData.precio_mayor === 0 ? '' : formData.precio_mayor} onChange={e => setFormData({...formData, precio_mayor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </section>
         </div>
 
         <div className="space-y-10">
-          {/* SECCIÓN 3: CLASIFICACIÓN (OBLIGATORIA) */}
+          {/* SECCIÓN 3: CLASIFICACIÓN (CAMBIO DINÁMICO) */}
           <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 mb-8 flex items-center gap-3 transition-colors">
               <span className="w-1.5 h-1.5 bg-zinc-400 dark:bg-zinc-300 rounded-full"></span> Clasificación
@@ -259,7 +259,7 @@ export default function NuevoProducto() {
             </div>
           </section>
 
-          {/* SECCIÓN 4: STOCK (BLOQUEADO A 0) */}
+          {/* SECCIÓN 4: STOCK (CAMBIO DINÁMICO) */}
           <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-300 mb-8 flex items-center gap-3 transition-colors">
               <span className="w-1.5 h-1.5 bg-zinc-200 dark:bg-zinc-300 rounded-full"></span> Stock Inicial
