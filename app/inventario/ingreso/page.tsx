@@ -269,7 +269,7 @@ export default function RegistrarIngreso() {
         <div className="lg:col-span-4 lg:sticky lg:top-8 space-y-6">
           <section className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] shadow-2xl">
             <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-6 ml-2">Referencia Documental</h3>
-            <input required placeholder="EJ: FACTURA F-102" value={formData.documento_referencia} onChange={e => setFormData({...formData, documento_referencia: e.target.value.toUpperCase()})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white uppercase mb-6" />
+            <input placeholder="EJ: FACTURA F-102" value={formData.documento_referencia} onChange={e => setFormData({...formData, documento_referencia: e.target.value.toUpperCase()})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 font-bold text-white uppercase mb-6" />
             
             <div className="space-y-4">
                <button type="button" disabled={!productoSeleccionado} onClick={() => setPreciosConfirmados(true)} className={`w-full py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${preciosConfirmados ? 'bg-emerald-600 text-white shadow-emerald-500/20' : 'bg-zinc-800 text-zinc-500 hover:text-white border border-zinc-700'}`}>
