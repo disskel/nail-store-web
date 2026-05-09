@@ -60,7 +60,6 @@ export default function Dashboard() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
       
-      {/* CABECERA PRINCIPAL */}
       <header className="mb-12">
         <h1 className="text-6xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase italic transition-colors duration-300">Panel de Control</h1>
         <p className="text-pink-600 dark:text-pink-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2 italic">
@@ -68,7 +67,6 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* REJILLA DE INDICADORES (Bento Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <MetricCard 
           titulo="Capital en Stock" 
@@ -93,9 +91,8 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* SECCIÓN DE ACCESOS RÁPIDOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <section className="bg-zinc-100/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[3rem] backdrop-blur-xl transition-colors duration-300">
+        <section className="bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[3rem] backdrop-blur-xl transition-colors duration-300">
           <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-6">Operaciones Críticas</h2>
           <div className="grid grid-cols-2 gap-4">
             <QuickActionButton href="/ventas" label="Nueva Venta" desc="Punto de Venta (POS)" icon="🛍️" />
@@ -107,8 +104,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* INDICADOR DE STATUS OPERATIVO */}
-        <section className="bg-pink-600/5 dark:bg-pink-600/5 border border-pink-200 dark:border-pink-500/20 p-8 rounded-[3rem] flex flex-col justify-center text-center transition-colors duration-300">
+        <section className="bg-pink-600/5 border border-pink-200 dark:border-pink-500/20 p-8 rounded-[3rem] flex flex-col justify-center text-center transition-colors duration-300">
           <div className="text-4xl mb-4">🚀</div>
           <h3 className="text-xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors duration-300">Terminal Asegurada</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-2 max-w-xs mx-auto font-bold uppercase">
@@ -120,28 +116,27 @@ export default function Dashboard() {
   );
 }
 
-// --- SUB-COMPONENTES DE INTERFAZ ---
-
+// SUB-COMPONENTES ACTUALIZADOS PARA v4
 function MetricCard({ titulo, valor, sub, color, icon }: any) {
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] shadow-xl dark:shadow-2xl hover:border-indigo-500/50 transition-all group duration-300">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] shadow-xl dark:shadow-2xl hover:border-indigo-500/50 transition-all group duration-300">
       <div className="flex justify-between items-start mb-4">
         <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">{titulo}</span>
         <span className="text-2xl group-hover:scale-125 transition-transform">{icon}</span>
       </div>
-      <p className={`text-5xl font-black italic tracking-tighter ${color} mb-2 transition-colors duration-300`}>{valor}</p>
-      <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest transition-colors duration-300">{sub}</p>
+      <p className={`text-5xl font-black italic tracking-tighter ${color} mb-2`}>{valor}</p>
+      <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-600 uppercase tracking-widest">{sub}</p>
     </div>
   );
 }
 
 function QuickActionButton({ href, label, desc, icon }: any) {
   return (
-    <a href={href} className="bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all flex items-center gap-4 group active:scale-95 shadow-sm dark:shadow-none duration-300">
+    <a href={href} className="bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-5 rounded-3xl hover:bg-white dark:hover:bg-zinc-800 transition-all flex items-center gap-4 group active:scale-95 shadow-sm dark:shadow-none duration-300">
       <span className="text-2xl">{icon}</span>
       <div className="text-left">
-        <p className="text-xs font-black text-zinc-900 dark:text-white uppercase transition-colors duration-300">{label}</p>
-        <p className="text-[9px] text-zinc-500 dark:text-zinc-600 font-bold uppercase transition-colors duration-300">{desc}</p>
+        <p className="text-xs font-black text-zinc-900 dark:text-white uppercase">{label}</p>
+        <p className="text-[9px] text-zinc-500 dark:text-zinc-600 font-bold uppercase">{desc}</p>
       </div>
     </a>
   );

@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
-/* CONFIGURURACION GLOBAL - JEAN NAILS STORE
-  VersION 3.0: SOporte para Dark/Light Mode.
+/* CONFIGURACIÓN GLOBAL v4 - SELECCIÓN MANUAL DE TEMA
+  Añadimos la variante para que Tailwind v4 reconozca el botón de Trujillo.
 */
+@variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
-    --background: 255, 255, 255; /* Branco */
-    --foreground: 9, 9, 11;      /* Zinc 950 */
+    --background: 255, 255, 255; /* Blanco en Modo Claro */
+    --foreground: 9, 9, 11;      /* Negro en Modo Claro */
     --card: 244, 244, 245;       /* Zinc 100 */
     --border: 228, 228, 231;     /* Zinc 200 */
   }
 
   .dark {
-    --background: 9, 9, 11;      /* Zinc 950 */
-    --foreground: 255, 255, 255; /* Branco */
+    --background: 9, 9, 11;      /* Negro en Modo Oscuro */
+    --foreground: 255, 255, 255; /* Blanco en Modo Oscuro */
     --card: 24, 24, 27;          /* Zinc 900 */
     --border: 39, 39, 42;        /* Zinc 800 */
   }
 
   body {
-    /* As cores agora são dinâmicas baseadas na classe .dark */
+    /* Fondo y texto dinámicos según el tema seleccionado */
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
     -webkit-font-smoothing: antialiased;
@@ -29,7 +30,7 @@
   }
 }
 
-/* Scrollbar adaptada para ambos os temas */
+/* Scrollbar adaptada para ambos temas */
 @layer components {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
