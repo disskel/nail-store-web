@@ -7,9 +7,9 @@ import NotaPedidoPrint from './components/NotaPedidoPrint';
 import ClienteModal from './components/ClienteModal';
 
 /**
- * MÓDULO DE VENTAS (POS) - JEAN NAILS STORE (v1.0.34)
+ * MÓDULO DE VENTAS (POS) - JEAN NAILS STORE (v1.0.35)
  * Propósito: Gestionar ventas con interfaz de alta densidad para escritorio (Estilo Excel).
- * Actualización: Layout Full-Width y reducción de espacios para maximizar visibilidad.
+ * Actualización: Layout Full-Width, visualización de Proveedor y optimización de espacios.
  */
 
 export default function ModuloVentas() {
@@ -420,6 +420,7 @@ export default function ModuloVentas() {
                     <div>
                       <h3 className="font-black text-white uppercase text-sm group-hover:text-white">{p.nombre}</h3>
                       <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{p.categoria}</span>
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">• {p.proveedor}</span>
                     </div>
                     <div className="text-right">
                        <p className="text-lg font-black text-emerald-400 group-hover:text-white italic">S/ {Number(p.precio).toFixed(2)}</p>
@@ -445,6 +446,7 @@ export default function ModuloVentas() {
               <thead className="sticky top-0 bg-zinc-900 z-10 shadow-md">
                 <tr className="text-[9px] font-black text-zinc-500 uppercase tracking-widest border-b border-zinc-800">
                   <th className="p-3 w-[40%] border-r border-zinc-800/50">Descripción del Ítem</th>
+                  <th className="p-3 w-[15%] border-r border-zinc-800/50">Proveedor</th> {/* NUEVA COLUMNA */}
                   <th className="p-3 text-center w-[15%] border-r border-zinc-800/50">Tipo Precio</th>
                   <th className="p-3 text-center w-[15%] border-r border-zinc-800/50">Cantidad</th>
                   <th className="p-3 text-right w-[10%] border-r border-zinc-800/50">Unitario</th>
@@ -459,6 +461,14 @@ export default function ModuloVentas() {
                       <p className="font-bold text-zinc-200 uppercase truncate">{item.nombre}</p>
                       <p className="text-[8px] text-zinc-600 font-bold uppercase truncate">{item.sku || 'S/SKU'}</p>
                     </td>
+
+                    {/* NUEVA CELDA: PROVEEDOR */}
+                    <td className="p-2 border-r border-zinc-800/30">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase truncate block">
+                        {item.proveedor || 'S/P'}
+                      </span>
+                    </td>
+
                     <td className="p-2 border-r border-zinc-800/30">
                       <div className="flex gap-1 justify-center scale-90">
                         <button onClick={() => cambiarTipoPrecio(item.id)} className={`px-2 py-1 rounded-md text-[8px] font-black transition-all ${!item.esPrecioMayor ? 'bg-indigo-600 text-white shadow-lg' : 'bg-black text-zinc-600 border border-zinc-800'}`}>MENOR</button>
