@@ -6,8 +6,8 @@ import { apiService } from '@/services/apiService';
 import NotaPedidoPrint from '../ventas/components/NotaPedidoPrint';
 
 /**
- * MÓDULO DE GESTIÓN DE CAJAS PRO (v1.1.0)
- * Actualización: Sistema de reimpresión atómico para evitar descuadres visuales.
+ * MÓDULO DE GESTIÓN DE CAJAS PRO (v1.1.1)
+ * Actualización: Soporte para Modo Claro/Oscuro y Sistema de reimpresión atómico.
  * Propósito: Auditoría avanzada y recuperación de documentos históricos.
  */
 export default function HistorialCajas() {
@@ -124,9 +124,9 @@ export default function HistorialCajas() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 relative">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 relative transition-colors duration-300">
       
-      {/* CAPA DE IMPRESIÓN (AISLADA DE LA VISTA WEB MEDIANTE Z-INDEX) */}
+      {/* CAPA DE IMPRESIÓN (AISLADA MEDIANTE Z-INDEX Y FONDO BLANCO PARA PAPEL) */}
       {datosImpresion && (
         <div className="absolute inset-0 z-[999] bg-white print:block">
            <NotaPedidoPrint data={datosImpresion} />
@@ -136,26 +136,26 @@ export default function HistorialCajas() {
       {/* CABECERA (ESTILO TRUJILLO) */}
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
         <div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Control de Cajas</h1>
-          <p className="text-indigo-400 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">Auditoría de Turnos • v1.1.0</p>
+          <h1 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase italic transition-colors">Control de Cajas</h1>
+          <p className="text-indigo-600 dark:text-indigo-400 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic transition-colors">Auditoría de Turnos • v1.1.1</p>
         </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 px-8 py-5 rounded-3xl text-right">
-          <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Registros Totales</p>
-          <p className="text-2xl text-white font-black italic">{historial.length} TURNOS</p>
+        <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-8 py-5 rounded-3xl text-right transition-colors">
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest">Registros Totales</p>
+          <p className="text-2xl text-zinc-900 dark:text-white font-black italic transition-colors">{historial.length} TURNOS</p>
         </div>
       </header>
 
       {/* SECCIÓN DE FILTROS */}
-      <section className="bg-zinc-900/40 border border-zinc-800 p-6 rounded-[2.5rem] mb-10 flex flex-wrap gap-4 print:hidden shadow-inner">
-        <input type="date" onChange={(e) => setFiltro(e.target.value)} className="bg-black border border-zinc-800 p-4 rounded-2xl text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all cursor-pointer" />
-        <input placeholder="BUSCAR POR ESTADO O FECHA..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="flex-1 bg-black border border-zinc-800 p-4 rounded-2xl text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all uppercase placeholder:text-zinc-800" />
+      <section className="bg-zinc-100/50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] mb-10 flex flex-wrap gap-4 print:hidden shadow-inner transition-colors">
+        <input type="date" onChange={(e) => setFiltro(e.target.value)} className="bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all cursor-pointer" />
+        <input placeholder="BUSCAR POR ESTADO O FECHA..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="flex-1 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all uppercase placeholder:text-zinc-300 dark:placeholder:text-zinc-800" />
         
         <button 
           onClick={() => setMostrarSoloDescuadres(!mostrarSoloDescuadres)}
           className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
             mostrarSoloDescuadres 
-            ? 'bg-red-500 text-white border-red-400 shadow-lg shadow-red-500/20' 
-            : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-white'
+            ? 'bg-red-600 text-white border-red-400 shadow-lg shadow-red-500/20' 
+            : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 border-zinc-300 dark:border-zinc-700 hover:text-zinc-900 dark:hover:text-white'
           }`}
         >
           {mostrarSoloDescuadres ? '🔔 VIENDO DESCUADRES' : 'MOSTRAR TODO'}
@@ -163,55 +163,55 @@ export default function HistorialCajas() {
       </section>
 
       {/* TABLA DE AUDITORÍA */}
-      <div className="bg-zinc-900/30 border border-zinc-800 rounded-[3rem] overflow-hidden shadow-2xl print:hidden">
+      <div className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-[3rem] overflow-hidden shadow-2xl print:hidden transition-colors">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-black/60 border-b border-zinc-800">
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Apertura / Cierre</th>
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Inicial</th>
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Final (Sistema)</th>
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Diferencia</th>
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Estado</th>
-              <th className="p-8 text-[10px] font-black text-zinc-500 uppercase tracking-widest text-center">Acciones</th>
+            <tr className="bg-zinc-100 dark:bg-black/60 border-b border-zinc-200 dark:border-zinc-800 transition-colors">
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Apertura / Cierre</th>
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Inicial</th>
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Final (Sistema)</th>
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Diferencia</th>
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Estado</th>
+              <th className="p-8 text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-center">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/50">
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
             {historialFiltrado.map((caja) => {
               const diferencia = Number(caja.descuadre_total || 0);
               const esFaltante = diferencia < -0.01;
               const esSobrante = diferencia > 0.01;
               
               return (
-                <tr key={caja.id} className="hover:bg-indigo-500/5 transition-all group">
+                <tr key={caja.id} className="hover:bg-indigo-50 dark:hover:bg-indigo-500/5 transition-all group">
                   <td className="p-8">
-                    <p className="text-sm font-black text-white">{new Date(caja.fecha_apertura).toLocaleString('es-PE')}</p>
-                    <p className="text-[10px] font-bold text-zinc-600 mt-2 uppercase italic tracking-tighter">
+                    <p className="text-sm font-black text-zinc-900 dark:text-white transition-colors">{new Date(caja.fecha_apertura).toLocaleString('es-PE')}</p>
+                    <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-600 mt-2 uppercase italic tracking-tighter transition-colors">
                       {caja.fecha_cierre ? `Cierre: ${new Date(caja.fecha_cierre).toLocaleString('es-PE')}` : '🔓 TURNO ABIERTO'}
                     </p>
                   </td>
-                  <td className="p-8 text-center font-mono text-zinc-500">S/ {Number(caja.monto_inicial).toFixed(2)}</td>
-                  <td className="p-8 text-center font-mono text-zinc-300 font-bold italic bg-white/5">
+                  <td className="p-8 text-center font-mono text-zinc-400 dark:text-zinc-500">S/ {Number(caja.monto_inicial).toFixed(2)}</td>
+                  <td className="p-8 text-center font-mono text-zinc-900 dark:text-zinc-300 font-bold italic bg-zinc-50/50 dark:bg-white/5 transition-colors">
                     S/ {Number(caja.saldo_esperado_efectivo || 0).toFixed(2)}
                   </td>
                   <td className={`p-8 text-center font-mono font-black text-sm transition-all`}>
                     <div className={`px-4 py-2 rounded-xl inline-block ${
-                      esFaltante ? 'bg-red-500/10 text-red-500 border border-red-500/20 shadow-lg shadow-red-500/10' : 
-                       esSobrante ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 
-                      'text-zinc-500'
+                      esFaltante ? 'bg-red-500/10 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20' : 
+                       esSobrante ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-500/20' : 
+                      'text-zinc-400 dark:text-zinc-500'
                     }`}>
                       {esSobrante ? '+' : ''} S/ {diferencia.toFixed(2)}
                     </div>
                   </td>
                   <td className="p-8 text-center">
                     <span className={`px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter border ${
-                      caja.estado === 'CERRADA' ? 'bg-zinc-800 text-zinc-400 border-zinc-700' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 animate-pulse'
+                      caja.estado === 'CERRADA' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border-emerald-200 dark:border-emerald-500/20 animate-pulse'
                     }`}>
                       {caja.estado}
                     </span>
                   </td>
                   <td className="p-8 text-center space-x-3">
                     <button onClick={() => verReporteProductos(caja.id)} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black rounded-xl uppercase shadow-lg shadow-indigo-600/20 transition-all active:scale-95">📦 Productos</button>
-                    <button onClick={() => verReporteGeneral(caja.id)} className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[9px] font-black rounded-xl uppercase transition-all">📊 General</button>
+                    <button onClick={() => verReporteGeneral(caja.id)} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 text-[9px] font-black rounded-xl uppercase transition-all">📊 General</button>
                   </td>
                 </tr>
               );
@@ -220,32 +220,32 @@ export default function HistorialCajas() {
         </table>
       </div>
 
-      {/* --- MODAL DETALLE DE VENTAS (OCULTO EN IMPRESIÓN) --- */}
+      {/* --- MODAL DETALLE DE VENTAS --- */}
       {showReporteProd && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
-          <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-5xl shadow-2xl animate-in zoom-in duration-300">
-            <div className="flex justify-between items-start mb-10 text-white font-black uppercase italic text-4xl">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-xl p-4 print:hidden transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-5xl shadow-2xl animate-in zoom-in duration-300 transition-colors">
+            <div className="flex justify-between items-start mb-10 text-zinc-900 dark:text-white font-black uppercase italic text-4xl transition-colors">
               <h2>Detalle de Ventas</h2>
-              <button onClick={() => setShowReporteProd(false)}>✕</button>
+              <button onClick={() => setShowReporteProd(false)} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">✕</button>
             </div>
             
             <div className="space-y-6 max-h-[550px] overflow-y-auto pr-4 custom-scrollbar">
                 {reporteAgrupado.map((nota, idx) => (
-                  <div key={idx} className="bg-black/40 border border-zinc-800 rounded-[2rem] overflow-hidden group mb-6">
-                    <div className="p-6 bg-zinc-800/20 border-b border-zinc-800 flex justify-between items-center">
+                  <div key={idx} className="bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] overflow-hidden group mb-6 transition-colors">
+                    <div className="p-6 bg-zinc-100 dark:bg-zinc-800/20 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center transition-colors">
                        <div>
-                         <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-1">Nota de Venta</span>
-                         <h3 className="text-white font-black italic tracking-tighter">{nota.correlativo}</h3>
+                         <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-500 uppercase tracking-widest block mb-1 transition-colors">Nota de Venta</span>
+                         <h3 className="text-zinc-900 dark:text-white font-black italic tracking-tighter transition-colors">{nota.correlativo}</h3>
                        </div>
                        <div className="text-center">
-                         <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Cliente Atendido</span>
-                         <p className="text-zinc-300 font-bold uppercase text-[11px]">{nota.cliente}</p>
+                         <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest block mb-1 transition-colors">Cliente Atendido</span>
+                         <p className="text-zinc-600 dark:text-zinc-300 font-bold uppercase text-[11px] transition-colors">{nota.cliente}</p>
                        </div>
                        {/* BOTÓN DE REIMPRESIÓN ATÓMICO */}
                        <button 
                         onClick={() => ejecutarReimpresion(nota.id_venta)} 
                         disabled={cargandoDetalle}
-                        className="p-4 bg-indigo-600 hover:bg-white hover:text-black rounded-2xl shadow-xl transition-all font-black text-[10px] uppercase flex items-center gap-2"
+                        className="p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl transition-all font-black text-[10px] uppercase flex items-center gap-2"
                        >
                          🖨️ {cargandoDetalle ? '...' : 'Reimprimir'}
                        </button>
@@ -253,11 +253,11 @@ export default function HistorialCajas() {
                     <table className="w-full text-left text-xs">
                       <tbody>
                         {nota.productos.map((prod: any, pIdx: number) => (
-                          <tr key={pIdx} className="border-b border-zinc-800/50">
-                            <td className="p-5 font-bold text-zinc-400 uppercase">{prod.nombre}</td>
-                            <td className="p-5 text-center text-zinc-500 font-black">x{prod.cantidad}</td>
-                            <td className="p-5 text-center text-zinc-600">S/ {prod.precio_venta.toFixed(2)}</td>
-                            <td className="p-5 text-right text-emerald-400 font-black italic">S/ {prod.total_item.toFixed(2)}</td>
+                          <tr key={pIdx} className="border-b border-zinc-100 dark:border-zinc-800/50 transition-colors">
+                            <td className="p-5 font-bold text-zinc-500 dark:text-zinc-400 uppercase transition-colors">{prod.nombre}</td>
+                            <td className="p-5 text-center text-zinc-400 dark:text-zinc-500 font-black transition-colors">x{prod.cantidad}</td>
+                            <td className="p-5 text-center text-zinc-500 dark:text-zinc-600 transition-colors">S/ {prod.precio_venta.toFixed(2)}</td>
+                            <td className="p-5 text-right text-emerald-600 dark:text-emerald-400 font-black italic transition-colors">S/ {prod.total_item.toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -269,29 +269,29 @@ export default function HistorialCajas() {
         </div>
       )}
 
-      {/* --- MODAL REPORTE GENERAL FINANCIERO (OCULTO EN IMPRESIÓN) --- */}
+      {/* --- MODAL REPORTE GENERAL FINANCIERO --- */}
       {showReporteGen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 print:hidden">
-          <div className="bg-zinc-900 border border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl">
-            <div className="flex justify-between items-start mb-10 text-white font-black text-4xl">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-xl p-4 print:hidden transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-2xl shadow-2xl animate-in zoom-in duration-300 transition-colors">
+            <div className="flex justify-between items-start mb-10 text-zinc-900 dark:text-white font-black text-4xl transition-colors">
               <h2>Resumen Financiero</h2>
-              <button onClick={() => setShowReporteGen(false)}>✕</button>
+              <button onClick={() => setShowReporteGen(false)} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors text-3xl">✕</button>
             </div>
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 bg-black rounded-3xl border border-zinc-800 shadow-inner">
-                    <p className="text-[10px] text-zinc-500 font-black uppercase mb-2 italic">Efectivo Inicial</p>
-                    <p className="text-2xl text-white font-black">S/ {resumenFinanciero?.monto_inicial.toFixed(2)}</p>
+                  <div className="p-6 bg-zinc-50 dark:bg-black rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-inner transition-colors">
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase mb-2 italic transition-colors">Efectivo Inicial</p>
+                    <p className="text-2xl text-zinc-900 dark:text-white font-black transition-colors">S/ {resumenFinanciero?.monto_inicial.toFixed(2)}</p>
                   </div>
-                  <div className="p-6 bg-black rounded-3xl border border-zinc-800 shadow-inner">
-                    <p className="text-[10px] text-zinc-500 font-black uppercase mb-2 italic">Ventas Efectivo</p>
-                    <p className="text-2xl text-emerald-400 font-black">S/ {resumenFinanciero?.ventas_por_metodo.EFECTIVO.toFixed(2)}</p>
+                  <div className="p-6 bg-zinc-50 dark:bg-black rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-inner transition-colors">
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase mb-2 italic transition-colors">Ventas Efectivo</p>
+                    <p className="text-2xl text-emerald-600 dark:text-emerald-400 font-black transition-colors">S/ {resumenFinanciero?.ventas_por_metodo.EFECTIVO.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="p-8 bg-zinc-800/20 rounded-[2.5rem] border border-zinc-800 space-y-4 text-white text-xs">
-                    <div className="flex justify-between pb-3 border-b border-zinc-800 uppercase text-zinc-500"><span>Yape:</span> <span className="text-white">S/ {resumenFinanciero?.ventas_por_metodo.YAPE.toFixed(2)}</span></div>
-                    <div className="flex justify-between pb-3 border-b border-zinc-800 uppercase text-zinc-500"><span>Plin:</span> <span className="text-white">S/ {resumenFinanciero?.ventas_por_metodo.PLIN.toFixed(2)}</span></div>
-                    <div className="flex justify-between uppercase text-zinc-500"><span>Transferencias:</span> <span className="text-white">S/ {resumenFinanciero?.ventas_por_metodo.TRANSFERENCIA.toFixed(2)}</span></div>
+                <div className="p-8 bg-zinc-100 dark:bg-zinc-800/20 rounded-[2.5rem] border border-zinc-200 dark:border-zinc-800 space-y-4 text-zinc-900 dark:text-white text-xs transition-colors">
+                    <div className="flex justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 uppercase text-zinc-500 transition-colors"><span>Yape:</span> <span className="text-zinc-900 dark:text-white font-bold transition-colors">S/ {resumenFinanciero?.ventas_por_metodo.YAPE.toFixed(2)}</span></div>
+                    <div className="flex justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 uppercase text-zinc-500 transition-colors"><span>Plin:</span> <span className="text-zinc-900 dark:text-white font-bold transition-colors">S/ {resumenFinanciero?.ventas_por_metodo.PLIN.toFixed(2)}</span></div>
+                    <div className="flex justify-between uppercase text-zinc-500 transition-colors"><span>Transferencias:</span> <span className="text-zinc-900 dark:text-white font-bold transition-colors">S/ {resumenFinanciero?.ventas_por_metodo.TRANSFERENCIA.toFixed(2)}</span></div>
                 </div>
             </div>
           </div>

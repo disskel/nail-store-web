@@ -72,28 +72,28 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
   };
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-zinc-900/80 dark:bg-black/80 backdrop-blur-sm p-4 transition-colors duration-300">
       <form 
         onSubmit={handleSubmit}
-        className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl space-y-6 animate-in zoom-in duration-300"
+        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl space-y-6 animate-in zoom-in duration-300 transition-colors"
       >
         <div className="text-center">
-          <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">
+          <h2 className="text-2xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">
             {clienteInicial ? 'Editar Cliente' : 'Nuevo Registro'}
           </h2>
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Maestro de Clientes Jean Nails</p>
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-widest mt-1 transition-colors">Maestro de Clientes Jean Nails</p>
         </div>
 
         <div className="space-y-4">
           {/* TIPO Y NÚMERO DE DOCUMENTO */}
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Tipo</label>
+              <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Tipo</label>
               <select 
                 name="tipo_documento"
                 value={formData.tipo_documento}
                 onChange={handleChange}
-                className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-xs font-bold text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-xs font-bold text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
               >
                 <option value="DNI">DNI</option>
                 <option value="RUC">RUC</option>
@@ -101,51 +101,51 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
               </select>
             </div>
             <div className="col-span-2 space-y-1">
-              <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Documento</label>
+              <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Documento</label>
               <input 
                 name="numero_documento"
                 placeholder="00000000"
                 value={formData.numero_documento}
                 onChange={handleChange}
-                className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm font-black text-emerald-400 outline-none"
+                className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-black text-emerald-600 dark:text-emerald-400 outline-none transition-colors"
               />
             </div>
           </div>
 
           {/* NOMBRE O RAZÓN SOCIAL */}
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Nombre / Razón Social</label>
+            <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Nombre / Razón Social</label>
             <input 
               name="nombre_razon_social"
               placeholder="NOMBRE COMPLETO..."
               value={formData.nombre_razon_social}
               onChange={handleChange}
               required
-              className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm font-bold text-white outline-none uppercase"
+              className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-900 dark:text-white outline-none uppercase placeholder:text-zinc-300 dark:placeholder:text-zinc-800 transition-colors"
             />
           </div>
 
           {/* DIRECCIÓN */}
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Dirección</label>
+            <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Dirección</label>
             <input 
               name="direccion"
               placeholder="CALLE, DISTRITO..."
               value={formData.direccion}
               onChange={handleChange}
-              className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-400 outline-none uppercase"
+              className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-500 dark:text-zinc-400 outline-none uppercase placeholder:text-zinc-300 dark:placeholder:text-zinc-800 transition-colors"
             />
           </div>
 
           {/* CELULAR */}
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-zinc-500 uppercase ml-2">Celular de Contacto</label>
+            <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Celular de Contacto</label>
             <input 
               name="celular"
               placeholder="900000000"
               value={formData.celular}
               onChange={handleChange}
-              className="w-full bg-black border border-zinc-800 p-3 rounded-xl text-sm font-bold text-white outline-none"
+              className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-900 dark:text-white outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-800 transition-colors"
             />
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
           <button 
             type="button"
             onClick={onCancel}
-            className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all"
+            className="flex-1 py-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all"
           >
             Cancelar
           </button>

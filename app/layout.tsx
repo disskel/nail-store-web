@@ -1,5 +1,6 @@
 'use client'; // 1. Habilitamos clics y lógica de sesión
 
+import { useEffect, useState } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link"; // 2. Navegación rápida sin recargar
 import { useRouter } from 'next/navigation';
@@ -12,6 +13,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const [isDark, setIsDark] = useState(true); // Estado del tema (Inicia en oscuro por defecto)
   
   // Inicializamos el portero de sesión para el navegador
   const supabase = createBrowserClient(
@@ -19,7 +21,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Función para salir del sistema de forma segura[cite: 13]
+  // 1. SINCRONIZACIÓN DEL TEMA CON EL NAVEGADOR Y ALMACENAMIENTO LOCAL
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const darkMode = savedTheme ? savedTheme === 'dark' : true;
+    setIsDark(darkMode);
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  // Función para alternar entre temas
+  const toggleTheme = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Función para salir del sistema de forma segura
   const handleLogout = async () => {
     await supabase.auth.signOut(); // Avisa a Supabase
     await apiService.logout();     // Limpia el localStorage de Trujillo
@@ -28,11 +55,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full dark`}>
-      <body className="flex flex-col lg:flex-row h-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full ${isDark ? 'dark' : ''}`}>
+      <body className="flex flex-col lg:flex-row h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans transition-colors duration-300">
         
-        {/* BARRA LATERAL (Mantenemos tu estilo original)[cite: 15] */}
-        <aside className="hidden lg:flex w-72 bg-black border-r border-zinc-800 flex-col p-6 shadow-2xl">
+        {/* BARRA LATERAL (Mantenemos tu estilo original) */}
+        <aside className="hidden lg:flex w-72 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 flex-col p-6 shadow-2xl transition-colors duration-300">
           
           <div className="flex items-center gap-3 mb-10 px-2">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
@@ -40,50 +67,60 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div>
               <h2 className="text-xl font-bold tracking-tight">Nail-Store</h2>
-              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Admin Pro</p>
+              <p className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase font-bold tracking-widest">Admin Pro</p>
             </div>
           </div>
 
           <nav className="flex-1 space-y-1">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase px-3 mb-3">Principal</p>
+            <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase px-3 mb-3">Principal</p>
             
-            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">🏠</span> Dashboard
             </Link>
 
-            <Link href="/ventas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/ventas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">🛍️</span> Ventas
             </Link>
 
-            <Link href="/clientes" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/clientes" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">👤</span> Clientes
             </Link>
 
             {/* NUEVO ACCESO: GESTIÓN DE CAJAS (AUDITORÍA FINANCIERA) */}
-            <Link href="/cajas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/cajas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">🔐</span> Historial Cajas
             </Link>
 
             {/* NUEVO ACCESO: UTILIDADES (INGRESOS VS EGRESOS) */}
-            <Link href="/utilidades" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/utilidades" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">📈</span> Utilidades
             </Link>
 
-            <Link href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">📊</span> Inventario
             </Link>
 
-            <Link href="/compras" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/compras" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">📦</span> Registrar Ingreso
             </Link>
 
-            <Link href="/inventario/nuevo" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-900 transition-all text-zinc-400 hover:text-white">
+            <Link href="/inventario/nuevo" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">✨</span> Nuevo Producto
             </Link>
+
+            {/* BOTÓN SELECTOR DE TEMA (MODO CLARO / OSCURO) */}
+            <div className="pt-4">
+              <button 
+                onClick={toggleTheme}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-bold text-sm hover:bg-indigo-600 hover:text-white transition-all border border-indigo-600/20"
+              >
+                <span className="text-lg">{isDark ? '☀️' : '🌙'}</span> {isDark ? 'Modo Claro' : 'Modo Oscuro'}
+              </button>
+            </div>
           </nav>
 
-          {/* SECCIÓN DE CIERRE DE SESIÓN (Agregada al final)[cite: 13] */}
-          <div className="pt-6 border-t border-zinc-800">
+          {/* SECCIÓN DE CIERRE DE SESIÓN (Agregada al final) */}
+          <div className="pt-6 border-t border-zinc-200 dark:border-zinc-800">
             <button 
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white transition-all font-bold text-sm"
@@ -93,20 +130,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </aside>
 
-        {/* NAVEGACIÓN MÓVIL (Actualizada con Logout)[cite: 15] */}
-        <nav className="lg:hidden flex justify-around items-center bg-black border-b border-zinc-800 p-4 sticky top-0 z-50">
+        {/* NAVEGACIÓN MÓVIL (Actualizada con Logout y Tema) */}
+        <nav className="lg:hidden flex justify-around items-center bg-zinc-50 dark:bg-black border-b border-zinc-200 dark:border-zinc-800 p-4 sticky top-0 z-50 transition-colors duration-300">
           <Link href="/">🏠</Link>
           <Link href="/ventas">🛍️</Link>
           <Link href="/clientes">👤</Link>
-          <Link href="/cajas">🔐</Link> {/* NUEVO ÍCONO MÓVIL */}
-          <Link href="/utilidades">📈</Link> {/* NUEVO ÍCONO MÓVIL */}
+          <button onClick={toggleTheme} className="text-xl">{isDark ? '☀️' : '🌙'}</button>
+          <Link href="/cajas">🔐</Link>
+          <Link href="/utilidades">📈</Link>
           <Link href="/inventario">📊</Link>
-          <Link href="/compras">📦</Link>
-          <Link href="/inventario/nuevo">✨</Link>
+	  <Link href="/compras">📦</Link>
+	  <Link href="/inventario/nuevo">✨</Link>
           <button onClick={handleLogout} className="text-xl">🚪</button>
         </nav>
 
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-zinc-950 to-black pt-20 lg:pt-0 pb-20 lg:pb-0">
+        <main className="flex-1 overflow-y-auto bg-zinc-50 dark:bg-gradient-to-br dark:from-zinc-950 dark:to-black pt-20 lg:pt-0 pb-20 lg:pb-0 transition-colors duration-300">
           {children}
         </main>
       </body>

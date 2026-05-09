@@ -154,33 +154,33 @@ export default function InventarioDetallado() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
       
       {/* MODAL DE AJUSTE RÁPIDO DE PRECIOS */}
       {showAjuste && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-md p-4 transition-colors">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300 transition-colors">
             <div className="mb-8">
-              <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Ajuste Rápido</h2>
-              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Sincronización Manual de Precios</p>
+              <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">Ajuste Rápido</h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1 transition-colors">Sincronización Manual de Precios</p>
             </div>
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">Costo Unidad (S/)</label>
-                <input type="number" step="0.01" value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-emerald-400 font-black text-2xl text-center outline-none focus:ring-2 focus:ring-emerald-600 transition-all" />
+                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Costo Unidad (S/)</label>
+                <input type="number" step="0.01" value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-emerald-600 dark:text-emerald-400 font-black text-2xl text-center outline-none focus:ring-2 focus:ring-emerald-600 transition-all" />
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Menor (S/)</label>
-                  <input type="number" step="0.01" value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" />
+                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Menor (S/)</label>
+                  <input type="number" step="0.01" value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-500 uppercase ml-2">P. Mayor (S/)</label>
-                  <input type="number" step="0.01" value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} className="w-full p-5 bg-black border border-zinc-800 rounded-2xl text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600" />
+                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Mayor (S/)</label>
+                  <input type="number" step="0.01" value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
                 </div>
               </div>
               <div className="flex gap-4 pt-6">
-                <button onClick={() => setShowAjuste(false)} className="flex-1 py-4 text-zinc-500 font-bold hover:text-white transition-colors uppercase text-[10px]">Cancelar</button>
+                <button onClick={() => setShowAjuste(false)} className="flex-1 py-4 text-zinc-400 dark:text-zinc-500 font-bold hover:text-zinc-900 dark:hover:text-white transition-colors uppercase text-[10px]">Cancelar</button>
                 <button disabled={guardando} onClick={guardarCambiosPrecio} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-500 shadow-xl transition-all uppercase text-[10px]">{guardando ? 'Guardando...' : 'Actualizar'}</button>
               </div>
             </div>
@@ -191,30 +191,30 @@ export default function InventarioDetallado() {
       {/* CABECERA RESPONSIVA */}
       <header className="mb-8 flex flex-col gap-6">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">Inventario</h1>
+          <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">Inventario</h1>
           <div className="flex flex-wrap gap-2 mt-4">
-             <button onClick={() => setShowFiltros(!showFiltros)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${showFiltros ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+             <button onClick={() => setShowFiltros(!showFiltros)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${showFiltros ? 'bg-indigo-600 text-white shadow-lg' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
               {showFiltros ? '✕ Filtros' : '⚡ Filtros'}
              </button>
-             <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${mostrarInactivos ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
+             <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${mostrarInactivos ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600'}`}>
               {mostrarInactivos ? '👁️ Inactivos' : '🙈 Activos'}
              </button>
           </div>
         </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl">
-          <p className="text-[10px] text-zinc-500 font-black uppercase">Resultados</p>
-          <p className="text-xl font-black text-white">{productosFiltrados.length} ÍTEMS</p>
+        <div className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl transition-colors">
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase">Resultados</p>
+          <p className="text-xl font-black text-zinc-900 dark:text-white transition-colors">{productosFiltrados.length} ÍTEMS</p>
         </div>
       </header>
 
       {/* PANEL DE FILTROS MÓVIL */}
       {showFiltros && (
-        <div className="mb-8 p-6 bg-zinc-900 border border-zinc-800 rounded-3xl space-y-4">
-          <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold" />
-          <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-black border border-zinc-800 rounded-2xl text-white font-bold">
+        <div className="mb-8 p-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-4 shadow-inner transition-colors">
+          <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
+          <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-colors">
             {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
           </select>
-          <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] border ${soloBajoStock ? 'bg-amber-500/20 border-amber-500 text-amber-500' : 'bg-black border-zinc-800 text-zinc-500'}`}>
+          <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] border transition-all ${soloBajoStock ? 'bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-500' : 'bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
             {soloBajoStock ? '⚠️ Solo Críticos' : '📦 Todo el Stock'}
           </button>
         </div>
@@ -222,77 +222,76 @@ export default function InventarioDetallado() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2">
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-[2rem] overflow-hidden">
+          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] overflow-hidden transition-colors">
             <table className="w-full">
               {/* HEADERS: Ocultos en móvil */}
-              <thead className="hidden md:table-header-group bg-black/40 text-[10px] font-black uppercase text-zinc-500">
+              <thead className="hidden md:table-header-group bg-zinc-100 dark:bg-black/40 text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 transition-colors">
                 <tr>
-                  <th className="p-6">Producto</th>
+                  <th className="p-6 text-left">Producto</th>
                   <th className="p-6 text-center">Stock</th>
                   <th className="p-6 text-right">Costo / Precio</th>
                   <th className="p-6 text-center">Gestión</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/50">
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                 {productosFiltrados.map((p) => (
-                  <tr key={p.id} className={`flex flex-col md:table-row transition-all ${!p.activo ? 'opacity-30' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/10' : 'hover:bg-white/5'}`}>
+                  <tr key={p.id} className={`flex flex-col md:table-row transition-all ${!p.activo ? 'opacity-30' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/5 dark:bg-indigo-600/10' : 'hover:bg-zinc-50 dark:hover:bg-white/5'}`}>
                     
                     {/* INFO PRINCIPAL */}
                     <td className="p-4 md:p-6">
                       <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+                        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-700'}`}></div>
                         <div>
-                          <div className="font-black text-white text-base md:text-lg uppercase leading-tight">{p.nombre}</div>
-                          <div className="flex gap-2 mt-2">
-                            <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-1 rounded font-bold uppercase">{p.categoria}</span>
-                            <span className="text-[9px] text-zinc-500 font-bold uppercase mt-1">📦 {p.proveedor}</span>
+                          <div className="font-black text-zinc-900 dark:text-white text-base md:text-lg uppercase leading-tight transition-colors">{p.nombre}</div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded font-bold uppercase transition-colors">{p.categoria}</span>
+                            <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold uppercase mt-1 transition-colors">📦 {p.proveedor}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
                     {/* STOCK: Estilo diferente en móvil */}
-                    <td className="px-4 md:p-6 md:text-center flex justify-between md:table-cell border-t border-zinc-800/30 md:border-none py-3">
-                      <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Stock Actual</span>
-                      <div className={`px-4 py-1 rounded-xl font-black text-xs ${ (p.stock || 0) < 10 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400' }`}>
+                    <td className="px-4 md:p-6 md:text-center flex justify-between md:table-cell border-t border-zinc-100 dark:border-none py-3 transition-colors">
+                      <span className="md:hidden text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase mt-1">Stock Actual</span>
+                      <div className={`px-4 py-1 rounded-xl font-black text-xs inline-block ${ (p.stock || 0) < 10 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-500' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' }`}>
                         {p.stock || 0} UNID
                       </div>
                     </td>
 
                     {/* COLUMNA FINANCIERA: Costo vs Precios (Menor/Mayor) */}
-                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3 border-t border-zinc-800/30 md:border-none">
-                    {/* Etiqueta para celulares */}
-                    <span className="md:hidden text-[10px] font-black text-zinc-600 uppercase mt-1">Análisis Financiero</span>
+                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3 border-t border-zinc-100 dark:border-none transition-colors">
+                    <span className="md:hidden text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase mt-1">Análisis Financiero</span>
                     
                     <div className="flex flex-col md:items-end gap-1">
                       {/* Costo Maestro (Principal) */}
-                      <div className="font-mono font-black text-white text-lg leading-none">
+                      <div className="font-mono font-black text-zinc-900 dark:text-white text-lg leading-none transition-colors">
                         S/ {Number(p.costo || 0).toFixed(2)}
                       </div>
                       
                       {/* Precios de Venta (Secundarios) */}
                       <div className="flex flex-col md:items-end gap-0.5">
-                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">
-                          <span className="text-amber-500/80 mr-1">MEN:</span> 
-                          <span className="text-zinc-300">S/ {Number(p.precio || 0).toFixed(2)}</span>
+                        <div className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter transition-colors">
+                          <span className="text-amber-600 dark:text-amber-500/80 mr-1">MEN:</span> 
+                          <span className="text-zinc-600 dark:text-zinc-300">S/ {Number(p.precio || 0).toFixed(2)}</span>
                         </div>
-                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">
-                          <span className="text-indigo-400/80 mr-1">MAY:</span> 
-                          <span className="text-zinc-300">S/ {Number(p.precio_mayor || 0).toFixed(2)}</span>
+                        <div className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter transition-colors">
+                          <span className="text-indigo-600 dark:text-indigo-400/80 mr-1">MAY:</span> 
+                          <span className="text-zinc-600 dark:text-zinc-300">S/ {Number(p.precio_mayor || 0).toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
                   </td>
 
                     {/* ACCIONES: Siempre visibles y centradas */}
-                    <td className="p-4 md:p-6 text-center border-t border-zinc-800 md:border-none">
+                    <td className="p-4 md:p-6 text-center border-t border-zinc-100 dark:border-none transition-colors">
                       <div className="flex justify-center md:justify-center gap-3">
-                        <button onClick={() => editarNombre(p.id, p.nombre)} className="flex-1 md:flex-none p-3 bg-zinc-800 text-white rounded-xl active:scale-90 transition-transform">✏️</button>
-                        <button onClick={() => abrirAjuste(p)} className="flex-1 md:flex-none p-3 bg-zinc-800 text-white rounded-xl active:scale-90">🏷️</button>
-                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`flex-1 md:flex-none p-3 rounded-xl ${p.activo ? 'bg-zinc-800 text-zinc-500' : 'bg-emerald-600 text-white'}`}>
+                        <button onClick={() => editarNombre(p.id, p.nombre)} className="flex-1 md:flex-none p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl active:scale-90 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-700">✏️</button>
+                        <button onClick={() => abrirAjuste(p)} className="flex-1 md:flex-none p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl active:scale-90 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-700">🏷️</button>
+                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`flex-1 md:flex-none p-3 rounded-xl transition-all ${p.activo ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-red-500/10 hover:text-red-500' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'}`}>
                           {p.activo ? '🗑️' : '✅'}
                         </button>
-                        <button onClick={() => verTrazabilidad(p)} className={`flex-1 md:flex-none p-3 rounded-xl ${productoSel?.id === p.id ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}>🔍</button>
+                        <button onClick={() => verTrazabilidad(p)} className={`flex-1 md:flex-none p-3 rounded-xl transition-all ${productoSel?.id === p.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-400 hover:text-indigo-600'}`}>🔍</button>
                       </div>
                     </td>
                   </tr>
@@ -304,21 +303,21 @@ export default function InventarioDetallado() {
 
         {/* PANEL DE TRAZABILIDAD (STICKY) */}
         <div className="space-y-8">
-          <section className="bg-zinc-900/60 border border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8 flex items-center gap-3"><span className="w-2 h-2 bg-indigo-400 rounded-full"></span> Trazabilidad del Ítem</h3>
+          <section className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8 transition-colors">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-8 flex items-center gap-3 transition-colors"><span className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></span> Trazabilidad del Ítem</h3>
             {productoSel ? (
               <div className="space-y-8 animate-in slide-in-from-right duration-500">
-                <div className="pb-6 border-b border-zinc-800"><div className="text-2xl font-black text-white uppercase tracking-tighter">{productoSel.nombre}</div></div>
+                <div className="pb-6 border-b border-zinc-200 dark:border-zinc-800 transition-colors"><div className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter transition-colors">{productoSel.nombre}</div></div>
                 <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
                   {historial.map((m, i) => (
-                    <div key={i} className="p-5 bg-black/40 rounded-[1.5rem] border border-zinc-800/50 flex justify-between items-center group hover:border-zinc-700 transition-all">
-                      <div className="space-y-1"><div className={`text-[10px] font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-400' : 'text-red-400'}`}>{m.tipo_movimiento}</div><div className="text-xs font-black text-zinc-300">{new Date(m.fecha).toLocaleDateString()}</div></div>
-                      <div className="text-xl font-black text-white">{m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}</div>
+                    <div key={i} className="p-5 bg-white dark:bg-black/40 rounded-[1.5rem] border border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center group hover:border-indigo-300 dark:hover:border-zinc-700 transition-all shadow-sm">
+                      <div className="space-y-1"><div className={`text-[10px] font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{m.tipo_movimiento}</div><div className="text-xs font-black text-zinc-400 dark:text-zinc-300 transition-colors">{new Date(m.fecha).toLocaleDateString()}</div></div>
+                      <div className="text-xl font-black text-zinc-900 dark:text-white transition-colors">{m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}</div>
                     </div>
                   ))}
                 </div>
               </div>
-            ) : (<div className="text-center py-32 opacity-20"><div className="text-5xl mb-4">📈</div><p className="text-[10px] font-black uppercase">Seleccione un producto</p></div>)}
+            ) : (<div className="text-center py-32 opacity-20"><div className="text-5xl mb-4 grayscale">📈</div><p className="text-[10px] font-black uppercase text-zinc-900 dark:text-white transition-colors">Seleccione un producto</p></div>)}
           </section>
         </div>
       </div>

@@ -6,9 +6,10 @@ import { apiService } from '@/services/apiService';
 import ClienteForm from './components/ClienteForm';
 
 /**
- * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM) - VERSIÓN COMPLETA
+ * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM) - VERSIÓN 1.0.36
  * Propósito: Listar clientes registrados, realizar búsquedas dinámicas,
  * registrar nuevos perfiles y visualizar el historial de ventas (Hoja de Vida).
+ * Actualización: Soporte para Modo Claro/Oscuro y optimización de contraste CRM.
  */
 
 export default function ModuloClientes() {
@@ -75,15 +76,15 @@ export default function ModuloClientes() {
     setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
   };
 
-  // Pantalla de carga mientras se sincroniza con Trujillo
+  // Pantalla de carga profesional mientras se sincroniza con Trujillo
   if (cargando) return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950 text-emerald-500 font-black tracking-widest uppercase italic animate-pulse">
+    <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950 text-emerald-600 dark:text-emerald-500 font-black tracking-widest uppercase italic animate-pulse transition-colors duration-300">
       Cargando Base de Clientes...
     </div>
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
       
       {/* MODAL DEL FORMULARIO (SE DISPARA AL PRESIONAR "NUEVO CLIENTE") */}
       {showForm && (
@@ -96,8 +97,8 @@ export default function ModuloClientes() {
       {/* CABECERA DEL MÓDULO */}
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic">Gestión de Clientes</h1>
-          <p className="text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic">
+          <h1 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase italic transition-colors">Gestión de Clientes</h1>
+          <p className="text-emerald-600 dark:text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic transition-colors">
             Trazabilidad y Fidelización • Jean Nails Store
           </p>
         </div>
@@ -109,9 +110,9 @@ export default function ModuloClientes() {
           >
             ➕ Nuevo Cliente
           </button>
-          <div className="bg-zinc-900/50 border border-zinc-800 px-6 py-4 rounded-2xl text-right">
-            <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
-            <p className="text-2xl text-white font-black">{clientes.length}</p>
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-2xl text-right transition-colors">
+            <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
+            <p className="text-2xl text-zinc-900 dark:text-white font-black transition-colors">{clientes.length}</p>
           </div>
         </div>
       </header>
@@ -120,12 +121,12 @@ export default function ModuloClientes() {
         
         {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3 DE LA PANTALLA) */}
         <div className="lg:col-span-2 space-y-6">
-          <section className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl">
+          <section className="bg-zinc-100/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <input 
               placeholder="BUSCAR POR NOMBRE O DNI/RUC..." 
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full p-5 bg-black border border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-white uppercase transition-all shadow-inner"
+              className="w-full p-5 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-zinc-900 dark:text-white uppercase transition-all shadow-inner"
             />
           </section>
 
@@ -137,32 +138,32 @@ export default function ModuloClientes() {
                 onClick={() => verDetalleCliente(c)}
                 className={`p-6 border rounded-3xl text-left transition-all active:scale-[0.98] group flex justify-between items-center ${
                   clienteSeleccionado?.id === c.id 
-                  ? 'bg-emerald-600/10 border-emerald-500' 
-                  : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-600'
+                  ? 'bg-emerald-50 dark:bg-emerald-600/10 border-emerald-500 shadow-sm' 
+                  : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600'
                 }`}
               >
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="text-[9px] font-black bg-black px-2 py-0.5 rounded border border-zinc-800 text-zinc-400">
+                    <span className="text-[9px] font-black bg-white dark:bg-black px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors">
                       {c.tipo_documento}
                     </span>
-                    <span className="text-xs font-bold text-zinc-500">{c.numero_documento}</span>
+                    <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 transition-colors">{c.numero_documento}</span>
                   </div>
-                  <h3 className="font-black text-white text-lg uppercase group-hover:text-emerald-400 transition-colors">
+                  <h3 className="font-black text-zinc-900 dark:text-white text-lg uppercase group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                     {c.nombre_razon_social}
                   </h3>
-                  <p className="text-[10px] text-zinc-500 font-medium mt-1">
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500 font-medium mt-1 transition-colors">
                     📍 {c.direccion || 'DIRECCIÓN NO REGISTRADA'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] font-black text-zinc-600 uppercase">Contacto</p>
-                  <p className="text-sm font-black text-white">{c.celular || 'S/N'}</p>
+                  <p className="text-[9px] font-black text-zinc-300 dark:text-zinc-600 uppercase transition-colors">Contacto</p>
+                  <p className="text-sm font-black text-zinc-900 dark:text-white transition-colors">{c.celular || 'S/N'}</p>
                 </div>
               </button>
             ))}
             {clientesFiltrados.length === 0 && (
-              <div className="py-20 text-center text-zinc-700 font-black uppercase italic tracking-widest">
+              <div className="py-20 text-center text-zinc-400 dark:text-zinc-700 font-black uppercase italic tracking-widest transition-colors">
                 No se encontraron coincidencias en la base de datos
               </div>
             )}
@@ -171,11 +172,11 @@ export default function ModuloClientes() {
 
         {/* COLUMNA DERECHA: FICHA DE SEGUIMIENTO (OCUPA 1/3 DE LA PANTALLA) */}
         <div className="space-y-6">
-          <section className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative">
+          <section className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative transition-colors">
             {!clienteSeleccionado ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-30">
                 <div className="text-6xl">👤</div>
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-500">
+                <p className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-500 transition-colors">
                   Seleccione un cliente para ver su historial de compras
                 </p>
               </div>
@@ -183,55 +184,55 @@ export default function ModuloClientes() {
               <div className="animate-in fade-in duration-500 space-y-8">
                 {/* FICHA DE CONTACTO RÁPIDA */}
                 <div className="space-y-2">
-                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-500">
+                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-500 transition-colors">
                     Ficha de Seguimiento
                   </h2>
-                  <p className="text-2xl font-black text-white leading-tight uppercase italic tracking-tighter">
+                  <p className="text-2xl font-black text-zinc-900 dark:text-white leading-tight uppercase italic tracking-tighter transition-colors">
                     {clienteSeleccionado.nombre_razon_social}
                   </p>
                   <div className="pt-4 space-y-3">
-                     <div className="flex items-center gap-3 text-zinc-400">
+                     <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 transition-colors">
                         <span className="text-lg">📱</span>
                         <span className="text-sm font-bold">{clienteSeleccionado.celular || 'Sin celular'}</span>
                      </div>
                   </div>
                 </div>
 
-                <hr className="border-zinc-800" />
+                <hr className="border-zinc-200 dark:border-zinc-800 transition-colors" />
 
                 {/* HISTORIAL CRONOLÓGICO DE NOTAS DE PEDIDO */}
                 <div className="space-y-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors">
                     Últimas Notas de Pedido
                   </h3>
                   
                   <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
                     {cargandoHistorial ? (
-                      <p className="text-center py-10 text-[10px] font-black text-zinc-700 animate-pulse">RECUPERANDO HISTORIAL...</p>
+                      <p className="text-center py-10 text-[10px] font-black text-zinc-400 dark:text-zinc-700 animate-pulse transition-colors">RECUPERANDO HISTORIAL...</p>
                     ) : historialCompras.map((compra, idx) => (
-                      <div key={idx} className="p-4 bg-black/40 border border-zinc-800 rounded-2xl space-y-2">
+                      <div key={idx} className="p-4 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-2 transition-colors">
                         <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-black text-white italic">
+                          <span className="text-[10px] font-black text-zinc-900 dark:text-white italic transition-colors">
                             {compra.correlativo_nota || 'S/N'}
                           </span>
-                          <span className={`text-[8px] font-black px-2 py-0.5 rounded ${
-                            compra.estado === 'COMPLETADA' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                          <span className={`text-[8px] font-black px-2 py-0.5 rounded transition-colors ${
+                            compra.estado === 'COMPLETADA' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-amber-500/10 text-amber-600 dark:text-amber-500'
                           }`}>
                             {compra.estado}
                           </span>
                         </div>
                         <div className="flex justify-between items-end">
-                          <p className="text-[9px] text-zinc-600 font-bold">
+                          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-bold transition-colors">
                             {new Date(compra.fecha).toLocaleDateString('es-PE')}
                           </p>
-                          <p className="text-lg font-black text-white italic">
+                          <p className="text-lg font-black text-zinc-900 dark:text-white italic transition-colors">
                             S/ {Number(compra.monto_neto).toFixed(2)}
                           </p>
                         </div>
                       </div>
                     ))}
                     {!cargandoHistorial && historialCompras.length === 0 && (
-                      <p className="text-center py-10 text-[9px] font-bold text-zinc-700 uppercase italic">
+                      <p className="text-center py-10 text-[9px] font-bold text-zinc-400 dark:text-zinc-700 uppercase italic transition-colors">
                         El cliente no registra compras previas
                       </p>
                     )}
@@ -240,8 +241,8 @@ export default function ModuloClientes() {
               </div>
             )}
 
-            <div className="mt-auto pt-6 border-t border-zinc-800">
-              <p className="text-[8px] text-zinc-600 font-black uppercase text-center tracking-tighter">
+            <div className="mt-auto pt-6 border-t border-zinc-200 dark:border-zinc-800 transition-colors">
+              <p className="text-[8px] text-zinc-400 dark:text-zinc-600 font-black uppercase text-center tracking-tighter italic">
                 Módulo CRM Trujillo - Jean Nails Store
               </p>
             </div>

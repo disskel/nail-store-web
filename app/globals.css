@@ -1,48 +1,47 @@
 @import "tailwindcss";
 
-/* 
-  CONFIGURACIÓN GLOBAL - JEAN NAILS STORE
-  Versión 2.2: Eliminación total de @apply para máxima compatibilidad.
-  Propósito: Garantizar el Dark Mode y el estilo de scroll sin advertencias del editor.
+/* CONFIGURURACION GLOBAL - JEAN NAILS STORE
+  VersION 3.0: SOporte para Dark/Light Mode.
 */
 
 @layer base {
+  :root {
+    --background: 255, 255, 255; /* Branco */
+    --foreground: 9, 9, 11;      /* Zinc 950 */
+    --card: 244, 244, 245;       /* Zinc 100 */
+    --border: 228, 228, 231;     /* Zinc 200 */
+  }
+
+  .dark {
+    --background: 9, 9, 11;      /* Zinc 950 */
+    --foreground: 255, 255, 255; /* Branco */
+    --card: 24, 24, 27;          /* Zinc 900 */
+    --border: 39, 39, 42;        /* Zinc 800 */
+  }
+
   body {
-    /* Mantiene el fondo negro profundo y suavizado de fuente en todo el sistema */
-    background-color: rgb(9, 9, 11); /* Equivalente a bg-zinc-950 */
-    color: rgb(255, 255, 255);       /* Equivalente a text-white */
+    /* As cores agora são dinâmicas baseadas na classe .dark */
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
-/* 
-  CAPA DE COMPONENTES: custom-scrollbar (CSS ESTÁNDAR)
-  Propósito: Estilizar las barras de desplazamiento para que coincidan 
-  con la estética Zinc/Indigo del sistema sin ocupar espacio excesivo.
-*/
+/* Scrollbar adaptada para ambos os temas */
 @layer components {
-  /* 1. Dimensiones del carril de desplazamiento */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
-    height: 6px;
   }
   
-  /* 2. Estilo del carril (Track) - Zinc 900 con 50% opacidad */
   .custom-scrollbar::-webkit-scrollbar-track {
-    background-color: rgba(24, 24, 27, 0.5); 
+    background-color: rgba(var(--foreground), 0.05); 
     border-radius: 9999px;
   }
   
-  /* 3. Estilo del pulgar (Thumb) - Zinc 800 sólido */
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgb(39, 39, 42); 
+    background-color: rgba(var(--foreground), 0.2); 
     border-radius: 9999px;
-  }
-
-  /* 4. Efecto de interacción (Hover) - Indigo 600 con 50% opacidad */
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(79, 70, 229, 0.5);
-    cursor: pointer;
   }
 }
