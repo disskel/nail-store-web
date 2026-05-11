@@ -2,19 +2,21 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
+import { useRouter } from 'next/navigation';
 
 /**
- * MÓDULO DE UTILIDADES Y RENTABILIDAD (v1.0.36)
+ * MÓDULO DE UTILIDADES Y RENTABILIDAD (v1.0.37)
  * Propósito: Comparar Ingresos vs Egresos para calcular la Utilidad Neta Real.
- * Actualización: Soporte para Modo Claro/Oscuro y optimización de contraste financiero.
+ * Actualización: Inclusión de selector de medio de pago y manejo de sesión expirada.
  */
 export default function UtilidadesPage() {
+  const router = useRouter();
   const [reporte, setReporte] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   
   // --- ESTADOS DE FILTRO (Rango de fechas) ---
-  const [fechaInicio, setFechaInicio] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]); // 1ero del mes
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]); // Hoy
+  const [fechaInicio, setFechaInicio] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]); 
+  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]); 
 
   // --- ESTADOS PARA NUEVO GASTO ---
   const [showModalGasto, setShowModalGasto] = useState(false);
@@ -22,7 +24,7 @@ export default function UtilidadesPage() {
     descripcion: '',
     monto: 0,
     categoria: 'OTROS',
-    metodo_pago: 'EFECTIVO'
+    metodo_pago: 'EFECTIVO' // Este valor es crítico para el backend
   });
 
   // --- 1. CARGA DE DATOS FINANCIEROS ---
@@ -31,8 +33,13 @@ export default function UtilidadesPage() {
     try {
       const data = await apiService.getReporteUtilidad(fechaInicio, fechaFin);
       setReporte(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al sincronizar utilidades:", error);
+      // Si el error es de autorización (401), redirigimos al login
+      if (error.message.includes('SESIÓN EXPIRADA')) {
+        alert("Su sesión ha expirado. Por favor, inicie sesión nuevamente.");
+        router.push('/login');
+      }
     } finally {
       setCargando(false);
     }
@@ -40,7 +47,7 @@ export default function UtilidadesPage() {
 
   useEffect(() => { cargarDatos(); }, [fechaInicio, fechaFin]);
 
-  // --- 2. CÁLCULO DE TOTALES (BALANCE GLOBAL) ---
+  // --- 2. CÁLCULO DE TOTALES ---
   const totales = useMemo(() => {
     return reporte.reduce((acc, curr) => ({
       ingresos: acc.ingresos + Number(curr.ingresos_totales),
@@ -52,16 +59,24 @@ export default function UtilidadesPage() {
   const utilidadBruta = totales.ingresos - totales.costos;
   const utilidadNeta = utilidadBruta - totales.gastos;
 
-  // --- 3. GESTIÓN DE GASTOS ---
+  // --- 3. GESTIÓN DE GASTOS (CON VALIDACIÓN MEJORADA) ---
   const guardarGasto = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validación de seguridad antes de enviar
+    if (nuevoGasto.monto <= 0) {
+      alert("El monto debe ser mayor a cero");
+      return;
+    }
+
     try {
       await apiService.registrarGasto(nuevoGasto);
       setShowModalGasto(false);
+      // Reset del formulario incluyendo el medio de pago por defecto
       setNuevoGasto({ descripcion: '', monto: 0, categoria: 'OTROS', metodo_pago: 'EFECTIVO' });
-      cargarDatos(); // Refrescamos el balance
-    } catch (error) {
-      alert("Error al registrar el gasto");
+      cargarDatos(); 
+    } catch (error: any) {
+      alert(`Error al registrar el gasto: ${error.message || 'Error interno del servidor'}`);
     }
   };
 
@@ -91,35 +106,31 @@ export default function UtilidadesPage() {
       {/* FILTROS DE FECHA */}
       <section className="bg-zinc-100/50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] mb-10 flex flex-wrap items-center gap-6 shadow-inner transition-colors">
         <div className="flex items-center gap-4">
-          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase italic">Desde</span>
+          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase italic transition-colors">Desde</span>
           <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase italic">Hasta</span>
+          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase italic transition-colors">Hasta</span>
           <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
         </div>
       </section>
 
       {/* TARJETAS DE INDICADORES (KPIs) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        
         <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] transition-colors shadow-sm dark:shadow-none">
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest mb-2">Ingresos Totales</p>
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest mb-2 transition-colors">Ingresos Totales</p>
           <p className="text-3xl text-zinc-900 dark:text-white font-black italic transition-colors">S/ {totales.ingresos.toFixed(2)}</p>
         </div>
-
         <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] transition-colors shadow-sm dark:shadow-none">
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest mb-2">Costo Mercadería</p>
+          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest mb-2 transition-colors">Costo Mercadería</p>
           <p className="text-3xl text-zinc-500 dark:text-zinc-400 font-black italic transition-colors">S/ {totales.costos.toFixed(2)}</p>
         </div>
-
         <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] transition-colors shadow-sm dark:shadow-none">
-          <p className="text-[10px] text-red-600 dark:text-red-500 font-black uppercase tracking-widest mb-2">Gastos Operativos</p>
+          <p className="text-[10px] text-red-600 dark:text-red-500 font-black uppercase tracking-widest mb-2 transition-colors">Gastos Operativos</p>
           <p className="text-3xl text-red-600 dark:text-red-500 font-black italic transition-colors">S/ {totales.gastos.toFixed(2)}</p>
         </div>
-
         <div className="bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-500/20 dark:border-emerald-500/30 p-8 rounded-[2.5rem] shadow-lg shadow-emerald-500/5 transition-colors">
-          <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-black uppercase tracking-widest mb-2">Utilidad Neta (Real)</p>
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-black uppercase tracking-widest mb-2 transition-colors">Utilidad Neta (Real)</p>
           <p className="text-4xl text-emerald-600 dark:text-emerald-400 font-black italic tracking-tighter transition-colors">S/ {utilidadNeta.toFixed(2)}</p>
         </div>
       </div>
@@ -157,8 +168,8 @@ export default function UtilidadesPage() {
 
       {/* MODAL: REGISTRO DE GASTO OPERATIVO */}
       {showModalGasto && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-xl p-4">
-          <form onSubmit={guardarGasto} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-xl shadow-2xl animate-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-xl p-4 transition-colors">
+          <form onSubmit={guardarGasto} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-12 rounded-[3.5rem] w-full max-w-xl shadow-2xl animate-in zoom-in duration-300 transition-colors">
             <div className="flex justify-between items-center mb-10">
               <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">Registrar Egreso</h2>
               <button type="button" onClick={() => setShowModalGasto(false)} className="text-zinc-400 dark:text-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-colors text-3xl">✕</button>
@@ -173,7 +184,7 @@ export default function UtilidadesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2 block transition-colors">Monto (S/)</label>
-                  <input type="number" step="0.01" required value={nuevoGasto.monto} onChange={(e) => setNuevoGasto({...nuevoGasto, monto: Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-red-600 transition-colors" />
+                  <input type="number" step="0.01" required value={nuevoGasto.monto === 0 ? '' : nuevoGasto.monto} onChange={(e) => setNuevoGasto({...nuevoGasto, monto: Number(e.target.value)})} className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-red-600 transition-colors" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2 block transition-colors">Categoría</label>
@@ -188,7 +199,28 @@ export default function UtilidadesPage() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white p-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/20">
+              {/* SECCIÓN NUEVA: MEDIO DE PAGO (CORRIGE ERROR 500 POSIBLE) */}
+              <div>
+                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2 block transition-colors">Medio de Pago</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map((metodo) => (
+                    <button
+                      key={metodo}
+                      type="button"
+                      onClick={() => setNuevoGasto({...nuevoGasto, metodo_pago: metodo})}
+                      className={`py-3 rounded-xl text-[10px] font-black transition-all border ${
+                        nuevoGasto.metodo_pago === metodo 
+                        ? 'bg-red-600 border-red-500 text-white' 
+                        : 'bg-zinc-50 dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500'
+                      }`}
+                    >
+                      {metodo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white p-5 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-red-600/20 active:scale-95">
                 Confirmar Pago de Gasto
               </button>
             </div>
