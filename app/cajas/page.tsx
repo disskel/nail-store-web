@@ -180,7 +180,26 @@ export default function HistorialCajas() {
               const diferencia = Number(caja.descuadre_total || 0);
               const esFaltante = diferencia < -0.01;
               const esSobrante = diferencia > 0.01;
-              
+              /**
+               * SOLUCIÓN DE AUDITORÍA TRUJILLO:
+               * Reemplazamos el parseo simple por uno que respete la cadena literal 
+               * enviada por nuestra Vista SQL (que ya está en hora de Lima).
+               */
+              const formatearFechaLocal = (fechaStr: string) => {
+                if (!fechaStr) return null;
+                // Quitamos el indicador de zona '+00' o 'Z' para que el navegador 
+                // lo trate como hora local de la computadora del usuario.
+                const fechaLimpia = fechaStr.replace('Z', '').replace(/\+00$/, '');
+                return new Date(fechaLimpia).toLocaleString('es-PE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                });
+              };
               return (
                 <tr key={caja.id} className="hover:bg-indigo-50 dark:hover:bg-indigo-500/5 transition-all group">
                   <td className="p-8">
