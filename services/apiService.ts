@@ -3,7 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 /**
  * FUNCIÓN AUXILIAR DE SEGURIDAD (PORTERO FRONTERA)
  * Propósito: Recuperar el token de sesión activa de Supabase para enviarlo al Backend.
- * Garantiza que cada fetch lleve el 'pasaporte' del usuario logueado.
+ * Garantiza que cada fetch lleve el 'pasaporte' del usuario logueado para saltar políticas RLS.
  */
 const getHeaders = () => {
   // Buscamos el token en el almacenamiento local que usa Supabase

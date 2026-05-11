@@ -899,8 +899,8 @@ def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_toke
 
 
 # -----------------------------------------------------------------------------
-# 17. NUEVO: MÓDULO DE GASTOS Y UTILIDADES (OPERACIONES DE NEGOCIO)
-# Propósito: Calcular la rentabilidad real descontando gastos operativos.
+# 17. MÓDULO DE GASTOS Y UTILIDADES (ACTUALIZADO PARA v1.0.34)
+# Propósito: Solucionar Error 42501 inyectando el token del usuario.
 # -----------------------------------------------------------------------------
 
 @app.post("/api/gastos")
@@ -908,9 +908,10 @@ def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_toke
 def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
     """
     Registra un egreso operativo en la base de datos.
-    Si se vincula a una sesión de caja, afecta el arqueo final.
+    SOLUCIÓN AL ERROR 42501: Inyectamos el token del usuario para bypass RLS.
     """
     try:
+        token = user["token"] # Pasaporte extraído del portero
         data = {
             "descripcion": req.descripcion.upper(),
             "monto": req.monto,
@@ -918,10 +919,24 @@ def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
             "metodo_pago": req.metodo_pago,
             "id_sesion_caja": req.id_sesion_caja
         }
+       # AUDITORÍA INTELIGENTE: Si no se envía caja, buscamos la que esté ABIERTA en Trujillo
+        if not req.id_sesion_caja:
+            sesion_activa = supabase.table("sesiones_caja")\
+                .select("id").eq("estado", "ABIERTA")\
+                .order("fecha_apertura", desc=True).limit(1).execute()
+            
+            if sesion_activa.data:
+                data["id_sesion_caja"] = sesion_activa.data[0]["id"]
+
         if req.fecha_gasto:
             data["fecha_gasto"] = req.fecha_gasto
 
-        res = supabase.table("gastos_operativos").insert(data).execute()
+        # ACCIÓN CRÍTICA: Ejecutamos identificándonos con el token del usuario
+        res = supabase.postgrest.auth(token).table("gastos_operativos").insert(data).execute()
+        
+        if not res.data:
+            raise Exception("No se recibió respuesta de confirmación de la base de datos")
+
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al registrar gasto: {str(e)}")
