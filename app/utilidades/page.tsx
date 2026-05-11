@@ -16,8 +16,8 @@ export default function UtilidadesPage() {
   
   // --- 1. ESTADOS DE FILTRO (RANGO DE FECHAS) ---
   // Por defecto, muestra desde el primer día del mes actual hasta hoy.
-  const [fechaInicio, setFechaInicio] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]); 
-  const [fechaFin, setFechaFin] = useState(new Date().toISOString().split('T')[0]); 
+  const [fechaInicio, setFechaInicio] = useState(new Date().toLocaleDateString('en-CA')); // Formato YYYY-MM-DD local
+  const [fechaFin, setFechaFin] = useState(new Date().toLocaleDateString('en-CA'));
 
   // --- 2. ESTADOS PARA EL REGISTRO DE GASTOS ---
   const [showModalGasto, setShowModalGasto] = useState(false);
@@ -168,9 +168,10 @@ export default function UtilidadesPage() {
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
             {reporte.map((dia, idx) => {
               const gananciaDia = (Number(dia.ingresos_totales) - Number(dia.costo_mercaderia)) - Number(dia.egresos_operativos);
+         
               return (
                 <tr key={idx} className="hover:bg-zinc-50 dark:hover:bg-white/5 transition-all">
-                  <td className="p-8 font-black text-zinc-900 dark:text-white transition-colors">{new Date(dia.fecha).toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' })}</td>
+                  <td className="p-8 font-black text-zinc-900 dark:text-white transition-colors">{new Date(dia.fecha + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' })}</td>
                   <td className="p-8 text-center text-zinc-500 dark:text-zinc-400 transition-colors">S/ {Number(dia.ingresos_totales).toFixed(2)}</td>
                   <td className="p-8 text-center text-zinc-400 dark:text-zinc-600 transition-colors">S/ {Number(dia.costo_mercaderia).toFixed(2)}</td>
                   <td className="p-8 text-center text-red-600 dark:text-red-500/70 font-bold transition-colors">S/ {Number(dia.egresos_operativos).toFixed(2)}</td>
