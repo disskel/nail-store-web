@@ -82,7 +82,9 @@ async def validar_token(authorization: str = Header(None)):
         if not user:
             raise HTTPException(status_code=401, detail="SESIÓN INVÁLIDA")
             
-        return user # Ahora retornamos el objeto de usuario limpio
+        # IMPORTANTE: Retornamos un diccionario, no el objeto pelado.
+        # Esto permite hacer auth_data["token"] más adelante.
+        return {"user": user, "token": token}
     except Exception as e:
         print(f"Error de seguridad en Trujillo: {str(e)}")
         raise HTTPException(status_code=401, detail="SESIÓN EXPIRADA")
@@ -899,19 +901,28 @@ def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_toke
 
 
 # -----------------------------------------------------------------------------
-# 17. MÓDULO DE GASTOS Y UTILIDADES (ACTUALIZADO PARA v1.0.34)
-# Propósito: Solucionar Error 42501 inyectando el token del usuario.
+# 17. MÓDULO DE GASTOS Y UTILIDADES (ACTUALIZADO - v1.0.35)
 # -----------------------------------------------------------------------------
 
 @app.post("/api/gastos")
 @app.post("/gastos")
-def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
+def registrar_gasto(
+    req: GastoRequest, 
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # Capturamos el header aquí mismo
+):
     """
     Registra un egreso operativo en la base de datos.
-    SOLUCIÓN AL ERROR 42501: Inyectamos el token del usuario para bypass RLS.
+    SOLUCIÓN: Extraemos el token directamente del header para no romper 
+    la compatibilidad con el resto de tu código que usa 'user'.
     """
     try:
-        token = user["token"] # Pasaporte extraído del portero
+        # Extraemos el token del encabezado 'Authorization: Bearer <TOKEN>'
+        if not authorization:
+            raise Exception("No se proporcionó el encabezado de autorización")
+            
+        token = authorization.split(" ")[1]
+
         data = {
             "descripcion": req.descripcion.upper(),
             "monto": req.monto,
@@ -919,7 +930,8 @@ def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
             "metodo_pago": req.metodo_pago,
             "id_sesion_caja": req.id_sesion_caja
         }
-       # AUDITORÍA INTELIGENTE: Si no se envía caja, buscamos la que esté ABIERTA en Trujillo
+
+        # AUDITORÍA AUTOMÁTICA: Si no viene caja, buscamos la abierta en Trujillo
         if not req.id_sesion_caja:
             sesion_activa = supabase.table("sesiones_caja")\
                 .select("id").eq("estado", "ABIERTA")\
@@ -931,14 +943,16 @@ def registrar_gasto(req: GastoRequest, user = Depends(validar_token)):
         if req.fecha_gasto:
             data["fecha_gasto"] = req.fecha_gasto
 
-        # ACCIÓN CRÍTICA: Ejecutamos identificándonos con el token del usuario
+        # ACCIÓN CRÍTICA: Nos identificamos ante Supabase usando el token capturado
+        # Esto permite saltar la política RLS (Error 42501) sin cambiar el objeto 'user'
         res = supabase.postgrest.auth(token).table("gastos_operativos").insert(data).execute()
         
         if not res.data:
-            raise Exception("No se recibió respuesta de confirmación de la base de datos")
+            raise Exception("La base de datos no confirmó el registro del gasto")
 
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
+        # Devolvemos el error detallado para ver cualquier otro problema en la consola
         raise HTTPException(status_code=500, detail=f"Error al registrar gasto: {str(e)}")
 
 @app.get("/api/reportes/utilidad")
