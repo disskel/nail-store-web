@@ -452,6 +452,19 @@ export const apiService = {
   // -------------------------------------------------------------------------
 
   /**
+   * Registra una nueva obligación (Luz, Alquiler, etc.) en la tabla maestra.
+   */
+  async crearObligacion(data: any) {
+    const res = await fetch(`${API_URL}/obligaciones`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Error al crear la obligación');
+    return res.json();
+  },
+
+  /**
    * Obtiene la lista de obligaciones de pago pendientes.
    */
   async getObligaciones() {

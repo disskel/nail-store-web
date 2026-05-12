@@ -979,6 +979,26 @@ def obtener_reporte_utilidad(desde: str, hasta: str, user = Depends(validar_toke
 # 18. MÓDULO DE OBLIGACIONES (NOTIFICACIONES)
 # -----------------------------------------------------------------------------
 
+class ObligacionRequest(BaseModel):
+    descripcion: str
+    categoria: str
+    es_recurrente: bool = True
+    dia_vencimiento: Optional[int] = None
+    fecha_especifica: Optional[str] = None
+    monto_sugerido: float = 0.0
+    recordatorio_dias: int = 3
+
+@app.post("/api/obligaciones")
+@app.post("/obligaciones")
+def crear_obligacion(req: ObligacionRequest, user = Depends(validar_token)):
+    """Registra una nueva regla de pago en el cronograma informativo."""
+    try:
+        data = req.dict()
+        res = supabase.table("obligaciones_pago").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class ObligacionUpdate(BaseModel):
     ultima_notificacion: str
 
