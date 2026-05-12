@@ -1037,3 +1037,37 @@ def actualizar_pago_obligacion(id_obligacion: str, req: ObligacionUpdate, user =
         return {"status": "success", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- ENDPOINTS DE ADMINISTRACIÓN DE CRONOGRAMA ---
+
+@app.patch("/api/obligaciones/{id_ob}")
+@app.patch("/obligaciones/{id_ob}")
+def actualizar_configuracion_obligacion(
+    id_ob: str, 
+    req: dict, 
+    user = Depends(validar_token), 
+    authorization: str = Header(None)
+):
+    """Permite activar/desactivar la regla o cambiar el día de aviso."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        # Bypass RLS: Nos identificamos para poder modificar la regla
+        res = supabase.postgrest.auth(token).table("obligaciones_pago").update(req).eq("id", id_ob).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/obligaciones/{id_ob}")
+@app.delete("/obligaciones/{id_ob}")
+def eliminar_obligacion_maestra(
+    id_ob: str, 
+    user = Depends(validar_token), 
+    authorization: str = Header(None)
+):
+    """Borra definitivamente una regla del cronograma."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        supabase.postgrest.auth(token).table("obligaciones_pago").delete().eq("id", id_ob).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

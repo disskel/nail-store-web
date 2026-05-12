@@ -489,4 +489,22 @@ export const apiService = {
     return res.json();
   },
     
+  // --- GESTIÓN AVANZADA DE OBLIGACIONES ---
+  async updateObligacion(id: string, data: any) {
+    const res = await fetch(`${API_URL}/obligaciones/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async deleteObligacion(id: string) {
+    const res = await fetch(`${API_URL}/obligaciones/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    });
+    return res.json();
+  },
+
 };
