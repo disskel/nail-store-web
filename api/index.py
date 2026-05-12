@@ -1021,20 +1021,9 @@ class ObligacionUpdate(BaseModel):
 def listar_obligaciones(user = Depends(validar_token)):
     """Trae las reglas de pago para la campana de notificaciones."""
     try:
-        # Filtramos solo las obligaciones activas
-        res = supabase.table("obligaciones_pago").select("*").eq("activo", True).execute()
+        # ELIMINAMOS el .eq("activo", True) para que Jean pueda ver y reactivar servicios
+        res = supabase.table("obligaciones_pago").select("*").order("dia_vencimiento").execute()
         return res.data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.patch("/api/obligaciones/{id_obligacion}/pagar")
-@app.patch("/obligaciones/{id_obligacion}/pagar")
-def actualizar_pago_obligacion(id_obligacion: str, req: ObligacionUpdate, user = Depends(validar_token)):
-    """Actualiza la fecha de control para que la notificación no se repita."""
-    try:
-        data = {"ultima_notificacion": req.ultima_notificacion}
-        res = supabase.table("obligaciones_pago").update(data).eq("id", id_obligacion).execute()
-        return {"status": "success", "data": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1048,26 +1037,26 @@ def actualizar_configuracion_obligacion(
     user = Depends(validar_token), 
     authorization: str = Header(None)
 ):
-    """Permite activar/desactivar la regla o cambiar el día de aviso."""
+    """Permite editar montos, días o activar/pausar la regla."""
     try:
         token = authorization.split(" ")[1] if authorization else None
-        # Bypass RLS: Nos identificamos para poder modificar la regla
+        # Bypass RLS: Nos identificamos para modificar nuestra propia regla
         res = supabase.postgrest.auth(token).table("obligaciones_pago").update(req).eq("id", id_ob).execute()
-        return {"status": "success"}
+        return {"status": "success", "data": res.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error al editar regla: {str(e)}")
 
 @app.delete("/api/obligaciones/{id_ob}")
 @app.delete("/obligaciones/{id_ob}")
-def eliminar_obligacion_maestra(
+def eliminar_obligacion_definitiva(
     id_ob: str, 
     user = Depends(validar_token), 
     authorization: str = Header(None)
 ):
-    """Borra definitivamente una regla del cronograma."""
+    """Borra físicamente la regla del cronograma."""
     try:
         token = authorization.split(" ")[1] if authorization else None
         supabase.postgrest.auth(token).table("obligaciones_pago").delete().eq("id", id_ob).execute()
         return {"status": "success"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error al eliminar: {str(e)}")
