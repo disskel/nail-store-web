@@ -512,13 +512,25 @@ def crear_proveedor(prov: ProveedorRequest, user = Depends(validar_token)):
 
 @app.post("/api/caja/abrir")
 @app.post("/caja/abrir")
-def abrir_caja(req: AperturaCajaRequest, user = Depends(validar_token)):
+def abrir_caja(
+    req: AperturaCajaRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Inicia un nuevo turno registrando el autor del mismo."""
     try:
-        res = supabase.table("sesiones_caja").insert({
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # Usamos el token para que el registro quede asociado al usuario logueado
+        res = supabase.postgrest.auth(token).table("sesiones_caja").insert({
             "monto_inicial": req.monto_inicial, 
             "estado": "ABIERTA", 
             "observaciones": req.observaciones
         }).execute()
+        
+        if not res.data:
+            raise Exception("No se pudo confirmar la apertura en la base de datos")
+            
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -707,10 +719,17 @@ def obtener_reporte_completo(user = Depends(validar_token)):
 
 @app.get("/api/caja/estado-actual")
 @app.get("/caja/estado-actual")
-def obtener_estado_caja(user = Depends(validar_token)):
-    """Busca si existe una sesión abierta actualmente."""
+def obtener_estado_caja(
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Busca si existe una sesión abierta usando el token para saltar el RLS."""
     try:
-        res = supabase.table("sesiones_caja")\
+        # Extraemos el token del encabezado
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Nos identificamos ante la DB con .auth(token)
+        res = supabase.postgrest.auth(token).table("sesiones_caja")\
             .select("*")\
             .eq("estado", "ABIERTA")\
             .order("fecha_apertura", desc=True)\
@@ -721,27 +740,37 @@ def obtener_estado_caja(user = Depends(validar_token)):
             return {"esta_abierta": True, "sesion": res.data[0]}
         return {"esta_abierta": False, "sesion": None}
     except Exception as e:
+        print(f"Error de seguridad en terminal: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/caja/resumen/{sesion_id}")
 @app.get("/caja/resumen/{sesion_id}")
-def obtener_resumen_caja(sesion_id: str, user = Depends(validar_token)):
-    """Calcula totales acumulados para corroborar con el banco y caja física."""
+def obtener_resumen_caja(
+    sesion_id: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Calcula totales acumulados usando identificación segura."""
     try:
-        # 1. Obtener datos de la sesión para el monto inicial
-        sesion = supabase.table("sesiones_caja").select("monto_inicial").eq("id", sesion_id).single().execute()
-        if not sesion.data: raise HTTPException(status_code=404, detail="Sesión no encontrada")
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # Obtenemos datos de la sesión con permiso RLS
+        sesion = supabase.postgrest.auth(token).table("sesiones_caja")\
+            .select("monto_inicial")\
+            .eq("id", sesion_id).single().execute()
+            
+        if not sesion.data: 
+            raise HTTPException(status_code=404, detail="Sesión no encontrada")
         
         m_inicial = float(sesion.data.get("monto_inicial") or 0.0)
 
-        # 2. Consultar Cabeceras de Venta Completadas
-        ventas_res = supabase.table("ventas")\
+        # Consultar Ventas con permiso RLS
+        ventas_res = supabase.postgrest.auth(token).table("ventas")\
             .select("monto_neto, medio_pago")\
             .eq("id_sesion_caja", sesion_id)\
             .eq("estado", "COMPLETADA")\
             .execute()
         
-        # 3. Clasificación y Totalización Multimodal
         total_ventas_netas = 0.0
         desglose = {"EFECTIVO": 0.0, "YAPE": 0.0, "PLIN": 0.0, "TRANSFERENCIA": 0.0}
 
@@ -755,19 +784,26 @@ def obtener_resumen_caja(sesion_id: str, user = Depends(validar_token)):
             "monto_inicial": round(m_inicial, 2),
             "ventas_por_metodo": {k: round(v, 2) for k, v in desglose.items()},
             "total_ventas_turno": round(total_ventas_netas, 2),
-            "saldo_esperado_efectivo": round(m_inicial + desglose["EFECTIVO"], 2), # Dinero FÍSICO en el cajón
-            "total_general_caja_bancos": round(m_inicial + total_ventas_netas, 2)  # Total Global (Caja + Apps)
+            "saldo_esperado_efectivo": round(m_inicial + desglose["EFECTIVO"], 2),
+            "total_general_caja_bancos": round(m_inicial + total_ventas_netas, 2)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/caja/cerrar")
 @app.post("/caja/cerrar")
-def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
-    """Finaliza el turno y guarda auditoría detallada de cada método."""
+def cerrar_caja(
+    req: CierreCajaRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN PARA EL RLS
+):
+    """Finaliza el turno y guarda auditoría detallada usando identificación segura."""
     try:
-        # 1. Obtener el resumen actualizado
-        resumen = obtener_resumen_caja(req.id_sesion, user)
+        # Extraemos el token del encabezado de autorización
+        token = authorization.split(" ")[1] if authorization else None
+
+        # 1. Obtener el resumen actualizado (Pasamos el authorization para saltar el RLS)
+        resumen = obtener_resumen_caja(req.id_sesion, user, authorization)
         esp_efectivo = resumen["saldo_esperado_efectivo"]
         
         # 2. Calcular descuadres por cada método
@@ -778,28 +814,31 @@ def cerrar_caja(req: CierreCajaRequest, user = Depends(validar_token)):
 
         total_diferencia = dif_efectivo + dif_yape + dif_plin + dif_transf
 
-        # 3. Actualizar Sesión Maestra
-        supabase.table("sesiones_caja").update({
+        # 3. Actualizar Sesión Maestra con permiso RLS
+        # Usamos .auth(token) para que Supabase reconozca al cajero autor de la acción
+        supabase.postgrest.auth(token).table("sesiones_caja").update({
             "monto_final_contado": req.monto_fisico_efectivo,
             "monto_final_sistema": esp_efectivo,
             "estado": "CERRADA"
         }).eq("id", req.id_sesion).execute()
 
-        # 4. Registrar Auditoría Final Detallada
+        # 4. Registrar Auditoría Final Detallada con permiso RLS
         obs_arqueo = f"Dif Yape: {dif_yape:.2f}, Plin: {dif_plin:.2f}, Transf: {dif_transf:.2f}"
-        supabase.table("cierres_caja_detalle").insert({
+        supabase.postgrest.auth(token).table("cierres_caja_detalle").insert({
             "id_sesion": req.id_sesion,
             "total_efectivo_sistema": esp_efectivo,
             "total_digital_sistema": resumen["total_ventas_turno"] - resumen["ventas_por_metodo"]["EFECTIVO"],
             "monto_fisico_contado": req.monto_fisico_efectivo,
             "diferencia": total_diferencia,
-            "observaciones_arqueo": obs_arqueo # Guardamos el detalle de los bancos aquí
+            "observaciones_arqueo": obs_arqueo
         }).execute()
 
         return {"status": "success", "resumen_diferencias": {
             "efectivo": dif_efectivo, "digital": dif_yape + dif_plin + dif_transf, "total": total_diferencia
         }}
     except Exception as e:
+        # Imprimimos el error en el servidor para facilitar el soporte técnico
+        print(f"Error crítico en cierre de caja: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 
 # -----------------------------------------------------------------------------
