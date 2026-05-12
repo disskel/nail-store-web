@@ -5,7 +5,7 @@ from typing import List, Optional, Any, Literal
 from supabase import create_client, Client
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # -----------------------------------------------------------------------------
@@ -974,3 +974,32 @@ def obtener_reporte_utilidad(desde: str, hasta: str, user = Depends(validar_toke
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en reporte financiero: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 18. MÓDULO DE OBLIGACIONES (NOTIFICACIONES)
+# -----------------------------------------------------------------------------
+
+class ObligacionUpdate(BaseModel):
+    ultima_notificacion: str
+
+@app.get("/api/obligaciones")
+@app.get("/obligaciones")
+def listar_obligaciones(user = Depends(validar_token)):
+    """Trae las reglas de pago para la campana de notificaciones."""
+    try:
+        # Filtramos solo las obligaciones activas
+        res = supabase.table("obligaciones_pago").select("*").eq("activo", True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/obligaciones/{id_obligacion}/pagar")
+@app.patch("/obligaciones/{id_obligacion}/pagar")
+def actualizar_pago_obligacion(id_obligacion: str, req: ObligacionUpdate, user = Depends(validar_token)):
+    """Actualiza la fecha de control para que la notificación no se repita."""
+    try:
+        data = {"ultima_notificacion": req.ultima_notificacion}
+        res = supabase.table("obligaciones_pago").update(data).eq("id", id_obligacion).execute()
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

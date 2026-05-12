@@ -446,5 +446,34 @@ export const apiService = {
     }
     return res.json();
   },
+
+  // -------------------------------------------------------------------------
+  // 12. MÓDULO DE OBLIGACIONES Y NOTIFICACIONES (v1.1.2)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Obtiene la lista de obligaciones de pago pendientes.
+   */
+  async getObligaciones() {
+    const res = await fetch(`${API_URL}/obligaciones`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al cargar cronograma de pagos');
+    return res.json();
+  },
+
+  /**
+   * Actualiza la fecha de última notificación para silenciar la alerta
+   * tras haber registrado el gasto operativo.
+   */
+  async marcarObligacionComoPagada(id: string, fechaNotificacion: string) {
+    const res = await fetch(`${API_URL}/obligaciones/${id}/pagar`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ ultima_notificacion: fechaNotificacion }),
+    });
+    if (!res.ok) throw new Error('Error al actualizar estado de la obligación');
+    return res.json();
+  },
     
 };
