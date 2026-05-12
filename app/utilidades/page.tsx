@@ -31,7 +31,7 @@ export default function UtilidadesPage() {
     // --- NUEVA LÓGICA DE CONFIGURACIÓN (ADICIONADA) ---
   const [showModalConfig, setShowModalConfig] = useState(false);
   const [nuevaOb, setNuevaOb] = useState({
-    descripcion: '', categoria: 'SERVICIOS', es_recurrente: true, dia_vencimiento: 15, recordatorio_dias: 3
+    descripcion: '', categoria: 'SERVICIOS', es_recurrente: true, dia_vencimiento: 15, recordatorio_dias: 3,monto_sugerido: 0
   });
 
   // --- 3. MOTOR DE CARGA FINANCIERA ---

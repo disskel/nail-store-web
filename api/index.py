@@ -990,13 +990,27 @@ class ObligacionRequest(BaseModel):
 
 @app.post("/api/obligaciones")
 @app.post("/obligaciones")
-def crear_obligacion(req: ObligacionRequest, user = Depends(validar_token)):
-    """Registra una nueva regla de pago en el cronograma informativo."""
+def crear_obligacion(
+    req: ObligacionRequest, 
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # <--- Capturamos el pasaporte de seguridad
+):
+    """Registra una obligación sincronizada con las políticas de Supabase."""
     try:
+        # Extraemos el token del encabezado
+        token = authorization.split(" ")[1] if authorization else None
         data = req.dict()
-        res = supabase.table("obligaciones_pago").insert(data).execute()
+
+        # USAMOS EL TOKEN PARA SALTAR EL RLS (Igual que en Gastos)
+        res = supabase.postgrest.auth(token).table("obligaciones_pago").insert(data).execute()
+        
+        # Validación de seguridad para evitar el error 500 si la DB no responde
+        if not res.data:
+            raise Exception("No se pudo insertar la regla en la base de datos")
+
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
+        print(f"Error crítico en obligaciones: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 class ObligacionUpdate(BaseModel):
