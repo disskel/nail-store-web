@@ -1018,13 +1018,21 @@ class ObligacionUpdate(BaseModel):
 
 @app.get("/api/obligaciones")
 @app.get("/obligaciones")
-def listar_obligaciones(user = Depends(validar_token)):
-    """Trae las reglas de pago para la campana de notificaciones."""
+def listar_obligaciones(
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # <--- CAPTURAMOS EL HEADER
+):
+    """Trae todas las reglas usando el token para saltar el RLS de Supabase."""
     try:
-        # ELIMINAMOS el .eq("activo", True) para que Jean pueda ver y reactivar servicios
-        res = supabase.table("obligaciones_pago").select("*").order("dia_vencimiento").execute()
+        # EXTRAEMOS EL TOKEN PARA IDENTIFICARNOS ANTE LA DB
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # USAMOS .auth(token) PARA QUE SUPABASE NOS PERMITA VER LOS DATOS
+        res = supabase.postgrest.auth(token).table("obligaciones_pago").select("*").order("dia_vencimiento").execute()
+        
         return res.data
     except Exception as e:
+        print(f"Error al listar obligaciones: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- ENDPOINTS DE ADMINISTRACIÓN DE CRONOGRAMA ---

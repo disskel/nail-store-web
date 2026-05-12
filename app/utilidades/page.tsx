@@ -304,11 +304,11 @@ export default function UtilidadesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-1 block">Día de Pago (1-31)</label>
-                  <input type="number" value={formOb.dia_vencimiento} className="w-full bg-black border border-zinc-800 p-5 rounded-2xl text-white font-black" onChange={(e) => setFormOb({...formOb, dia_vencimiento: parseInt(e.target.value)})} />
+                  <input type="number" value={formOb.dia_vencimiento} className="w-full bg-black border border-zinc-800 p-5 rounded-2xl text-white font-black" onChange={(e) => setFormOb({...formOb, dia_vencimiento: parseInt(e.target.value)|| 1})} />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-zinc-500 uppercase ml-2 mb-1 block">Monto Mensual (S/)</label>
-                  <input type="number" step="0.01" value={formOb.monto_sugerido} placeholder="S/ 0.00" className="w-full bg-black border border-zinc-800 p-5 rounded-2xl text-indigo-400 font-black" onChange={(e) => setFormOb({...formOb, monto_sugerido: parseFloat(e.target.value)})} />
+                  <input type="number" step="0.01" value={formOb.monto_sugerido} placeholder="S/ 0.00" className="w-full bg-black border border-zinc-800 p-5 rounded-2xl text-indigo-400 font-black" onChange={(e) => setFormOb({...formOb, monto_sugerido: parseFloat(e.target.value)|| 0})} />
                 </div>
               </div>
 
