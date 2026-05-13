@@ -1314,32 +1314,42 @@ def eliminar_obligacion_definitiva(
 # 18.2 MÓDULO DE CUMPLIMIENTO (MARCAR COMO PAGADO)
 # -----------------------------------------------------------------------------
 
-# 1. Definimos el modelo para recibir la fecha en el cuerpo del mensaje
-class PagoObligacionRequest(BaseModel):
+# Nuevo modelo para la transacción unificada
+class LiquidarPagoRequest(BaseModel):
+    monto: float
+    metodo_pago: str
+    categoria: str
+    descripcion: str
     fecha_pago: str
+    id_sesion_caja: Optional[str] = None
 
-# 2. Actualizamos el endpoint para usar este nuevo modelo
-@app.patch("/api/obligaciones/{id_ob}/pagar")
-@app.patch("/obligaciones/{id_ob}/pagar")
-def marcar_obligacion_pagada(
+@app.post("/api/obligaciones/{id_ob}/liquidar")
+@app.post("/obligaciones/{id_ob}/liquidar")
+def liquidar_pago_completo(
     id_ob: str, 
-    req: PagoObligacionRequest, # <--- CAMBIO: Ahora usamos el modelo 'req'
+    req: LiquidarPagoRequest, 
     user = Depends(validar_token),
     authorization: str = Header(None)
 ):
-    """Actualiza la fecha de cumplimiento identificándose ante la DB."""
+    """Procesa gasto y alerta en una sola transacción atómica."""
     try:
         token = authorization.split(" ")[1] if authorization else None
         
-        # Usamos req.fecha_pago para obtener el dato del cuerpo del mensaje
-        res = supabase.postgrest.auth(token).table("obligaciones_pago")\
-            .update({"ultima_notificacion": req.fecha_pago})\
-            .eq("id", id_ob).execute()
-            
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Obligación no encontrada")
-            
-        return {"status": "success", "message": "Cumplimiento registrado en Trujillo"}
+        # Invocamos la función SQL (RPC) de Supabase
+        params = {
+            "p_id_ob": id_ob,
+            "p_monto": req.monto,
+            "p_metodo": req.metodo_pago,
+            "p_cat": req.categoria,
+            "p_desc": req.descripcion.upper(),
+            "p_fecha": req.fecha_pago,
+            "p_id_caja": req.id_sesion_caja
+        }
+        
+        # ACCIÓN ATÓMICA: Todo o Nada
+        res = supabase.postgrest.auth(token).rpc("liquidar_obligacion_trujillo", params).execute()
+        
+        return res.data
     except Exception as e:
-        print(f"Error al marcar pago: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error en transacción Trujillo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Fallo crítico: {str(e)}")

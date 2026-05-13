@@ -474,28 +474,7 @@ export const apiService = {
     if (!res.ok) throw new Error('Error al cargar cronograma de pagos');
     return res.json();
   },
-
-/**
- * Actualiza la fecha de última notificación para silenciar la alerta
- * tras haber registrado el gasto operativo.
- */
-  async marcarObligacionComoPagada(id: string, fechaNotificacion: string) {
-    const res = await fetch(`${API_URL}/obligaciones/${id}/pagar`, {
-      method: 'PATCH',
-      headers: getHeaders(), // <--- OBTIENE EL TOKEN JWT PARA EL RLS
-      
-      // CORRECCIÓN: Cambiamos 'ultima_notificacion' por 'fecha_pago' 
-      // para sincronizar con el modelo del Backend
-      body: JSON.stringify({ fecha_pago: fechaNotificacion }),
-    });
-
-    if (!res.ok) {
-      throw new Error('Error al actualizar estado de la obligación');
-    }
-    
-    return res.json();
-  },
-    
+  
   // --- GESTIÓN AVANZADA DE OBLIGACIONES ---
   async updateObligacion(id: string, data: any) {
     const res = await fetch(`${API_URL}/obligaciones/${id}`, {
@@ -514,4 +493,33 @@ export const apiService = {
     return res.json();
   },
 
+  /**
+   * LIQUIDAR OBLIGACIÓN COMPLETA (Atómico) - v1.1.0
+   * Realiza el registro del gasto y apaga la alerta en una sola transacción.
+   * Evita duplicados si hay fallos de red en Trujillo.
+   */
+  async liquidarObligacionCompleta(id_ob: string, data: {
+    monto: number,
+    metodo_pago: string,
+    categoria: string,
+    descripcion: string,
+    fecha_pago: string,
+    id_sesion_caja: string | null
+  }) {
+    // Realizamos la petición POST al nuevo endpoint unificado
+    const res = await fetch(`${API_URL}/obligaciones/${id_ob}/liquidar`, {
+      method: 'POST',
+      headers: getHeaders(), // <--- INCLUYE EL TOKEN JWT PARA SEGURIDAD RLS
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      // Si el servidor detecta un error, extraemos el mensaje para el usuario
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Fallo crítico al liquidar la obligación');
+    }
+
+    return res.json();
+  },
+  
 };

@@ -65,35 +65,30 @@ export default function NotificationBell() {
     }
   };
 
-    const ejecutarPago = async () => {
-    // Obtenemos la fecha actual de Trujillo para marcar el cumplimiento
-    const hoyStr = new Date().toISOString().split('T')[0];
-    
-    try {
-      // 1. Registramos en Utilidades como Gasto Operativo
-      // Esta función ya existe en tu apiService y afecta el balance financiero
-      await apiService.registrarGasto({
-        descripcion: `PAGO: ${modalPago.descripcion}`,
-        monto: parseFloat(monto),
-        categoria: modalPago.categoria,
-        metodo_pago: metodoPago,// <--- ENVIAMOS EL MÉTODO SELECCIONADO
-        id_sesion_caja: null // El backend buscará automáticamente la caja abierta de Trujillo
-      });
+const ejecutarPago = async () => {
+  const hoyStr = new Date().toISOString().split('T')[0];
+  
+  try {
+    // LLAMADA ÚNICA: Ahora el servidor se encarga de ambos procesos
+    await apiService.liquidarObligacionCompleta(modalPago.id, {
+      monto: parseFloat(monto),
+      metodo_pago: metodoPago,
+      categoria: modalPago.categoria,
+      descripcion: `PAGO: ${modalPago.descripcion}`,
+      fecha_pago: hoyStr,
+      id_sesion_caja: null 
+    });
 
-      // 2. CORRECCIÓN: Usamos el nombre exacto definido en apiService.ts
-      // Cambiamos 'marcarObligacionPagada' por 'marcarObligacionComoPagada'
-      await apiService.marcarObligacionComoPagada(modalPago.id, hoyStr);
-
-      // 3. Limpieza de estados y refresco de la campana
-      setModalPago(null);
-      setMonto(""); // Limpiamos el monto para el siguiente pago
-      setMetodoPago("EFECTIVO"); // Reset al valor por defecto
-      revisar();    // Volvemos a consultar para apagar la alerta si no quedan pendientes
-    } catch (error) {
-      console.error("Error al procesar el pago:", error);
-      alert("Hubo un error al registrar el pago. Revisa la consola.");
-    }
-  };
+    // Éxito total: Limpiamos y cerramos
+    setModalPago(null);
+    setMonto(""); 
+    revisar(); // Refrescamos la campana
+  } catch (error) {
+    // Si falla, NO se creó ni el gasto ni se apagó la alerta. Es seguro reintentar.
+    console.error("La transacción falló, no se guardó nada.");
+    alert("Error de red. Intenta de nuevo, no se han duplicado cobros.");
+  }
+};
 
   return (
     <div className="relative">
