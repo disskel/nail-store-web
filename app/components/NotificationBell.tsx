@@ -79,6 +79,12 @@ const ejecutarPago = async () => {
       id_sesion_caja: null 
     });
 
+    // ============================================================
+    // AVISO DE ÉXITO: Se coloca aquí porque si el código llega
+    // a este punto, significa que la transacción fue exitosa.
+    // ============================================================
+    alert("¡Pago registrado con éxito en Jean Nails Store!");
+
     // Éxito total: Limpiamos y cerramos
     setModalPago(null);
     setMonto(""); 
