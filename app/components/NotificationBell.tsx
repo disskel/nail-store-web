@@ -49,7 +49,23 @@ export default function NotificationBell() {
     return () => clearInterval(timer);
   }, []);
 
-  const ejecutarPago = async () => {
+  // =========================================================================
+  // FUNCIÓN: PREPARAR PAGO (Lógica de Monto Sugerido)
+  // Propósito: Al abrir el modal, decidir si pre-llenamos el monto o no.
+  // =========================================================================
+  const prepararPago = (obligacion: any) => {
+    setModalPago(obligacion);
+    
+    // Si la obligación tiene un monto sugerido en la DB (ej. S/ 400.00), lo cargamos
+    if (obligacion.monto_sugerido && parseFloat(obligacion.monto_sugerido) > 0) {
+      setMonto(obligacion.monto_sugerido.toString());
+    } else {
+      // Si no hay monto pactado, lo dejamos en blanco para que el usuario digite
+      setMonto("");
+    }
+  };
+
+    const ejecutarPago = async () => {
     // Obtenemos la fecha actual de Trujillo para marcar el cumplimiento
     const hoyStr = new Date().toISOString().split('T')[0];
     
@@ -93,14 +109,15 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* DROP-DOWN SUTIL */}
+      {/* LISTADO DE OBLIGACIONES PENDIENTES */}
       {isOpen && pendientes.length > 0 && (
         <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 z-[100]">
           {pendientes.map(p => (
             <div key={p.id} className="flex justify-between items-center mb-3">
               <p className="text-xs font-bold text-white">{p.descripcion}</p>
+              {/* BOTÓN ACTUALIZADO: Ahora usa prepararPago para la lógica del monto */}
               <button 
-                onClick={() => setModalPago(p)} 
+                onClick={() => prepararPago(p)} 
                 className="text-[10px] bg-indigo-600 px-2 py-1 rounded-lg text-white"
               >
                 Pagar
@@ -116,8 +133,9 @@ export default function NotificationBell() {
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-sm">
             <h3 className="text-white font-black italic mb-4 uppercase">Confirmar Gasto</h3>
             <p className="text-zinc-400 text-xs mb-4">
-              Ingresa el monto final para <b>{modalPago.descripcion}</b>. Esto se restará de tus utilidades hoy.
+              Monto para <b>{modalPago.descripcion}</b>. Se restará de utilidades hoy.
             </p>
+            
             <input 
               type="number" 
               value={monto} 
@@ -125,8 +143,8 @@ export default function NotificationBell() {
               placeholder="S/ 0.00" 
               className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white mb-6 outline-none focus:ring-2 focus:ring-indigo-600" 
             />
-            
-            {/* SELECTOR DE MÉTODO DE PAGO (Igual al módulo de Gastos) */}
+
+            {/* SELECTOR DE MEDIOS DE PAGO ESTILO TRUJILLO */}
             <div className="grid grid-cols-2 gap-2 mb-6">
               {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map((metodo) => (
                 <button
