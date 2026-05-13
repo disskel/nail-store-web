@@ -10,24 +10,40 @@ export default function NotificationBell() {
   const [monto, setMonto] = useState("");
 
   const revisar = async () => {
-    const data = await apiService.getObligaciones();
-    const hoy = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Lima"}));
-    const dia = hoy.getDate();
-    
-    // Filtramos obligaciones que vencen pronto y no han sido pagadas este mes
-    const filtrados = data.filter((ob: any) => {
-      if (ob.ultima_notificacion) {
-        const u = new Date(ob.ultima_notificacion);
-        if (u.getMonth() === hoy.getMonth() && u.getFullYear() === hoy.getFullYear()) return false;
-      }
-      return (ob.dia_vencimiento - dia) <= ob.recordatorio_dias;
-    });
-    setPendientes(filtrados);
+    // =========================================================================
+    // ESCUDO DE SEGURIDAD (ANTI-401): 
+    // Si no hay una sesión activa en localStorage, detenemos la ejecución.
+    // Esto evita que el sistema intente consultar la API antes del Login.
+    // =========================================================================
+    const sessionStr = typeof window !== 'undefined' ? localStorage.getItem('supabase-session') : null;
+    if (!sessionStr) return; 
+
+    try {
+      const data = await apiService.getObligaciones();
+      const hoy = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Lima"}));
+      const dia = hoy.getDate();
+      
+      // Filtramos obligaciones que vencen pronto y no han sido pagadas este mes
+      const filtrados = data.filter((ob: any) => {
+        if (ob.ultima_notificacion) {
+          const u = new Date(ob.ultima_notificacion);
+          if (u.getMonth() === hoy.getMonth() && u.getFullYear() === hoy.getFullYear()) return false;
+        }
+        return (ob.dia_vencimiento - dia) <= ob.recordatorio_dias;
+      });
+      setPendientes(filtrados);
+    } catch (error) {
+      // Si hay un error, lo registramos pero no bloqueamos la interfaz
+      console.error("Error al revisar notificaciones:", error);
+    }
   };
 
   useEffect(() => {
+    // Ejecutamos la revisión inicial
     revisar();
-    const timer = setInterval(revisar, 3600000); // Check cada 60 min
+    
+    // Check cada 60 min para mantener las alertas frescas
+    const timer = setInterval(revisar, 3600000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -61,9 +77,16 @@ export default function NotificationBell() {
 
   return (
     <div className="relative">
-      <button onClick={() => setIsOpen(!isOpen)} className={`p-2 rounded-full transition-all ${pendientes.length > 0 ? 'bg-red-500/20 text-red-500' : 'opacity-30 text-zinc-500'}`}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        className={`p-2 rounded-full transition-all ${pendientes.length > 0 ? 'bg-red-500/20 text-red-500' : 'opacity-30 text-zinc-500'}`}
+      >
         <Bell size={20} />
-        {pendientes.length > 0 && <span className="absolute top-0 right-0 bg-red-600 text-[10px] text-white px-1 rounded-full">{pendientes.length}</span>}
+        {pendientes.length > 0 && (
+          <span className="absolute top-0 right-0 bg-red-600 text-[10px] text-white px-1 rounded-full">
+            {pendientes.length}
+          </span>
+        )}
       </button>
 
       {/* DROP-DOWN SUTIL */}
@@ -72,7 +95,12 @@ export default function NotificationBell() {
           {pendientes.map(p => (
             <div key={p.id} className="flex justify-between items-center mb-3">
               <p className="text-xs font-bold text-white">{p.descripcion}</p>
-              <button onClick={() => setModalPago(p)} className="text-[10px] bg-indigo-600 px-2 py-1 rounded-lg text-white">Pagar</button>
+              <button 
+                onClick={() => setModalPago(p)} 
+                className="text-[10px] bg-indigo-600 px-2 py-1 rounded-lg text-white"
+              >
+                Pagar
+              </button>
             </div>
           ))}
         </div>
@@ -83,11 +111,29 @@ export default function NotificationBell() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-sm">
             <h3 className="text-white font-black italic mb-4 uppercase">Confirmar Gasto</h3>
-            <p className="text-zinc-400 text-xs mb-4">Ingresa el monto final para <b>{modalPago.descripcion}</b>. Esto se restará de tus utilidades hoy.</p>
-            <input type="number" value={monto} onChange={e => setMonto(e.target.value)} placeholder="S/ 0.00" className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white mb-6 outline-none focus:ring-2 focus:ring-indigo-600" />
+            <p className="text-zinc-400 text-xs mb-4">
+              Ingresa el monto final para <b>{modalPago.descripcion}</b>. Esto se restará de tus utilidades hoy.
+            </p>
+            <input 
+              type="number" 
+              value={monto} 
+              onChange={e => setMonto(e.target.value)} 
+              placeholder="S/ 0.00" 
+              className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white mb-6 outline-none focus:ring-2 focus:ring-indigo-600" 
+            />
             <div className="flex gap-2">
-                <button onClick={() => setModalPago(null)} className="flex-1 text-zinc-500 text-xs font-bold">Cancelar</button>
-                <button onClick={ejecutarPago} className="flex-1 bg-indigo-600 text-white p-3 rounded-xl font-bold text-xs">Registrar Pago</button>
+                <button 
+                  onClick={() => setModalPago(null)} 
+                  className="flex-1 text-zinc-500 text-xs font-bold"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={ejecutarPago} 
+                  className="flex-1 bg-indigo-600 text-white p-3 rounded-xl font-bold text-xs"
+                >
+                  Registrar Pago
+                </button>
             </div>
           </div>
         </div>
