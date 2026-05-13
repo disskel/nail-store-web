@@ -8,6 +8,8 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [modalPago, setModalPago] = useState<any>(null);
   const [monto, setMonto] = useState("");
+  // NUEVO: Estado para el método de pago seleccionado (por defecto EFECTIVO)
+  const [metodoPago, setMetodoPago] = useState("EFECTIVO");
 
   const revisar = async () => {
     // =========================================================================
@@ -58,6 +60,7 @@ export default function NotificationBell() {
         descripcion: `PAGO: ${modalPago.descripcion}`,
         monto: parseFloat(monto),
         categoria: modalPago.categoria,
+        metodo_pago: metodoPago,// <--- ENVIAMOS EL MÉTODO SELECCIONADO
         id_sesion_caja: null // El backend buscará automáticamente la caja abierta de Trujillo
       });
 
@@ -68,6 +71,7 @@ export default function NotificationBell() {
       // 3. Limpieza de estados y refresco de la campana
       setModalPago(null);
       setMonto(""); // Limpiamos el monto para el siguiente pago
+      setMetodoPago("EFECTIVO"); // Reset al valor por defecto
       revisar();    // Volvemos a consultar para apagar la alerta si no quedan pendientes
     } catch (error) {
       console.error("Error al procesar el pago:", error);
@@ -121,9 +125,27 @@ export default function NotificationBell() {
               placeholder="S/ 0.00" 
               className="w-full bg-black border border-zinc-800 p-4 rounded-xl text-white mb-6 outline-none focus:ring-2 focus:ring-indigo-600" 
             />
+            
+            {/* SELECTOR DE MÉTODO DE PAGO (Igual al módulo de Gastos) */}
+            <div className="grid grid-cols-2 gap-2 mb-6">
+              {['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA'].map((metodo) => (
+                <button
+                  key={metodo}
+                  onClick={() => setMetodoPago(metodo)}
+                  className={`py-2 rounded-xl text-[10px] font-bold transition-all border ${
+                    metodoPago === metodo 
+                      ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-600/20' 
+                      : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600'
+                  }`}
+                >
+                  {metodo}
+                </button>
+              ))}
+            </div>
+
             <div className="flex gap-2">
                 <button 
-                  onClick={() => setModalPago(null)} 
+                  onClick={() => {setModalPago(null); setMetodoPago("EFECTIVO");}} 
                   className="flex-1 text-zinc-500 text-xs font-bold"
                 >
                   Cancelar

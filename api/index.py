@@ -137,7 +137,7 @@ class GastoRequest(BaseModel):
     """Modelo para el registro de egresos operativos (Alquiler, Luz, etc.)"""
     descripcion: str
     monto: float
-    categoria: Literal['ALQUILER', 'LUZ', 'AGUA', 'PERSONAL', 'MOVILIDAD', 'OTROS']
+    categoria: Literal['ALQUILER', 'LUZ', 'AGUA', 'PERSONAL', 'MOVILIDAD', 'OTROS', 'SERVICIOS']
     metodo_pago: Optional[str] = "EFECTIVO"
     fecha_gasto: Optional[str] = None # Formato ISO opcional
     id_sesion_caja: Optional[str] = None # Vinculación opcional a un turno
