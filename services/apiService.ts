@@ -475,17 +475,24 @@ export const apiService = {
     return res.json();
   },
 
-  /**
-   * Actualiza la fecha de última notificación para silenciar la alerta
-   * tras haber registrado el gasto operativo.
-   */
+/**
+ * Actualiza la fecha de última notificación para silenciar la alerta
+ * tras haber registrado el gasto operativo.
+ */
   async marcarObligacionComoPagada(id: string, fechaNotificacion: string) {
     const res = await fetch(`${API_URL}/obligaciones/${id}/pagar`, {
       method: 'PATCH',
-      headers: getHeaders(),
-      body: JSON.stringify({ ultima_notificacion: fechaNotificacion }),
+      headers: getHeaders(), // <--- OBTIENE EL TOKEN JWT PARA EL RLS
+      
+      // CORRECCIÓN: Cambiamos 'ultima_notificacion' por 'fecha_pago' 
+      // para sincronizar con el modelo del Backend
+      body: JSON.stringify({ fecha_pago: fechaNotificacion }),
     });
-    if (!res.ok) throw new Error('Error al actualizar estado de la obligación');
+
+    if (!res.ok) {
+      throw new Error('Error al actualizar estado de la obligación');
+    }
+    
     return res.json();
   },
     
