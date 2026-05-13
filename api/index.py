@@ -1314,21 +1314,26 @@ def eliminar_obligacion_definitiva(
 # 18.2 MÓDULO DE CUMPLIMIENTO (MARCAR COMO PAGADO)
 # -----------------------------------------------------------------------------
 
+# 1. Definimos el modelo para recibir la fecha en el cuerpo del mensaje
+class PagoObligacionRequest(BaseModel):
+    fecha_pago: str
+
+# 2. Actualizamos el endpoint para usar este nuevo modelo
 @app.patch("/api/obligaciones/{id_ob}/pagar")
 @app.patch("/obligaciones/{id_ob}/pagar")
 def marcar_obligacion_pagada(
     id_ob: str, 
-    fecha_pago: str, # Recibimos la fecha desde el frontend
+    req: PagoObligacionRequest, # <--- CAMBIO: Ahora usamos el modelo 'req'
     user = Depends(validar_token),
     authorization: str = Header(None)
 ):
-    """Actualiza la fecha de última notificación para apagar la alerta este mes."""
+    """Actualiza la fecha de cumplimiento identificándose ante la DB."""
     try:
         token = authorization.split(" ")[1] if authorization else None
         
-        # ACCIÓN CRÍTICA: Actualizamos el campo 'ultima_notificacion' en Supabase
+        # Usamos req.fecha_pago para obtener el dato del cuerpo del mensaje
         res = supabase.postgrest.auth(token).table("obligaciones_pago")\
-            .update({"ultima_notificacion": fecha_pago})\
+            .update({"ultima_notificacion": req.fecha_pago})\
             .eq("id", id_ob).execute()
             
         if not res.data:
