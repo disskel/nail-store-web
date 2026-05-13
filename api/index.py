@@ -634,7 +634,7 @@ def abrir_caja(
             "monto_inicial": req.monto_inicial, 
             "estado": "ABIERTA", 
             "observaciones": req.observaciones,
-            "id_usuario": usuario_id # <--- VITAL: Vinculamos la caja al cajero
+            
         }).execute()
         
         if not res.data:
