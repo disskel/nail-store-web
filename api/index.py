@@ -393,23 +393,32 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user
 
 @app.get("/api/clientes")
 @app.get("/clientes")
-def listar_clientes(user = Depends(validar_token)):
+def listar_clientes(user = Depends(validar_token),authorization: str = Header(None)):
     """Devuelve la lista completa de clientes para el nuevo menú de seguimiento."""
     try:
-        res = supabase.table("clientes").select("*").order("nombre_razon_social").execute()
+        token = authorization.split(" ")[1] if authorization else None
+
+        # ACCIÓN CRÍTICA: Nos identificamos para saltar el RLS
+        res = supabase.postgrest.auth(token).table("clientes")\
+            .select("*").order("nombre_razon_social").execute()
         return res.data
     except Exception as e:
+        print(f"Error en listado clientes: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/clientes/{numero}")
 @app.get("/clientes/{numero}")
-def buscar_cliente(numero: str, user = Depends(validar_token)):
-    """Localiza un cliente registrado por su DNI o RUC."""
+def buscar_cliente(
+    numero: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Busca un cliente usando identificación segura."""
     try:
-        res = supabase.table("clientes").select("*").eq("numero_documento", numero).execute()
-        if res.data and len(res.data) > 0:
-            return res.data[0]
-        return None
+        token = authorization.split(" ")[1] if authorization else None
+        res = supabase.postgrest.auth(token).table("clientes")\
+            .select("*").eq("numero_documento", numero).execute()
+        return res.data[0] if res.data else None
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -429,9 +438,14 @@ def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
 
 @app.post("/api/clientes")
 @app.post("/clientes")
-def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
-    """Registra un nuevo cliente con formato en mayúsculas para el PDF."""
+def crear_cliente(
+    req: ClienteRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Registra cliente con formato formal para Trujillo."""
     try:
+        token = authorization.split(" ")[1] if authorization else None
         data = {
             "tipo_documento": req.tipo_documento,
             "numero_documento": req.numero_documento,
@@ -440,7 +454,7 @@ def crear_cliente(req: ClienteRequest, user = Depends(validar_token)):
             "celular": req.celular,
             "contacto_nombre": req.contacto_nombre.upper() if req.contacto_nombre else None
         }
-        res = supabase.table("clientes").insert(data).execute()
+        res = supabase.postgrest.auth(token).table("clientes").insert(data).execute()
         return res.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
