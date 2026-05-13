@@ -1309,3 +1309,32 @@ def eliminar_obligacion_definitiva(
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al eliminar: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 18.2 MÓDULO DE CUMPLIMIENTO (MARCAR COMO PAGADO)
+# -----------------------------------------------------------------------------
+
+@app.patch("/api/obligaciones/{id_ob}/pagar")
+@app.patch("/obligaciones/{id_ob}/pagar")
+def marcar_obligacion_pagada(
+    id_ob: str, 
+    fecha_pago: str, # Recibimos la fecha desde el frontend
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Actualiza la fecha de última notificación para apagar la alerta este mes."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Actualizamos el campo 'ultima_notificacion' en Supabase
+        res = supabase.postgrest.auth(token).table("obligaciones_pago")\
+            .update({"ultima_notificacion": fecha_pago})\
+            .eq("id", id_ob).execute()
+            
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Obligación no encontrada")
+            
+        return {"status": "success", "message": "Cumplimiento registrado en Trujillo"}
+    except Exception as e:
+        print(f"Error al marcar pago: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
