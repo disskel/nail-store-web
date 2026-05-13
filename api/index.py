@@ -237,9 +237,10 @@ def health_check():
 # -----------------------------------------------------------------------------
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
-def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_token)):
+def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_token),authorization: str = Header(None)):
     """Calcula márgenes. Permite filtrar productos inactivos (Borrado Lógico)."""
     try:
+        token = authorization.split(" ")[1] if authorization else None
         query = supabase.table("productos").select(
             "id, nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, activo, "
             "categorias(nombre), proveedores(nombre)"
@@ -298,9 +299,17 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
 
 @app.post("/api/productos")
 @app.post("/productos")
-def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
-    """Registra un nuevo producto. Obliga Proveedor/Categoría y fuerza stock a 0."""
+def crear_producto(
+    req: ProductoCreateRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Registra un nuevo producto identificándose ante la DB para saltar el RLS."""
     try:
+        # Extraemos el token para identificarnos ante la base de datos
+        token = authorization.split(" ")[1] if authorization else None
+
+        # Validaciones de negocio obligatorias para Trujillo
         if not req.id_proveedor or str(req.id_proveedor).strip() == "":
             raise HTTPException(status_code=400, detail="El Proveedor es obligatorio")
         if not req.id_categoria or str(req.id_categoria).strip() == "":
@@ -312,7 +321,7 @@ def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
 
         data = {
             "sku": req.sku, 
-            "nombre": req.nombre.upper(), # Siempre en mayúsculas
+            "nombre": req.nombre.upper(), 
             "id_proveedor": req.id_proveedor,
             "id_categoria": req.id_categoria, 
             "costo_unidad": costo_limpio, 
@@ -322,11 +331,14 @@ def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
             "stock_actual": 0,
             "activo": True
         }
-        res = supabase.table("productos").insert(data).execute()
+        
+        # 1. Insertamos el producto con firma digital (Token)
+        res = supabase.postgrest.auth(token).table("productos").insert(data).execute()
         
         if res.data and len(res.data) > 0:
             new_id = res.data[0]['id']
-            supabase.table("historial_precios").insert({
+            # 2. Registramos el historial inicial con firma digital (Token)
+            supabase.postgrest.auth(token).table("historial_precios").insert({
                 "id_producto": new_id, 
                 "costo_anterior": 0.0, 
                 "costo_nuevo": costo_limpio,
@@ -336,34 +348,62 @@ def crear_producto(req: ProductoCreateRequest, user = Depends(validar_token)):
 
         return {"status": "success", "data": res.data[0] if res.data else data}
     except Exception as e:
+        print(f"Error al crear producto: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al crear producto: {str(e)}")
 
 @app.patch("/api/productos/{producto_id}")
 @app.patch("/productos/{producto_id}")
-def actualizar_producto(producto_id: str, req: ProductoUpdateRequest, user = Depends(validar_token)):
-    """Permite corregir el nombre o desactivar el producto (Borrado Lógico)."""
+def actualizar_producto(
+    producto_id: str, 
+    req: ProductoUpdateRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Permite corregir el nombre o desactivar el producto identificándose ante la DB."""
     try:
+        # Extraemos el token para identificarnos ante Supabase
+        token = authorization.split(" ")[1] if authorization else None
+        
         update_data = {}
-        if req.nombre is not None: update_data["nombre"] = req.nombre.upper()
-        if req.activo is not None: update_data["activo"] = req.activo
+        if req.nombre is not None: 
+            update_data["nombre"] = req.nombre.upper()
+        if req.activo is not None: 
+            update_data["activo"] = req.activo
 
-        res = supabase.table("productos").update(update_data).eq("id", producto_id).execute()
+        # ACCIÓN CRÍTICA: Usamos .auth(token) para que el RLS permita la actualización
+        res = supabase.postgrest.auth(token).table("productos")\
+            .update(update_data).eq("id", producto_id).execute()
+            
         if not res.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
             
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
+        print(f"Error al actualizar producto: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/productos/{producto_id}/precios")
 @app.put("/productos/{producto_id}/precios")
-def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user = Depends(validar_token)):
-    """Ajusta precios y registra la trazabilidad siempre."""
+def actualizar_precios_producto(
+    producto_id: str, 
+    req: UpdatePrecioRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Ajusta precios y registra la trazabilidad identificándose ante la DB."""
     try:
-        prod_actual = supabase.table("productos").select("costo_unidad, costo_maximo, nombre").eq("id", producto_id).single().execute()
+        # Extraemos el token para identificarnos ante la base de datos
+        token = authorization.split(" ")[1] if authorization else None
+
+        # 1. Obtenemos datos actuales con identificación segura
+        prod_actual = supabase.postgrest.auth(token).table("productos")\
+            .select("costo_unidad, costo_maximo, nombre")\
+            .eq("id", producto_id).single().execute()
+            
         if not prod_actual.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+        # Mantenemos tu lógica de costo techo máximo
         c_max_actual = float(prod_actual.data.get('costo_maximo') or 0.0)
         nuevo_c_max = max(c_max_actual, float(req.costo_unidad))
 
@@ -373,9 +413,13 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user
             "precio_menor": req.precio_menor, 
             "precio_mayor": req.precio_mayor
         }
-        supabase.table("productos").update(update_data).eq("id", producto_id).execute()
+        
+        # 2. Actualizamos el producto con firma digital
+        supabase.postgrest.auth(token).table("productos")\
+            .update(update_data).eq("id", producto_id).execute()
 
-        supabase.table("historial_precios").insert({
+        # 3. Registramos la trazabilidad en el historial con firma digital
+        supabase.postgrest.auth(token).table("historial_precios").insert({
             "id_producto": producto_id, 
             "costo_anterior": float(prod_actual.data.get('costo_unidad') or 0.0),
             "costo_nuevo": float(req.costo_unidad), 
@@ -385,6 +429,7 @@ def actualizar_precios_producto(producto_id: str, req: UpdatePrecioRequest, user
 
         return {"status": "success", "message": f"Precios actualizados para {prod_actual.data['nombre']}"}
     except Exception as e:
+        print(f"Error en actualización de precios: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
@@ -424,16 +469,27 @@ def buscar_cliente(
 
 @app.get("/api/clientes/{id_cliente}/historial")
 @app.get("/clientes/{id_cliente}/historial")
-def historial_compras_cliente(id_cliente: str, user = Depends(validar_token)):
-    """Consulta todas las notas de pedido previas de un cliente específico."""
+def historial_compras_cliente(
+    id_cliente: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Consulta todas las notas de pedido previas identificándose ante la DB."""
     try:
-        res = supabase.table("ventas")\
+        # Extraemos el token del encabezado de seguridad
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Usamos .auth(token) para que Supabase reconozca 
+        # al administrador y nos permita ver las ventas vinculadas al cliente.
+        res = supabase.postgrest.auth(token).table("ventas")\
             .select("id, fecha, correlativo_nota, monto_neto, medio_pago, estado")\
             .eq("id_cliente", id_cliente)\
             .order("fecha", desc=True)\
             .execute()
+            
         return res.data
     except Exception as e:
+        print(f"Error en historial de cliente: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/clientes")
@@ -494,18 +550,35 @@ def crear_categoria(
         raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 8. MÓDULO DE DASHBOARD
+# 8. MÓDULO DE DASHBOARD (Resumen Financiero Seguro) - v1.1.0
 # -----------------------------------------------------------------------------
 
 @app.get("/api/dashboard/resumen")
 @app.get("/dashboard/resumen")
-def obtener_resumen_dashboard(user = Depends(validar_token)):
+def obtener_resumen_dashboard(
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Calcula el valor del inventario identificándose ante la DB para saltar el RLS."""
     try:
-        # Solo sumamos valor de productos activos
-        res = supabase.table("productos").select("costo_unidad, stock_actual").eq("activo", True).execute()
+        # Extraemos el token del encabezado de seguridad
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Usamos .auth(token) para que Supabase reconozca 
+        # al administrador y nos entregue los costos y el stock real.
+        res = supabase.postgrest.auth(token).table("productos")\
+            .select("costo_unidad, stock_actual")\
+            .eq("activo", True).execute()
+            
+        # Realizamos el cálculo financiero del capital inmovilizado en Trujillo
         v_total = sum(float(p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
-        return {"valor_total_inventario": round(v_total, 2), "total_items": len(res.data)}
+        
+        return {
+            "valor_total_inventario": round(v_total, 2), 
+            "total_items": len(res.data)
+        }
     except Exception as e:
+        print(f"Error en dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en dashboard: {str(e)}")
 
 # -----------------------------------------------------------------------------
@@ -572,42 +645,58 @@ def abrir_caja(
         raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
-# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO)
+# 11. MÓDULO DE VENTAS Y NOTA DE PEDIDO (TRABAJO PESADO) - v1.1.0
 # -----------------------------------------------------------------------------
 
 @app.post("/api/ventas/procesar")
 @app.post("/ventas/procesar")
-def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
-    """Registra transacción, vincula cliente y gestiona correlativos formales."""
+def procesar_venta(
+    venta: VentaRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Registra transacción, vincula cliente y gestiona stock con seguridad SSR."""
     try:
-        # 1. Resolución de Cliente (Identificar o Crear)
+        # Extraemos el token para identificarnos ante todas las tablas
+        token = authorization.split(" ")[1] if authorization else None
+
+        # 1. Resolución de Cliente (Identificar o Crear) - Pasamos authorization
         target_cliente_id = venta.id_cliente
         if not target_cliente_id and venta.cliente_data:
-            existente = buscar_cliente(venta.cliente_data.numero_documento, user)
-            if existente: target_cliente_id = existente['id']
+            # Actualizamos las llamadas para incluir el pasaporte de seguridad
+            existente = buscar_cliente(venta.cliente_data.numero_documento, user, authorization)
+            if existente: 
+                target_cliente_id = existente['id']
             else:
-                nuevo = crear_cliente(venta.cliente_data)
+                nuevo = crear_cliente(venta.cliente_data, user, authorization)
                 target_cliente_id = nuevo['id']
         
         if not target_cliente_id:
-            varios = supabase.table("clientes").select("id").eq("tipo_documento", "VARIOS").single().execute()
+            # Buscamos cliente VARIOS usando identificación segura
+            varios = supabase.postgrest.auth(token).table("clientes")\
+                .select("id").eq("tipo_documento", "VARIOS").single().execute()
             target_cliente_id = varios.data['id']
 
-        # 2. Generación de Correlativo Secuencial (P001-XXXXXXX)
+        # 2. Generación de Correlativo Secuencial Protegido
         correlativo_final = None
         if venta.tipo_documento == "NOTA_VENTA":
-            corr_data = supabase.table("correlativos").select("*").eq("tipo_documento", "NOTA_PEDIDO").single().execute()
+            corr_data = supabase.postgrest.auth(token).table("correlativos")\
+                .select("*").eq("tipo_documento", "NOTA_PEDIDO").single().execute()
+            
             nuevo_num = corr_data.data['ultimo_numero'] + 1
             correlativo_final = f"{corr_data.data['serie']}-{str(nuevo_num).zfill(corr_data.data['longitud_numero'])}"
-            supabase.table("correlativos").update({"ultimo_numero": nuevo_num}).eq("id", corr_data.data['id']).execute()
+            
+            # Actualizamos correlativo con firma digital
+            supabase.postgrest.auth(token).table("correlativos")\
+                .update({"ultimo_numero": nuevo_num}).eq("id", corr_data.data['id']).execute()
 
         # 3. Cálculos de Auditoría Financiera
         monto_bruto = sum(item.cantidad * item.precio_unitario for item in venta.items)
         monto_descuento = float(venta.descuento or 0.0)
         monto_neto = max(0.0, monto_bruto - monto_descuento)
 
-        # 4. Insertar Cabecera de Venta
-        res_header = supabase.table("ventas").insert({
+        # 4. Insertar Cabecera de Venta Identificada
+        res_header = supabase.postgrest.auth(token).table("ventas").insert({
             "id_sesion_caja": venta.id_sesion_caja,
             "id_cliente": target_cliente_id,
             "correlativo_nota": correlativo_final,
@@ -620,13 +709,20 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
 
         id_venta_db = res_header.data[0]['id']
 
-        # 5. Procesar Detalle y Descuento de Stock
+        # 5. Procesar Detalle y Descuento de Stock Autorizado
         for item in venta.items:
-            prod = supabase.table("productos").select("stock_actual").eq("id", item.id_producto).single().execute()
-            nuevo_stock = (int(prod.data.get('stock_actual') or 0)) - item.cantidad
-            supabase.table("productos").update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
+            # Leemos stock con identificación
+            prod = supabase.postgrest.auth(token).table("productos")\
+                .select("stock_actual").eq("id", item.id_producto).single().execute()
             
-            supabase.table("movimientos_inventario").insert({
+            nuevo_stock = (int(prod.data.get('stock_actual') or 0)) - item.cantidad
+            
+            # Actualizamos stock con identificación
+            supabase.postgrest.auth(token).table("productos")\
+                .update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
+            
+            # Registramos movimiento de salida con identificación
+            supabase.postgrest.auth(token).table("movimientos_inventario").insert({
                 "id_producto": item.id_producto, 
                 "tipo_movimiento": "SALIDA", 
                 "cantidad": item.cantidad, 
@@ -636,7 +732,7 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
                 "id_venta": id_venta_db
             }).execute()
 
-        # 6. Respuesta para el Frontend (Preparación de Impresión)
+        # 6. Respuesta para el Frontend
         return {
             "status": "success", 
             "id_venta": id_venta_db,
@@ -644,6 +740,7 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
             "total_letras": monto_a_letras(monto_neto)
         }
     except Exception as e:
+        print(f"Error crítico en venta Trujillo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error crítico en venta: {str(e)}")
 
 # -----------------------------------------------------------------------------
@@ -652,10 +749,24 @@ def procesar_venta(venta: VentaRequest, user = Depends(validar_token)):
 
 @app.post("/api/inventario/ingreso")
 @app.post("/inventario/ingreso")
-def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
-    """Aumenta stock y garantiza el registro histórico completo."""
+def registrar_ingreso(
+    req: IngresoRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """
+    Aumenta stock e identifica la operación ante Supabase para saltar el RLS.
+    SOLUCIÓN: Corrige el 'Error de Conexión' en el panel de Trujillo.
+    """
     try:
-        prod_res = supabase.table("productos").select("costo_unidad, costo_maximo, stock_actual").eq("id", req.id_producto).single().execute()
+        # Extraemos el token para identificarnos ante la DB
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Consultamos el producto con identificación segura
+        prod_res = supabase.postgrest.auth(token).table("productos")\
+            .select("costo_unidad, costo_maximo, stock_actual")\
+            .eq("id", req.id_producto).single().execute()
+            
         if not prod_res.data:
             raise HTTPException(status_code=404, detail="Producto no encontrado")
 
@@ -666,7 +777,8 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
         nuevo_stock = s_act + req.cantidad
         nuevo_c_max = max(c_max_ant, float(req.costo_nuevo))
 
-        supabase.table("productos").update({
+        # 2. Actualizamos el stock y precios con identificación
+        supabase.postgrest.auth(token).table("productos").update({
             "stock_actual": nuevo_stock, 
             "costo_unidad": req.costo_nuevo,
             "costo_maximo": nuevo_c_max, 
@@ -674,7 +786,8 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
             "precio_mayor": req.precio_mayor_nuevo
         }).eq("id", req.id_producto).execute()
 
-        supabase.table("movimientos_inventario").insert({
+        # 3. Registramos el movimiento de inventario con identificación
+        supabase.postgrest.auth(token).table("movimientos_inventario").insert({
             "id_producto": req.id_producto, 
             "tipo_movimiento": "ENTRADA", 
             "cantidad": req.cantidad,
@@ -682,7 +795,8 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
             "referencia": req.documento_referencia or "Ingreso Manual"
         }).execute()
 
-        supabase.table("historial_precios").insert({
+        # 4. Registramos la trazabilidad de precios con identificación
+        supabase.postgrest.auth(token).table("historial_precios").insert({
             "id_producto": req.id_producto, 
             "costo_anterior": c_ant, 
             "costo_nuevo": float(req.costo_nuevo),
@@ -692,6 +806,7 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
 
         return {"status": "success", "stock_final": nuevo_stock}
     except Exception as e:
+        print(f"Error crítico en ingreso stock: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error Crítico BD: {str(e)}")
 
 # -----------------------------------------------------------------------------
@@ -700,36 +815,64 @@ def registrar_ingreso(req: IngresoRequest, user = Depends(validar_token)):
 
 @app.get("/api/productos/{producto_id}/historial-ingresos")
 @app.get("/productos/{producto_id}/historial-ingresos")
-def obtener_historial_ingresos_especifico(producto_id: str, user = Depends(validar_token)):
+def obtener_historial_ingresos_especifico(
+    producto_id: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Trae los últimos 3 cambios de precio usando identificación segura ante la DB."""
     try:
-        res = supabase.table("historial_precios")\
+        # Extraemos el token del encabezado de seguridad
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Nos identificamos ante Supabase con .auth(token)
+        # Esto permite que el RLS nos deje ver la trazabilidad de costos de Trujillo.
+        res = supabase.postgrest.auth(token).table("historial_precios")\
             .select("fecha_cambio, costo_nuevo, precio_nuevo_menor, precio_nuevo_mayor")\
             .eq("id_producto", producto_id)\
             .order("fecha_cambio", desc=True)\
             .limit(3)\
             .execute()
+            
         return res.data
     except Exception as e:
+        print(f"Error en trazabilidad de costos: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/productos/{producto_id}/historial")
 @app.get("/productos/{producto_id}/historial")
-def obtener_historial_producto(producto_id: str, user = Depends(validar_token)):
+def obtener_historial_producto(
+    producto_id: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Consulta el log de movimientos identificándose para saltar el RLS."""
     try:
-        res = supabase.table("movimientos_inventario")\
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Identificación segura ante Supabase
+        res = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("*")\
             .eq("id_producto", producto_id)\
             .order("fecha", desc=True)\
             .execute()
+            
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/productos/reporte-completo")
 @app.get("/productos/reporte-completo")
-def obtener_reporte_completo(user = Depends(validar_token)):
+def obtener_reporte_completo(
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
+    """Genera reporte maestro de stock usando identificación segura."""
     try:
-        response = supabase.table("productos").select(
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Identificación segura para ver productos y proveedores protegidos
+        response = supabase.postgrest.auth(token).table("productos").select(
             "nombre, costo_unidad, costo_maximo, precio_menor, precio_mayor, stock_actual, proveedores(nombre)"
         ).execute()
         
@@ -883,24 +1026,36 @@ def cerrar_caja(
 
 @app.get("/api/caja/historial")
 @app.get("/caja/historial")
-def listar_historial_cajas(user = Depends(validar_token)):
-    """Consulta la Vista SQL para el resumen financiero de turnos."""
+def listar_historial_cajas(
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # <--- CAPTURAMOS EL PASAPORTE DE SEGURIDAD
+):
+    """Consulta la Vista SQL identificándose ante la DB para saltar el RLS."""
     try:
-        res = supabase.table("vista_historial_cajas").select("*").execute()
+        # Extraemos el token del encabezado para que Supabase sepa quién pregunta
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # ACCIÓN CRÍTICA: Usamos .auth(token) para que la vista nos entregue
+        # los datos de las sesiones protegidas.
+        res = supabase.postgrest.auth(token).table("vista_historial_cajas")\
+            .select("*").execute()
+            
         return res.data
     except Exception as e:
+        print(f"Error en vista historial: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en vista historial: {str(e)}")
 
 @app.get("/api/caja/reporte-productos/{sesion_id}")
 @app.get("/caja/reporte-productos/{sesion_id}")
-def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token)):
+def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),authorization: str = Header(None)):
     """
     Genera un reporte agrupado por Nota de Venta. 
     Propósito: Permitir reimpresiones intuitivas por bloque de productos.
     """
     try:
+        token = authorization.split(" ")[1] if authorization else None
         # 1. Ampliamos la consulta para traer la 'llave' (id_venta) y el Correlativo formal
-        res = supabase.table("movimientos_inventario")\
+        res = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, id_venta, "
                     "productos(nombre, sku), "
                     "ventas(id, correlativo_nota, id_cliente, clientes(nombre_razon_social))")\
@@ -952,18 +1107,19 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token)):
 
 @app.get("/api/ventas/{id_venta}/detalle-completo")
 @app.get("/ventas/{id_venta}/detalle-completo")
-def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_token)):
+def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_token),authorization: str = Header(None)):
     """
     Recupera cabecera, items y datos del cliente para volver a imprimir.
     """
     try:
+        token = authorization.split(" ")[1] if authorization else None
         # 1. Traemos la cabecera y datos del cliente
-        venta = supabase.table("ventas")\
+        venta = supabase.postgrest.auth(token).table("ventas")\
             .select("*, clientes(*)")\
             .eq("id", id_venta).single().execute()
             
         # 2. Traemos los productos vendidos en esa boleta específica
-        items = supabase.table("movimientos_inventario")\
+        items = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, productos(nombre, sku)")\
             .eq("id_venta", id_venta).execute()
             
@@ -1008,7 +1164,7 @@ def registrar_gasto(
 
         # AUDITORÍA AUTOMÁTICA: Si no viene caja, buscamos la abierta en Trujillo
         if not req.id_sesion_caja:
-            sesion_activa = supabase.table("sesiones_caja")\
+            sesion_activa = supabase.postgrest.auth(token).table("sesiones_caja")\
                 .select("id").eq("estado", "ABIERTA")\
                 .order("fecha_apertura", desc=True).limit(1).execute()
             
@@ -1032,14 +1188,23 @@ def registrar_gasto(
 
 @app.get("/api/reportes/utilidad")
 @app.get("/reportes/utilidad")
-def obtener_reporte_utilidad(desde: str, hasta: str, user = Depends(validar_token)):
+def obtener_reporte_utilidad(
+    desde: str, 
+    hasta: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
     """
-    Consulta la Vista SQL 'vista_reporte_utilidad' para obtener el balance.
+    Consulta la Vista SQL 'vista_reporte_utilidad' de forma segura.
     Fórmula: Utilidad Neta = (Ventas - Costo Mercadería) - Gastos Operativos.
     """
     try:
-        # Consultamos la vista filtrando por el rango de fechas proporcionado
-        res = supabase.table("vista_reporte_utilidad")\
+        # Extraemos el token del encabezado para identificarnos
+        token = authorization.split(" ")[1] if authorization else None
+
+        # ACCIÓN CRÍTICA: Usamos .auth(token) para que Supabase nos reconozca 
+        # y nos entregue todos los registros protegidos por RLS.
+        res = supabase.postgrest.auth(token).table("vista_reporte_utilidad")\
             .select("*")\
             .gte("fecha", desde)\
             .lte("fecha", hasta)\
@@ -1048,6 +1213,7 @@ def obtener_reporte_utilidad(desde: str, hasta: str, user = Depends(validar_toke
             
         return res.data
     except Exception as e:
+        print(f"Error en reporte financiero: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en reporte financiero: {str(e)}")
 
 # -----------------------------------------------------------------------------
