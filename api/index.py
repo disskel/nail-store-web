@@ -628,7 +628,7 @@ def abrir_caja(
     """Inicia un nuevo turno registrando el autor del mismo."""
     try:
         token = authorization.split(" ")[1] if authorization else None
-        usuario_id = user["user"].id
+        
         # Usamos el token para que el registro quede asociado al usuario logueado
         res = supabase.postgrest.auth(token).table("sesiones_caja").insert({
             "monto_inicial": req.monto_inicial, 
