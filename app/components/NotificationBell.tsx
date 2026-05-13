@@ -66,40 +66,31 @@ export default function NotificationBell() {
   };
 
 const ejecutarPago = async () => {
-  // =========================================================================
-  // CORRECCIÓN DE FECHA (ZONA HORARIA TRUJILLO, PERÚ)
-  // Utilizamos el formato 'en-CA' (YYYY-MM-DD) forzando el huso de Lima.
-  // Esto asegura que el gasto se registre HOY y no ayer por culpa de UTC.
-  // =========================================================================
-  const hoyStr = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Lima',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date());
+  // Capturamos la fecha y hora completa ISO, pero asegurando el horario de Lima
+  // Esto enviará algo como "2026-05-13T18:15:00-05:00"
+  const ahora = new Date();
+  const offset = -5; // Trujillo es UTC-5
+  const localTime = new Date(ahora.getTime() + (offset * 3600000));
+  const hoyIso = ahora.toISOString(); 
 
   try {
-    // LLAMADA ÚNICA ATÓMICA
     await apiService.liquidarObligacionCompleta(modalPago.id, {
       monto: parseFloat(monto),
       metodo_pago: metodoPago,
       categoria: modalPago.categoria,
       descripcion: `PAGO: ${modalPago.descripcion}`,
-      fecha_pago: hoyStr, // Ahora envía la fecha correcta de Trujillo
+      fecha_pago: hoyIso, // <--- Enviamos el timestamp completo
       id_sesion_caja: null 
     });
 
-    // AVISO DE ÉXITO
     alert("¡Pago registrado con éxito en Jean Nails Store!");
-
-    // Éxito total: Limpiamos estados y refrescamos la campana
     setModalPago(null);
     setMonto(""); 
     revisar(); 
     
   } catch (error) {
-    console.error("La transacción falló en Trujillo:", error);
-    alert("Error de red. Intenta de nuevo, no se han duplicado cobros.");
+    console.error("Fallo en Trujillo:", error);
+    alert("Error de red. Intenta de nuevo.");
   }
 };
 
