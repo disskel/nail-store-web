@@ -465,20 +465,31 @@ def crear_cliente(
 
 @app.get("/api/categorias")
 @app.get("/categorias")
-def listar_categorias(user = Depends(validar_token)):
+def listar_categorias(
+    user = Depends(validar_token), 
+    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+):
     try:
-        res = supabase.table("categorias").select("*").eq("activo", True).execute()
+        token = authorization.split(" ")[1] if authorization else None
+        # Usamos identificación para saltar el nuevo RLS
+        res = supabase.postgrest.auth(token).table("categorias")\
+            .select("*").eq("activo", True).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/categorias")
 @app.post("/categorias")
-def crear_categoria(req: CategoriaRequest, user = Depends(validar_token)):
+def crear_categoria(
+    req: CategoriaRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
     try:
+        token = authorization.split(" ")[1] if authorization else None
         data = {"nombre": req.nombre.upper(), "descripcion": req.descripcion, "activo": True}
-        res = supabase.table("categorias").insert(data).execute()
-        return {"status": "success", "data": res.data[0] if res.data else data}
+        res = supabase.postgrest.auth(token).table("categorias").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al crear categoría: {str(e)}")
 
@@ -503,20 +514,30 @@ def obtener_resumen_dashboard(user = Depends(validar_token)):
 
 @app.get("/api/proveedores")
 @app.get("/proveedores")
-def listar_proveedores(user = Depends(validar_token)):
+def listar_proveedores(
+    user = Depends(validar_token), 
+    authorization: str = Header(None)
+):
     try:
-        response = supabase.table("proveedores").select("*").eq("activo", True).execute()
-        return response.data
+        token = authorization.split(" ")[1] if authorization else None
+        res = supabase.postgrest.auth(token).table("proveedores")\
+            .select("*").eq("activo", True).execute()
+        return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/proveedores")
 @app.post("/proveedores")
-def crear_proveedor(prov: ProveedorRequest, user = Depends(validar_token)):
+def crear_proveedor(
+    prov: ProveedorRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
     try:
+        token = authorization.split(" ")[1] if authorization else None
         data = {"nombre": prov.nombre.upper(), "contacto": prov.contacto, "activo": True}
-        response = supabase.table("proveedores").insert(data).execute()
-        return {"status": "success", "data": response.data[0] if response.data else data}
+        response = supabase.postgrest.auth(token).table("proveedores").insert(data).execute()
+        return {"status": "success", "data": response.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
