@@ -525,7 +525,7 @@ def abrir_caja(
         res = supabase.postgrest.auth(token).table("sesiones_caja").insert({
             "monto_inicial": req.monto_inicial, 
             "estado": "ABIERTA", 
-            "observaciones": req.observaciones
+            "observaciones": req.observaciones,
             "id_usuario": usuario_id # <--- VITAL: Vinculamos la caja al cajero
         }).execute()
         
