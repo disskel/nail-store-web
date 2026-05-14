@@ -202,16 +202,24 @@ export default function HistorialCajas() {
               };
               return (
                 <tr key={caja.id} className="hover:bg-indigo-50 dark:hover:bg-indigo-500/5 transition-all group">
+                  {/* 1. APERTURA / CIERRE */}
                   <td className="p-8">
                     <p className="text-sm font-black text-zinc-900 dark:text-white transition-colors">{new Date(caja.fecha_apertura).toLocaleString('es-PE')}</p>
                     <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-600 mt-2 uppercase italic tracking-tighter transition-colors">
                       {caja.fecha_cierre ? `Cierre: ${new Date(caja.fecha_cierre).toLocaleString('es-PE')}` : '🔓 TURNO ABIERTO'}
                     </p>
                   </td>
-                  <td className="p-8 text-center font-mono text-zinc-400 dark:text-zinc-500">S/ {Number(caja.monto_inicial).toFixed(2)}</td>
-                  <td className="p-8 text-center font-mono text-zinc-900 dark:text-zinc-300 font-bold italic bg-zinc-50/50 dark:bg-white/5 transition-colors">
-                    S/ {Number(caja.saldo_esperado_efectivo || 0).toFixed(2)}
+                  {/* 2. INICIAL (Dinero físico al abrir) */}
+                  <td className="p-8 text-center font-mono text-zinc-400 dark:text-zinc-500">
+                    S/ {Number(caja.monto_inicial || 0).toFixed(2)}
                   </td>
+
+                  {/* 3. FINAL SISTEMA (Total Consolidado: Efectivo + Digital) */}
+                  <td className="p-8 text-center font-mono text-zinc-900 dark:text-zinc-300 font-bold italic bg-zinc-50/50 dark:bg-white/5 transition-colors">
+                    S/ {Number(caja.monto_total_sistema || 0).toFixed(2)}
+                  </td>
+
+                  {/* 4. DIFERENCIA (Cruce global de arqueo) */}
                   <td className={`p-8 text-center font-mono font-black text-sm transition-all`}>
                     <div className={`px-4 py-2 rounded-xl inline-block ${
                       esFaltante ? 'bg-red-500/10 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20' : 
@@ -221,6 +229,8 @@ export default function HistorialCajas() {
                       {esSobrante ? '+' : ''} S/ {diferencia.toFixed(2)}
                     </div>
                   </td>
+
+                  {/* 5. ESTADO */}
                   <td className="p-8 text-center">
                     <span className={`px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter border ${
                       caja.estado === 'CERRADA' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border-emerald-200 dark:border-emerald-500/20 animate-pulse'
@@ -228,6 +238,7 @@ export default function HistorialCajas() {
                       {caja.estado}
                     </span>
                   </td>
+                  
                   <td className="p-8 text-center space-x-3">
                     <button onClick={() => verReporteProductos(caja.id)} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] font-black rounded-xl uppercase shadow-lg shadow-indigo-600/20 transition-all active:scale-95">📦 Productos</button>
                     <button onClick={() => verReporteGeneral(caja.id)} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 text-[9px] font-black rounded-xl uppercase transition-all">📊 General</button>
