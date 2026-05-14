@@ -205,7 +205,8 @@ export default function RegistrarIngreso() {
                   <div key={idx} className="bg-white dark:bg-black/30 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800/50 transition-colors">
                     <p className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 mb-1">{new Date(h.fecha_cambio).toLocaleDateString()}</p>
                     <p className="text-sm font-black text-zinc-900 dark:text-white">S/ {Number(h.costo_nuevo || 0).toFixed(2)} <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-normal">COSTO</span></p>
-                    <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 mt-1 uppercase">Venta: S/ {Number(h.precio_nuevo_menor || 0).toFixed(2)}</p>
+                    <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 mt-1 uppercase">Venta Menor: S/ {Number(h.precio_nuevo_menor || 0).toFixed(2)}</p>
+                    <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-500 mt-1 uppercase">Venta Mayor: S/ {Number(h.precio_nuevo_mayor || 0).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
