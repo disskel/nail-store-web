@@ -323,8 +323,12 @@ export default function ModuloVentas() {
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter">Identificar Cliente</h2>
-                  <p className="text-zinc-500 dark:text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-1">Requerido para Nota de Pedido</p>
+                  <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter">
+                    {tipoDocumento === 'PROFORMA' ? 'Cotizar Cliente' : 'Identificar Cliente'}
+                  </h2>
+                  <p className="text-zinc-500 dark:text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-1">
+                    {tipoDocumento === 'PROFORMA' ? 'Requerido para el cálculo de Proforma' : 'Requerido para Nota de Pedido'}
+                  </p>  
                 </div>
                 <button onClick={() => setShowClienteModal(false)} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">✕</button>
               </div>
@@ -352,7 +356,19 @@ export default function ModuloVentas() {
                     </div>
                   </div>
                 )}
-                <button disabled={procesandoVenta} onClick={finalizarTransaccion} className="w-full py-6 bg-emerald-600 text-white font-black rounded-2xl uppercase tracking-[0.2em] shadow-xl shadow-emerald-900/20 active:scale-95 transition-all">{procesandoVenta ? 'PROCESANDO...' : '🚀 CONFIRMAR NOTA DE PEDIDO'}</button>
+                <button 
+                  disabled={procesandoVenta} 
+                  onClick={finalizarTransaccion} 
+                  className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${
+                    tipoDocumento === 'PROFORMA' 
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }`}
+                >
+                  {procesandoVenta ? 'PROCESANDO...' : (
+                    tipoDocumento === 'PROFORMA' ? '📄 CONFIRMAR Y EMITIR PROFORMA' : '🚀 CONFIRMAR NOTA DE PEDIDO'
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -530,7 +546,7 @@ export default function ModuloVentas() {
                     <p className="text-4xl lg:text-5xl font-black text-zinc-900 dark:text-white italic tracking-tighter transition-colors">S/ {totalFinal.toFixed(2)}</p>
                 </div>
 
-                {/* BOTÓN DE ACCIÓN FINAL */}
+                {/* BOTÓN DE ACCIÓN FINAL MULTIDOCUMENTO */}
                 <div className="md:col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* BOTÓN NOTA DE VENTA */}
                   <button 
