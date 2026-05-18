@@ -29,6 +29,7 @@ export default function ModuloVentas() {
   const [montoTransf, setMontoTransf] = useState(0);
 
   // --- 3. ESTADOS DE VENTA Y CARRITO ---
+  const [tipoDocumento, setTipoDocumento] = useState<'NOTA_VENTA' | 'PROFORMA'>('NOTA_VENTA');
   const [productos, setProductos] = useState<any[]>([]);
   const [busqueda, setFiltro] = useState('');
   const [carrito, setCarrito] = useState<any[]>([]);
@@ -184,7 +185,7 @@ export default function ModuloVentas() {
           cantidad: i.cantidad,
           precio_unitario: i.precioSeleccionado
         })),
-        tipo_documento: "NOTA_VENTA", // Siempre genera Nota de Pedido formal
+        tipo_documento: tipoDocumento, // <--- CAMBIO: Ahora es dinámico
         id_sesion_caja: sesionActiva.id,
         medio_pago: medioPago,
         descuento: descuento,
@@ -210,7 +211,8 @@ export default function ModuloVentas() {
         descuento_global: descuento,
         total_pagar: totalFinal,
         fecha: new Date().toLocaleDateString('es-PE'),
-        vendedor: "Usuario Administrador"
+        vendedor: "Usuario Administrador",
+        tipo_documento: tipoDocumento // <--- NUEVO: Lo pasamos al componente de impresión
       });
 
       // Disparo de impresión con delay para renderizado
@@ -529,12 +531,31 @@ export default function ModuloVentas() {
                 </div>
 
                 {/* BOTÓN DE ACCIÓN FINAL */}
-                <div className="md:col-span-1 lg:col-span-2">
-                  <button disabled={carrito.length === 0 || procesandoVenta} onClick={() => setShowClienteModal(true)} className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${carrito.length === 0 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'}`}>
-                    {procesandoVenta ? 'PROCESANDO...' : (
+                <div className="md:col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* BOTÓN NOTA DE VENTA */}
+                  <button 
+                    disabled={carrito.length === 0 || procesandoVenta} 
+                    onClick={() => { setTipoDocumento('NOTA_VENTA'); setShowClienteModal(true); }} 
+                    className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${carrito.length === 0 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'}`}
+                  >
+                    {procesandoVenta && tipoDocumento === 'NOTA_VENTA' ? 'PROCESANDO...' : (
                       <>
                         <span className="text-xl">🚀</span>
                         GENERAR NOTA DE VENTA
+                      </>
+                    )}
+                  </button>
+
+                  {/* BOTÓN NUEVO: PROFORMA */}
+                  <button 
+                    disabled={carrito.length === 0 || procesandoVenta} 
+                    onClick={() => { setTipoDocumento('PROFORMA'); setShowClienteModal(true); }} 
+                    className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${carrito.length === 0 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}
+                  >
+                    {procesandoVenta && tipoDocumento === 'PROFORMA' ? 'PROCESANDO...' : (
+                      <>
+                        <span className="text-xl">📄</span>
+                        GENERAR PROFORMA
                       </>
                     )}
                   </button>

@@ -660,6 +660,26 @@ def procesar_venta(
         # Extraemos el token para identificarnos ante todas las tablas
         token = authorization.split(" ")[1] if authorization else None
 
+        # =====================================================================
+        # INTELIGENCIA PROFORMA (BYPASS DE INVENTARIO Y TURNOS)
+        # Si es una cotización, calculamos montos pero NO tocamos la DB ni el Stock
+        # =====================================================================
+        if venta.tipo_documento == "PROFORMA":
+            monto_bruto = sum(item.cantidad * item.precio_unitario for item in venta.items)
+            monto_descuento = float(venta.descuento or 0.0)
+            monto_neto = max(0.0, monto_bruto - monto_descuento)
+            
+            # Generamos un correlativo temporal estético de proforma para Trujillo
+            timestamp_prof = datetime.now().strftime("%Y%m%d%H%M")
+            correlativo_proforma = f"PROF-{timestamp_prof}"
+            
+            return {
+                "status": "success", 
+                "id_venta": None,
+                "correlativo": correlativo_proforma,
+                "total_letras": monto_a_letras(monto_neto)
+            }
+
         # 1. Resolución de Cliente (Identificar o Crear) - Pasamos authorization
         target_cliente_id = venta.id_cliente
         if not target_cliente_id and venta.cliente_data:

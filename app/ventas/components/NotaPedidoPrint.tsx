@@ -19,6 +19,7 @@ interface NotaPedidoPrintProps {
     total_pagar: number;     // Monto neto final en soles
     fecha: string;          // Fecha de emisión
     vendedor: string;       // Nombre del cajero/administrador
+    tipo_documento?: string; // <--- NUEVO: Propiedad condicional
   };
 }
 
@@ -147,13 +148,20 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
               <p>INSTAGRAM: @{INFO_EMPRESA.instagram}</p>
             </td>
             <td style={{ width: '35%' }}>
-              <div className="recuadro-documento">
-                {/*<p className="bold" style={{ fontSize: '14px' }}>R.U.C. {INFO_EMPRESA.ruc}</p>*/}
-                <p className="bold" style={{ fontSize: '13px' }}>DOCUMENTO DE PAGO</p>
-                <p className="bold" style={{ margin: '6px 0', background: '#000', color: '#fff', padding: '4px' }}>NOTA DE PEDIDO</p>
-                <p className="bold" style={{ fontSize: '16px' }}>{data.correlativo}</p>
-              </div>
-            </td>
+            <div className="recuadro-documento">
+              {/* TÍTULO DINÁMICO SUPERIOR */}
+              <p className="bold" style={{ fontSize: '13px' }}>
+                {data.tipo_documento === "PROFORMA" ? "COTIZACIÓN DE VALORES" : "DOCUMENTO DE PAGO"}
+              </p>
+              
+              {/* BANNER NEGRO DINÁMICO */}
+              <p className="bold" style={{ margin: '6px 0', background: '#000', color: '#fff', padding: '4px' }}>
+                {data.tipo_documento === "PROFORMA" ? "PROFORMA" : "NOTA DE PEDIDO"}
+              </p>
+              
+              <p className="bold" style={{ fontSize: '16px' }}>{data.correlativo}</p>
+            </div>
+          </td>
           </tr>
         </tbody>
       </table>
