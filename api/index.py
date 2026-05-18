@@ -670,7 +670,16 @@ def procesar_venta(
             monto_neto = max(0.0, monto_bruto - monto_descuento)
             
             # Generamos un correlativo temporal estético de proforma para Trujillo
-            timestamp_prof = datetime.now().strftime("%Y%m%d%H%M")
+            # -----------------------------------------------------------------
+            # CORRECCIÓN DE ZONA HORARIA: TRUJILLO / LIMA, PERÚ (UTC-5)
+            # Importamos 'timedelta' y 'timezone' para crear un desplazamiento
+            # de -5 horas. Esto obliga al servidor de Vercel a calcular la
+            # fecha y hora local exacta de tu negocio y no la de Londres.
+            # -----------------------------------------------------------------
+            from datetime import timezone, timedelta
+            huso_horario_peru = timezone(timedelta(hours=-5))
+
+            timestamp_prof = datetime.now(huso_horario_peru).strftime("%Y%m%d%H%M")
             correlativo_proforma = f"PROF-{timestamp_prof}"
             
             return {
