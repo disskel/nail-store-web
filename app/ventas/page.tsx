@@ -215,11 +215,17 @@ export default function ModuloVentas() {
         tipo_documento: tipoDocumento // <--- NUEVO: Lo pasamos al componente de impresión
       });
 
-      // Disparo de impresión con delay para renderizado
+      // --- LÓGICA MÓVIL ACTUALIZADA ---
+      // 1. Escuchamos cuándo el celular termina o cancela la impresión para limpiar la memoria
+      window.onafterprint = () => {
+        setDatosImpresion(null);
+      };
+
+      // 2. Disparamos la orden de impresión (Dejamos de forzar el borrado aquí)
       setTimeout(() => {
         window.print();
-        setDatosImpresion(null);
       }, 800);
+      // --------------------------------
 
       setMensaje({ texto: '✅ PEDIDO GENERADO CON ÉXITO', tipo: 'success' });
       
