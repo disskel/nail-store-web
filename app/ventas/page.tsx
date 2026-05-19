@@ -216,15 +216,12 @@ export default function ModuloVentas() {
       });
 
       // --- LÓGICA MÓVIL ACTUALIZADA ---
-      // 1. Escuchamos cuándo el celular termina o cancela la impresión para limpiar la memoria
-      window.onafterprint = () => {
-        setDatosImpresion(null);
-      };
-
-      // 2. Disparamos la orden de impresión (Dejamos de forzar el borrado aquí)
+      // Simplemente damos la orden de imprimir con un buen margen de tiempo.
+      // Eliminamos el onafterprint: el celular ahora tendrá TODO el tiempo del mundo 
+      // para generar el PDF porque no le borraremos la información.
       setTimeout(() => {
         window.print();
-      }, 800);
+      }, 1000); 
       // --------------------------------
 
       setMensaje({ texto: '✅ PEDIDO GENERADO CON ÉXITO', tipo: 'success' });

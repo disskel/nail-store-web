@@ -48,30 +48,24 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
 
         /* Configuración específica para el motor de impresión del navegador */
         @media print {
-          /* Limpieza de cabeceras de página del navegador (URL, Título) */
           @page { margin: 0; size: auto; }
           
-          /* BLOQUEO MÓVIL: Apaga el scroll trasero y el fondo oscuro */
-          html, body {
-            height: 100vh !important;
-            overflow: hidden !important;
-            background: white !important;
-          }
+          /* ELIMINAMOS html, body { height: 100vh; overflow: hidden; } */
+          /* Esto permite que el PDF móvil respire y dibuje el contenido */
 
           body * { visibility: hidden; }
           .nota-pedido-container, .nota-pedido-container * { visibility: visible; }
           
           .nota-pedido-container {
-            position: fixed; /* CAMBIO CLAVE: Fijo, no absoluto, para evitar cortes en iOS/Android */
+            position: absolute; /* VOLVEMOS A ABSOLUTE: Evita el recorte en blanco en móviles */
             left: 0;
             top: 0;
             width: 100%;
-            height: 100%;
             padding: 0.8cm;
             color: black !important;
             background: white !important;
-            z-index: 99999; /* BLINDAJE: Aplasta al mensaje de "✅ Éxito" y al menú lateral */
-            font-family: 'Verdana', Geneva, sans-serif; /* Fuente clásica de auditoría */
+            z-index: 99999; 
+            font-family: 'Verdana', Geneva, sans-serif;
             font-weight: 600;
             font-size: 10px;
             line-height: 1.4;
