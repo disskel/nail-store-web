@@ -36,11 +36,11 @@ export default function ModuloVentas() {
   const [medioPago, setMedioPago] = useState('EFECTIVO');
   const [descuento, setDescuento] = useState(0);
 
-  // --- 4. NUEVOS ESTADOS: MODAL DE CLIENTE Y SEGUIMIENTO ---
-  const [showClienteModal, setShowClienteModal] = useState(false); // Se activa al presionar "Generar Pedido"
+  // --- 4. ESTADOS: IDENTIFICACIÓN DE CLIENTE Y CONFIRMACIÓN ---
   const [clienteDoc, setClienteDoc] = useState('');
   const [clienteData, setClienteData] = useState<any>(null);
   const [buscandoCliente, setBuscandoCliente] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // --- 5. ESTADO: MOTOR DE IMPRESIÓN ---
   const [datosImpresion, setDatosImpresion] = useState<any>(null);
@@ -170,11 +170,24 @@ export default function ModuloVentas() {
     return calculado < 0 ? 0 : calculado; 
   }, [subtotalCarrito, descuento]);
 
+  // --- VALIDACIÓN PREVIA (PREVENCIÓN DE ERRORES) ---
+  const prepararDocumento = (tipo: 'NOTA_VENTA' | 'PROFORMA') => {
+    if (!clienteData) {
+      setMensaje({ texto: '⚠️ POR FAVOR IDENTIFIQUE AL CLIENTE EN LA PARTE SUPERIOR', tipo: 'error' });
+      return;
+    }
+    setTipoDocumento(tipo);
+    setShowConfirmModal(true);
+  };
+
   // --- PROCESAMIENTO FINAL: VENTA + NOTA DE PEDIDO ---
   const finalizarTransaccion = async () => {
+    setShowConfirmModal(false); // Cerramos el modal elegante al procesar
+    
+    // Verificación de seguridad cerrada correctamente
     if (!clienteData?.nombre_razon_social) {
-      setMensaje({ texto: '⚠️ IDENTIFIQUE AL CLIENTE PARA CONTINUAR', tipo: 'error' });
-      return;
+        setMensaje({ texto: '⚠️ ERROR: CLIENTE NO IDENTIFICADO', tipo: 'error' });
+        return;
     }
 
     setProcesandoVenta(true);
@@ -231,7 +244,6 @@ export default function ModuloVentas() {
       setDescuento(0); 
       setClienteData(null);
       setClienteDoc('');
-      setShowClienteModal(false);
       
       const resumenActualizado = await apiService.getResumenCaja(sesionActiva.id);
       setResumenSesion(resumenActualizado);
@@ -321,56 +333,37 @@ export default function ModuloVentas() {
 
       {/* MODALES */}
       <div className="print:hidden">
-        {showClienteModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-xl p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in duration-300">
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                  <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter">
-                    {tipoDocumento === 'PROFORMA' ? 'Cotizar Cliente' : 'Identificar Cliente'}
-                  </h2>
-                  <p className="text-zinc-500 dark:text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-1">
-                    {tipoDocumento === 'PROFORMA' ? 'Requerido para el cálculo de Proforma' : 'Requerido para Nota de Pedido'}
-                  </p>  
-                </div>
-                <button onClick={() => setShowClienteModal(false)} className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">✕</button>
+        
+        {/* NUEVO MODAL DE CONFIRMACIÓN ELEGANTE (GLASSMORPHISM) */}
+        {showConfirmModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-900/80 dark:bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[3.5rem] w-full max-w-md shadow-2xl text-center animate-in zoom-in-95 duration-300 transition-colors">
+              <div className="w-24 h-24 mx-auto bg-zinc-50 dark:bg-black rounded-full flex items-center justify-center mb-6 shadow-inner border border-zinc-200 dark:border-zinc-800">
+                <span className="text-5xl">{tipoDocumento === 'PROFORMA' ? '📄' : '🚀'}</span>
               </div>
-              <div className="space-y-6">
-                <div className="flex gap-2">
-                  <input autoFocus placeholder="DNI / RUC" value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} className="flex-1 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl text-xl font-black text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-600 transition-all" />
-                  <button onClick={buscarClienteRapido} className="px-6 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-2xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">{buscandoCliente ? '...' : '🔍'}</button>
-                </div>
-                <button onClick={seleccionarPublicoGeneral} className="w-full py-3 bg-indigo-600/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 font-black rounded-xl uppercase text-[10px] tracking-widest hover:bg-indigo-600 hover:text-white transition-all">👥 Seleccionar Público General (Varios)</button>
-                {clienteData && (
-                  <div className="p-6 bg-zinc-50 dark:bg-black/40 border border-emerald-500/20 rounded-2xl space-y-4 animate-in slide-in-from-top duration-300">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2">Nombre / Razón Social</label>
-                      <input placeholder="ESCRIBA EL NOMBRE..." value={clienteData.nombre_razon_social} onChange={e => setClienteData({...clienteData, nombre_razon_social: e.target.value.toUpperCase()})} className="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 p-2 text-sm font-black text-emerald-600 dark:text-emerald-400 outline-none uppercase" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2">Dirección</label>
-                        <input placeholder="TRUJILLO..." value={clienteData.direccion || ''} onChange={e => setClienteData({...clienteData, direccion: e.target.value.toUpperCase()})} className="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none uppercase" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2">Celular</label>
-                        <input placeholder="999..." value={clienteData.celular || ''} onChange={e => setClienteData({...clienteData, celular: e.target.value})} className="w-full bg-transparent border-b border-zinc-200 dark:border-zinc-800 p-2 text-[11px] font-bold text-zinc-500 outline-none" />
-                      </div>
-                    </div>
+              <h2 className={`text-3xl font-black uppercase italic tracking-tighter mb-2 ${tipoDocumento === 'PROFORMA' ? 'text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-500'}`}>
+                ¿{tipoDocumento === 'PROFORMA' ? 'Generar Proforma' : 'Emitir Nota de Pedido'}?
+              </h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-widest mb-8">Por favor confirme la operación</p>
+              
+              <div className="bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2rem] mb-10 space-y-4 text-left shadow-inner">
+                <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-4">
+                  <span className="text-[10px] text-zinc-400 uppercase font-black tracking-widest">Cliente</span>
+                  <div className="text-right">
+                    <span className="text-xs text-zinc-900 dark:text-white font-black block truncate max-w-[180px]">{clienteData?.nombre_razon_social || 'NO IDENTIFICADO'}</span>
+                    {clienteData?.academias && <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-widest block mt-1">🎓 {clienteData.academias.nombre}</span>}
                   </div>
-                )}
-                <button 
-                  disabled={procesandoVenta} 
-                  onClick={finalizarTransaccion} 
-                  className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 ${
-                    tipoDocumento === 'PROFORMA' 
-                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white' 
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  }`}
-                >
-                  {procesandoVenta ? 'PROCESANDO...' : (
-                    tipoDocumento === 'PROFORMA' ? '📄 CONFIRMAR Y EMITIR PROFORMA' : '🚀 CONFIRMAR NOTA DE PEDIDO'
-                  )}
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-[10px] text-zinc-400 uppercase font-black tracking-widest">Total a Cobrar</span>
+                  <span className="text-2xl text-zinc-900 dark:text-white font-black italic">S/ {totalFinal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button disabled={procesandoVenta} onClick={() => setShowConfirmModal(false)} className="flex-1 py-5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all">Cancelar</button>
+                <button disabled={procesandoVenta} onClick={finalizarTransaccion} className={`flex-2 px-8 py-5 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 ${tipoDocumento === 'PROFORMA' ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'}`}>
+                  {procesandoVenta ? 'PROCESANDO...' : 'SÍ, EMITIR'}
                 </button>
               </div>
             </div>
@@ -426,6 +419,63 @@ export default function ModuloVentas() {
 
       {/* --- LAYOUT FULL-WIDTH: BUSCADOR SUPERIOR + CARRITO EXCEL --- */}
       <div className="flex flex-col gap-6 print:hidden">
+        
+        {/* 1. IDENTIFICACIÓN DE CLIENTE (NUEVO CABEZAL) */}
+        <section className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-4 rounded-[2rem] shadow-sm transition-colors duration-300">
+          <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
+            {/* ZONA DE BÚSQUEDA */}
+            <div className="flex items-center gap-3 flex-1 w-full lg:w-auto">
+              <div className="hidden sm:flex bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 w-12 h-12 rounded-xl items-center justify-center text-xl border border-emerald-100 dark:border-emerald-500/20">
+                👤
+              </div>
+              <div className="flex-1 flex gap-2">
+                <input 
+                  placeholder="DNI / RUC..." 
+                  value={clienteDoc} 
+                  onChange={e => setClienteDoc(e.target.value)} 
+                  onKeyDown={e => e.key === 'Enter' && buscarClienteRapido()}
+                  className="w-full xl:max-w-[200px] p-3.5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-black text-zinc-900 dark:text-white uppercase transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-800 text-sm" 
+                />
+                <button disabled={buscandoCliente} onClick={buscarClienteRapido} className="px-6 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-black rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors text-sm">
+                  {buscandoCliente ? '⏳' : '🔍'}
+                </button>
+                <button onClick={seleccionarPublicoGeneral} className="px-6 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black rounded-xl hover:bg-indigo-600 hover:text-white transition-all text-[10px] tracking-widest uppercase border border-indigo-100 dark:border-indigo-500/20">
+                  Varios
+                </button>
+              </div>
+            </div>
+
+            {/* TARJETA DEL CLIENTE SELECCIONADO */}
+            {clienteData && (
+              <div className="w-full xl:w-auto min-w-[350px] bg-zinc-50 dark:bg-black/40 border border-emerald-500/30 p-3.5 rounded-xl flex justify-between items-center animate-in fade-in transition-colors">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <p className="font-black text-sm text-zinc-900 dark:text-white uppercase truncate max-w-[250px]">{clienteData.nombre_razon_social || 'CLIENTE NUEVO'}</p>
+                    {clienteData.academias && (
+                      <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/20 uppercase tracking-widest">
+                        🎓 {clienteData.academias.nombre}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase mt-0.5 tracking-wider">
+                    {clienteData.numero_documento} • {clienteData.celular || 'SIN CELULAR'}
+                  </p>
+                </div>
+                <button onClick={() => {setClienteData(null); setClienteDoc('');}} className="w-8 h-8 flex items-center justify-center bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors ml-4">
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* CAMPOS RÁPIDOS SI ES CLIENTE NUEVO */}
+          {clienteData && !clienteData.id && clienteData.numero_documento !== '00000000' && (
+            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                <input placeholder="NOMBRE COMPLETO / RAZÓN SOCIAL..." value={clienteData.nombre_razon_social} onChange={e => setClienteData({...clienteData, nombre_razon_social: e.target.value.toUpperCase()})} className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl text-xs font-black text-emerald-600 dark:text-emerald-400 outline-none uppercase transition-colors" />
+                <input placeholder="CELULAR DE CONTACTO (OPCIONAL)..." value={clienteData.celular || ''} onChange={e => setClienteData({...clienteData, celular: e.target.value})} className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl text-xs font-bold text-zinc-500 outline-none transition-colors" />
+            </div>
+          )}
+        </section>
         
         {/* BUSCADOR COMPACTO SUPERIOR */}
         <section className="relative w-full z-[100]">
@@ -554,7 +604,7 @@ export default function ModuloVentas() {
                   {/* BOTÓN NOTA DE VENTA */}
                   <button 
                     disabled={carrito.length === 0 || procesandoVenta} 
-                    onClick={() => { setTipoDocumento('NOTA_VENTA'); setShowClienteModal(true); }} 
+                    onClick={() => prepararDocumento('NOTA_VENTA')} 
                     className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${carrito.length === 0 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'}`}
                   >
                     {procesandoVenta && tipoDocumento === 'NOTA_VENTA' ? 'PROCESANDO...' : (
@@ -568,7 +618,7 @@ export default function ModuloVentas() {
                   {/* BOTÓN NUEVO: PROFORMA */}
                   <button 
                     disabled={carrito.length === 0 || procesandoVenta} 
-                    onClick={() => { setTipoDocumento('PROFORMA'); setShowClienteModal(true); }} 
+                    onClick={() => prepararDocumento('PROFORMA')} 
                     className={`w-full py-6 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-4 ${carrito.length === 0 ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}
                   >
                     {procesandoVenta && tipoDocumento === 'PROFORMA' ? 'PROCESANDO...' : (
