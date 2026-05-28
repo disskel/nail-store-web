@@ -575,7 +575,7 @@ def listar_academias(user = Depends(validar_token), authorization: str = Header(
     """Trae las academias activas para los dropdowns del frontend."""
     try:
         token = authorization.split(" ")[1] if authorization else None
-        res = supabase.postgrest.auth(token).table("academias").select("*").eq("activo", True).execute()
+        res = supabase.postgrest.auth(token).table("academias").select("*").eq("activo", True).order("nombre").execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -591,6 +591,31 @@ def crear_academia(req: AcademiaRequest, user = Depends(validar_token), authoriz
             "activo": True
         }
         res = supabase.postgrest.auth(token).table("academias").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/academias/{id_academia}")
+@app.patch("/academias/{id_academia}")
+def actualizar_academia(
+    id_academia: str, 
+    req: dict, 
+    user = Depends(validar_token), 
+    authorization: str = Header(None)
+):
+    """Permite editar nombre/descuento o realizar borrado lógico (ocultar)."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # Formateamos a mayúsculas si se está actualizando el nombre
+        if "nombre" in req and req["nombre"]:
+            req["nombre"] = req["nombre"].upper()
+            
+        res = supabase.postgrest.auth(token).table("academias").update(req).eq("id", id_academia).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Academia no encontrada")
+            
         return {"status": "success", "data": res.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

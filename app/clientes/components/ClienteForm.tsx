@@ -31,11 +31,35 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
   const [academias, setAcademias] = useState<any[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  
+  // NUEVO ESTADO: QUICK-ADD ACADEMIA
+  const [modoCrearAcademia, setModoCrearAcademia] = useState(false);
+  const [nuevaAcademiaNombre, setNuevaAcademiaNombre] = useState('');
 
   // CARGAMOS LAS ACADEMIAS AL ABRIR EL MODAL
-  React.useEffect(() => {
+  const cargarAcademias = () => {
     apiService.getAcademias().then(data => setAcademias(data)).catch(console.error);
+  };
+
+  React.useEffect(() => {
+    cargarAcademias();
   }, []);
+
+  const handleCrearAcademiaRapida = async () => {
+    if (!nuevaAcademiaNombre.trim()) return;
+    setGuardando(true);
+    try {
+      const res = await apiService.crearAcademia({ nombre: nuevaAcademiaNombre.trim(), descuento_sugerido: 0 });
+      await cargarAcademias();
+      setFormData(prev => ({ ...prev, id_academia: res.data.id })); // Auto-selecciona la nueva academia
+      setModoCrearAcademia(false);
+      setNuevaAcademiaNombre('');
+    } catch (err: any) {
+      setError('ERROR AL CREAR ACADEMIA: VERIFIQUE QUE NO EXISTA EL NOMBRE');
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   // --- 2. MANEJADOR DE CAMBIOS CON FORMATEO ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -166,9 +190,34 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
               className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-900 dark:text-white outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-800 transition-colors"
             />
           </div>
-          {/* NUEVO: SELECTOR DE ACADEMIA */}
-            <div className="space-y-1">
+          {/* NUEVO: SELECTOR DE ACADEMIA CON QUICK-ADD */}
+          <div className="space-y-1 relative">
+            <div className="flex justify-between items-end mb-1">
               <label className="text-[9px] font-black text-indigo-400 dark:text-indigo-500 uppercase ml-2 transition-colors">Academia Vinculada (Opcional)</label>
+              {!modoCrearAcademia && (
+                <button 
+                  type="button" 
+                  onClick={() => setModoCrearAcademia(true)} 
+                  className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline"
+                >
+                  [+ Nueva]
+                </button>
+              )}
+            </div>
+
+            {modoCrearAcademia ? (
+              <div className="flex gap-2 animate-in zoom-in-95 duration-200">
+                <input 
+                  autoFocus
+                  placeholder="NOMBRE DE LA ACADEMIA..."
+                  value={nuevaAcademiaNombre}
+                  onChange={e => setNuevaAcademiaNombre(e.target.value.toUpperCase())}
+                  className="flex-1 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800/50 p-3 rounded-xl text-sm font-bold text-indigo-900 dark:text-indigo-300 outline-none uppercase transition-colors"
+                />
+                <button type="button" onClick={handleCrearAcademiaRapida} disabled={guardando} className="px-4 bg-indigo-600 text-white rounded-xl text-xs font-black shadow-md hover:bg-indigo-500 transition-all">✓</button>
+                <button type="button" onClick={() => setModoCrearAcademia(false)} className="px-4 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl text-xs font-black transition-all hover:bg-zinc-300 dark:hover:bg-zinc-700">✕</button>
+              </div>
+            ) : (
               <select 
                 name="id_academia"
                 value={formData.id_academia}
@@ -180,7 +229,8 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
                   <option key={a.id} value={a.id}>{a.nombre} (S/ {Number(a.descuento_sugerido).toFixed(2)})</option>
                 ))}
               </select>
-            </div>
+            )}
+          </div>
         </div>
 
         {error && <p className="text-[10px] text-red-500 font-black text-center uppercase animate-pulse">{error}</p>}

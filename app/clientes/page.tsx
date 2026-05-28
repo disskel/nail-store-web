@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 // IMPORTACIÓN DEL COMPONENTE DE FORMULARIO PARA REGISTRO/EDICIÓN
 import ClienteForm from './components/ClienteForm';
+// IMPORTACIÓN DEL MANTENEDOR CENTRAL DE ACADEMIAS
+import AcademiasModal from './components/AcademiasModal';
 
 /**
  * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM) - VERSIÓN 1.0.36
@@ -27,6 +29,9 @@ export default function ModuloClientes() {
   // --- 3. ESTADO PARA CONTROL DE MODAL DE REGISTRO Y EDICIÓN ---
   const [showForm, setShowForm] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(null);
+  
+  // NUEVO ESTADO: CONTROL DEL MANTENEDOR DE ACADEMIAS
+  const [showAcademias, setShowAcademias] = useState(false);
 
   // --- 4. CARGA INICIAL DE CLIENTES DESDE EL BACKEND ---
   async function cargarDatos() {
@@ -100,13 +105,17 @@ export default function ModuloClientes() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
       
-      {/* MODAL DEL FORMULARIO */}
+      {/* MODALES DEL MÓDULO */}
       {showForm && (
         <ClienteForm 
           clienteInicial={clienteAEditar}
           onSuccess={manejarExitoRegistro} 
           onCancel={() => { setShowForm(false); setClienteAEditar(null); }} 
         />
+      )}
+
+      {showAcademias && (
+        <AcademiasModal onClose={() => setShowAcademias(false)} />
       )}
 
       {/* CABECERA DEL MÓDULO */}
@@ -118,14 +127,20 @@ export default function ModuloClientes() {
           </p>
         </div>
         
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 lg:gap-6">
+          <button 
+            onClick={() => setShowAcademias(true)}
+            className="px-6 py-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-black rounded-2xl uppercase text-[9px] tracking-widest border border-indigo-200 dark:border-indigo-500/20 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <span className="text-sm">🎓</span> Gestionar Academias
+          </button>
           <button 
             onClick={() => { setClienteAEditar(null); setShowForm(true); }}
             className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all active:scale-95"
           >
             ➕ Nuevo Cliente
           </button>
-          <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-2xl text-right transition-colors">
+          <div className="hidden sm:block bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-2xl text-right transition-colors">
             <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
             <p className="text-2xl text-zinc-900 dark:text-white font-black transition-colors">{clientes.length}</p>
           </div>

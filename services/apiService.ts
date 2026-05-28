@@ -303,6 +303,20 @@ export const apiService = {
     return res.json();
   },
 
+  // Permite editar el nombre o realizar un borrado lógico de la academia
+  async actualizarAcademia(id: string, data: any) {
+    const res = await fetch(`${API_URL}/academias/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al actualizar academia');
+    }
+    return res.json();
+  },
+
   // -------------------------------------------------------------------------
   // 7. GESTIÓN DE VENTAS Y CAJA (POS - PROTEGIDO)
   // -------------------------------------------------------------------------
