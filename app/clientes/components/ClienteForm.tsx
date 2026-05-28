@@ -24,11 +24,18 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
     nombre_razon_social: clienteInicial?.nombre_razon_social || '',
     direccion: clienteInicial?.direccion || '',
     celular: clienteInicial?.celular || '',
-    contacto_nombre: clienteInicial?.contacto_nombre || ''
+    contacto_nombre: clienteInicial?.contacto_nombre || '',
+    id_academia: clienteInicial?.id_academia || '' // NUEVO: Relación Academia
   });
 
+  const [academias, setAcademias] = useState<any[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+
+  // CARGAMOS LAS ACADEMIAS AL ABRIR EL MODAL
+  React.useEffect(() => {
+    apiService.getAcademias().then(data => setAcademias(data)).catch(console.error);
+  }, []);
 
   // --- 2. MANEJADOR DE CAMBIOS CON FORMATEO ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -61,11 +68,22 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
     setError('');
 
     try {
-      // Llamada al endpoint POST /api/clientes definido en index.py
-      await apiService.registrarCliente(formData);
+      // Limpiamos la academia si seleccionó "NINGUNA"
+      const payload = { 
+        ...formData, 
+        id_academia: formData.id_academia === '' ? null : formData.id_academia 
+      };
+
+      if (clienteInicial?.id) {
+        // MODO EDICIÓN
+        await apiService.actualizarCliente(clienteInicial.id, payload);
+      } else {
+        // MODO NUEVO REGISTRO
+        await apiService.registrarCliente(payload);
+      }
       onSuccess();
     } catch (err: any) {
-      setError('ERROR AL GUARDAR: VERIFIQUE SI EL DNI YA EXISTE');
+      setError('ERROR AL GUARDAR: VERIFIQUE LOS DATOS O EL DNI');
     } finally {
       setGuardando(false);
     }
@@ -148,6 +166,21 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
               className="w-full bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-sm font-bold text-zinc-900 dark:text-white outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-800 transition-colors"
             />
           </div>
+          {/* NUEVO: SELECTOR DE ACADEMIA */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-indigo-400 dark:text-indigo-500 uppercase ml-2 transition-colors">Academia Vinculada (Opcional)</label>
+              <select 
+                name="id_academia"
+                value={formData.id_academia}
+                onChange={handleChange}
+                className="w-full bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-200 dark:border-indigo-800/50 p-3 rounded-xl text-sm font-bold text-indigo-900 dark:text-indigo-300 outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+              >
+                <option value="">-- NINGUNA ACADEMIA --</option>
+                {academias.map(a => (
+                  <option key={a.id} value={a.id}>{a.nombre} (S/ {Number(a.descuento_sugerido).toFixed(2)})</option>
+                ))}
+              </select>
+            </div>
         </div>
 
         {error && <p className="text-[10px] text-red-500 font-black text-center uppercase animate-pulse">{error}</p>}

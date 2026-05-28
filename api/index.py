@@ -142,6 +142,11 @@ class GastoRequest(BaseModel):
     fecha_gasto: Optional[str] = None # Formato ISO opcional
     id_sesion_caja: Optional[str] = None # Vinculación opcional a un turno
 
+class AcademiaRequest(BaseModel):
+    """Modelo para el catálogo de academias"""
+    nombre: str
+    descuento_sugerido: Optional[float] = 0.0
+
 class ClienteRequest(BaseModel):
     """Modelo para el registro y búsqueda de clientes"""
     tipo_documento: str # DNI, RUC, VARIOS
@@ -150,6 +155,15 @@ class ClienteRequest(BaseModel):
     direccion: Optional[str] = None
     celular: Optional[str] = None
     contacto_nombre: Optional[str] = None
+    id_academia: Optional[str] = None # NUEVO: Relación con academia
+
+class ClienteUpdateRequest(BaseModel):
+    """Modelo para edición y borrado lógico de clientes"""
+    nombre_razon_social: Optional[str] = None
+    direccion: Optional[str] = None
+    celular: Optional[str] = None
+    id_academia: Optional[str] = None
+    activo: Optional[bool] = None
 
 class ItemVenta(BaseModel):
     id_producto: str
@@ -443,9 +457,11 @@ def listar_clientes(user = Depends(validar_token),authorization: str = Header(No
     try:
         token = authorization.split(" ")[1] if authorization else None
 
-        # ACCIÓN CRÍTICA: Nos identificamos para saltar el RLS
+        # ACTUALIZACIÓN: JOIN con academias y filtramos los activos (Borrado Lógico)
         res = supabase.postgrest.auth(token).table("clientes")\
-            .select("*").order("nombre_razon_social").execute()
+            .select("*, academias(nombre, descuento_sugerido)")\
+            .eq("activo", True)\
+            .order("nombre_razon_social").execute()
         return res.data
     except Exception as e:
         print(f"Error en listado clientes: {str(e)}")
@@ -508,10 +524,72 @@ def crear_cliente(
             "nombre_razon_social": req.nombre_razon_social.upper(),
             "direccion": req.direccion.upper() if req.direccion else None,
             "celular": req.celular,
-            "contacto_nombre": req.contacto_nombre.upper() if req.contacto_nombre else None
+            "contacto_nombre": req.contacto_nombre.upper() if req.contacto_nombre else None,
+            "id_academia": req.id_academia, # NUEVO: Guardamos la relación
+            "activo": True
         }
         res = supabase.postgrest.auth(token).table("clientes").insert(data).execute()
         return res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+
+@app.patch("/api/clientes/{id_cliente}")
+@app.patch("/clientes/{id_cliente}")
+def actualizar_cliente(
+    id_cliente: str, 
+    req: ClienteUpdateRequest, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Permite editar datos del cliente o realizar un borrado lógico (ocultar)."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        update_data = {}
+        if req.nombre_razon_social is not None: update_data["nombre_razon_social"] = req.nombre_razon_social.upper()
+        if req.direccion is not None: update_data["direccion"] = req.direccion.upper()
+        if req.celular is not None: update_data["celular"] = req.celular
+        if req.id_academia is not None: update_data["id_academia"] = req.id_academia
+        if req.activo is not None: update_data["activo"] = req.activo
+
+        res = supabase.postgrest.auth(token).table("clientes")\
+            .update(update_data).eq("id", id_cliente).execute()
+            
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+            
+        return {"status": "success", "data": res.data[0]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =============================================================================
+# 6.5 MÓDULO DE ACADEMIAS (NUEVO CATÁLOGO)
+# =============================================================================
+@app.get("/api/academias")
+@app.get("/academias")
+def listar_academias(user = Depends(validar_token), authorization: str = Header(None)):
+    """Trae las academias activas para los dropdowns del frontend."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        res = supabase.postgrest.auth(token).table("academias").select("*").eq("activo", True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/academias")
+@app.post("/academias")
+def crear_academia(req: AcademiaRequest, user = Depends(validar_token), authorization: str = Header(None)):
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        data = {
+            "nombre": req.nombre.upper(),
+            "descuento_sugerido": req.descuento_sugerido,
+            "activo": True
+        }
+        res = supabase.postgrest.auth(token).table("academias").insert(data).execute()
+        return {"status": "success", "data": res.data[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

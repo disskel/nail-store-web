@@ -264,6 +264,45 @@ export const apiService = {
     return res.json();
   },
 
+  // Permite editar datos del cliente o realizar un borrado lógico (ocultar)
+  async actualizarCliente(id: string, data: any) {
+    const res = await fetch(`${API_URL}/clientes/${id}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al actualizar cliente');
+    }
+    return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // 6.5 MANTENEDOR DE ACADEMIAS (NUEVO - PROTEGIDO)
+  // -------------------------------------------------------------------------
+  
+  async getAcademias() {
+    const res = await fetch(`${API_URL}/academias`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al listar academias');
+    return res.json();
+  },
+
+  async crearAcademia(data: { nombre: string, descuento_sugerido: number }) {
+    const res = await fetch(`${API_URL}/academias`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al registrar la academia');
+    }
+    return res.json();
+  },
+
   // -------------------------------------------------------------------------
   // 7. GESTIÓN DE VENTAS Y CAJA (POS - PROTEGIDO)
   // -------------------------------------------------------------------------

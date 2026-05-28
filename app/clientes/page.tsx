@@ -24,8 +24,9 @@ export default function ModuloClientes() {
   const [historialCompras, setHistorialCompras] = useState<any[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
-  // --- 3. ESTADO PARA CONTROL DE MODAL DE REGISTRO ---
+  // --- 3. ESTADO PARA CONTROL DE MODAL DE REGISTRO Y EDICIÓN ---
   const [showForm, setShowForm] = useState(false);
+  const [clienteAEditar, setClienteAEditar] = useState<any>(null);
 
   // --- 4. CARGA INICIAL DE CLIENTES DESDE EL BACKEND ---
   async function cargarDatos() {
@@ -68,12 +69,25 @@ export default function ModuloClientes() {
     }
   };
 
-  // --- 7. MANEJADORES DE ÉXITO PARA REGISTROS ---
+  // --- 7. MANEJADORES DE ÉXITO Y BORRADO LÓGICO ---
   const manejarExitoRegistro = () => {
     setShowForm(false);
-    cargarDatos(); // Refrescar lista para incluir al nuevo cliente
+    setClienteAEditar(null);
+    cargarDatos(); 
     setMensaje({ texto: '✅ OPERACIÓN REALIZADA CON ÉXITO', tipo: 'success' });
     setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
+  };
+
+  const ocultarCliente = async (id: string, nombre: string) => {
+    if(!confirm(`¿Estás segura de ocultar a ${nombre}? No se borrarán sus compras.`)) return;
+    try {
+      await apiService.actualizarCliente(id, { activo: false });
+      setMensaje({ texto: '🗑️ CLIENTE OCULTADO CORRECTAMENTE', tipo: 'success' });
+      cargarDatos();
+      if(clienteSeleccionado?.id === id) setClienteSeleccionado(null);
+    } catch (e) {
+      setMensaje({ texto: '❌ ERROR AL OCULTAR CLIENTE', tipo: 'error' });
+    }
   };
 
   // Pantalla de carga profesional mientras se sincroniza con Trujillo
@@ -86,11 +100,12 @@ export default function ModuloClientes() {
   return (
     <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
       
-      {/* MODAL DEL FORMULARIO (SE DISPARA AL PRESIONAR "NUEVO CLIENTE") */}
+      {/* MODAL DEL FORMULARIO */}
       {showForm && (
         <ClienteForm 
+          clienteInicial={clienteAEditar}
           onSuccess={manejarExitoRegistro} 
-          onCancel={() => setShowForm(false)} 
+          onCancel={() => { setShowForm(false); setClienteAEditar(null); }} 
         />
       )}
 
@@ -105,7 +120,7 @@ export default function ModuloClientes() {
         
         <div className="flex items-center gap-6">
           <button 
-            onClick={() => setShowForm(true)}
+            onClick={() => { setClienteAEditar(null); setShowForm(true); }}
             className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all active:scale-95"
           >
             ➕ Nuevo Cliente
@@ -133,34 +148,54 @@ export default function ModuloClientes() {
           {/* LISTA DE TARJETAS DE CLIENTES CON SCROLL PERSONALIZADO */}
           <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
             {clientesFiltrados.map(c => (
-              <button 
+              <div 
                 key={c.id} 
                 onClick={() => verDetalleCliente(c)}
-                className={`p-6 border rounded-3xl text-left transition-all active:scale-[0.98] group flex justify-between items-center ${
+                className={`p-6 border rounded-3xl text-left transition-all active:scale-[0.98] group flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer ${
                   clienteSeleccionado?.id === c.id 
                   ? 'bg-emerald-50 dark:bg-emerald-600/10 border-emerald-500 shadow-sm' 
                   : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600'
                 }`}
               >
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <span className="text-[9px] font-black bg-white dark:bg-black px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors">
                       {c.tipo_documento}
                     </span>
                     <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 transition-colors">{c.numero_documento}</span>
+                    
+                    {/* ETIQUETA WOW DE ACADEMIA */}
+                    {c.academias && (
+                      <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/20">
+                        🎓 {c.academias.nombre}
+                      </span>
+                    )}
                   </div>
                   <h3 className="font-black text-zinc-900 dark:text-white text-lg uppercase group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                     {c.nombre_razon_social}
                   </h3>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500 font-medium mt-1 transition-colors">
-                    📍 {c.direccion || 'DIRECCIÓN NO REGISTRADA'}
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500 font-medium mt-1 transition-colors flex gap-4">
+                    <span>📍 {c.direccion || 'S/D'}</span>
+                    <span>📱 {c.celular || 'S/N'}</span>
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-zinc-300 dark:text-zinc-600 uppercase transition-colors">Contacto</p>
-                  <p className="text-sm font-black text-zinc-900 dark:text-white transition-colors">{c.celular || 'S/N'}</p>
+                
+                {/* BOTONES DE ADMINISTRACIÓN (EDITAR / OCULTAR) */}
+                <div className="flex gap-2">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setClienteAEditar(c); setShowForm(true); }}
+                    className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
+                  >
+                    Editar
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); ocultarCliente(c.id, c.nombre_razon_social); }}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
+                  >
+                    Ocultar
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
             {clientesFiltrados.length === 0 && (
               <div className="py-20 text-center text-zinc-400 dark:text-zinc-700 font-black uppercase italic tracking-widest transition-colors">
