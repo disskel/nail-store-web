@@ -474,11 +474,13 @@ def buscar_cliente(
     user = Depends(validar_token),
     authorization: str = Header(None)
 ):
-    """Busca un cliente usando identificación segura."""
+    """Busca un cliente usando identificación segura y trae su academia."""
     try:
         token = authorization.split(" ")[1] if authorization else None
+        # ACTUALIZACIÓN: JOIN con academias para traer el nombre y descuento en la búsqueda del POS
         res = supabase.postgrest.auth(token).table("clientes")\
-            .select("*").eq("numero_documento", numero).execute()
+            .select("*, academias(nombre, descuento_sugerido)")\
+            .eq("numero_documento", numero).execute()
         return res.data[0] if res.data else None
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
