@@ -145,17 +145,22 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
             font-weight: 600;
           }
 
+          /* ESCUDO PROTECTOR PARA ALINEACIÓN: Forzamos el Flexbox para que no sea destruido por el display:block global */
           .totales-grid {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
             padding-top: 10px;
           }
 
           .monto-letras { font-weight: 800; width: 60%; font-size: 9px; text-transform: uppercase; }
           
           .totales-calculo { width: 35%; }
-          .fila-total { display: flex; justify-content: space-between; padding: 2px 0; }
+          .fila-total { 
+            display: flex !important; 
+            justify-content: space-between !important; 
+            padding: 2px 0; 
+          }
           .total-final { 
             border-top: 2px solid black; 
             margin-top: 5px; 
