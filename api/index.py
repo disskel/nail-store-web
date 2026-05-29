@@ -545,16 +545,33 @@ def actualizar_cliente(
     user = Depends(validar_token),
     authorization: str = Header(None)
 ):
-    """Permite editar datos del cliente o realizar un borrado lógico (ocultar)."""
+    """Permite editar datos del cliente, desvincular academias o borrado lógico."""
     try:
         token = authorization.split(" ")[1] if authorization else None
         
+        # SOLUCIÓN: exclude_unset=True captura exactamente lo que el frontend envió,
+        # permitiendo diferenciar entre "no me enviaron el id_academia" y "enviaron id_academia = null"
+        campos_recibidos = req.dict(exclude_unset=True)
         update_data = {}
-        if req.nombre_razon_social is not None: update_data["nombre_razon_social"] = req.nombre_razon_social.upper()
-        if req.direccion is not None: update_data["direccion"] = req.direccion.upper()
-        if req.celular is not None: update_data["celular"] = req.celular
-        if req.id_academia is not None: update_data["id_academia"] = req.id_academia
-        if req.activo is not None: update_data["activo"] = req.activo
+
+        if "nombre_razon_social" in campos_recibidos and req.nombre_razon_social:
+            update_data["nombre_razon_social"] = req.nombre_razon_social.upper()
+        
+        if "direccion" in campos_recibidos and req.direccion:
+            update_data["direccion"] = req.direccion.upper()
+            
+        if "celular" in campos_recibidos:
+            update_data["celular"] = req.celular
+            
+        if "activo" in campos_recibidos:
+            update_data["activo"] = req.activo
+
+        # MAGIA: Si el frontend envió el campo, lo asignamos (incluso si es None/null)
+        if "id_academia" in campos_recibidos:
+            update_data["id_academia"] = req.id_academia
+
+        if not update_data:
+            return {"status": "success", "message": "Sin cambios detectados"}
 
         res = supabase.postgrest.auth(token).table("clientes")\
             .update(update_data).eq("id", id_cliente).execute()
