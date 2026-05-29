@@ -48,22 +48,35 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
 
         /* Configuración específica para el motor de impresión del navegador */
         @media print {
-          @page { margin: 0; size: auto; }
+          @page { margin: 0.5cm; size: auto; }
           
-          /* ELIMINAMOS html, body { height: 100vh; overflow: hidden; } */
-          /* Esto permite que el PDF móvil respire y dibuje el contenido */
+          /* 1. CIRUGÍA MAESTRA: Anular las paredes de Modales y Tailwind CSS */
+          /* Esto fuerza a que todos los contenedores padre liberen la altura y permitan crear la Página 2 */
+          html, body, #__next, div, main, section {
+            position: static !important;
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            display: block !important; 
+          }
 
+          /* 2. Ocultar la interfaz web del fondo */
           body * { visibility: hidden; }
-          .nota-pedido-container, .nota-pedido-container * { visibility: visible; }
           
+          /* 3. Mostrar solo el documento */
+          .nota-pedido-container, .nota-pedido-container * { 
+            visibility: visible; 
+          }
+          
+          /* 4. Contenedor Principal (Debe ser relative, NUNCA absolute) */
           .nota-pedido-container {
-            /* SOLUCIÓN AL CORTE: Cambiamos absolute por relative. 
-               El 'absolute' convierte la tabla en una imagen estática que no puede dividirse en 2 páginas. */
-            position: relative; 
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 0.8cm;
+            position: relative !important; 
+            width: 100% !important;
+            left: 0 !important;
+            top: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
             color: black !important;
             background: white !important;
             z-index: 99999; 
@@ -73,12 +86,26 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
             line-height: 1.4;
           }
 
-          /* --- MAGIA DE PAGINACIÓN DE TABLAS LARGAS --- */
-          .items-table { page-break-inside: auto; }
-          .items-table tr { page-break-inside: avoid; page-break-after: auto; }
-          .items-table thead { display: table-header-group; } /* Repite las cabeceras (CÓDIGO, CANT, etc.) en la Pág 2 */
-          .totales-grid, .seccion-cliente { page-break-inside: avoid; } /* Evita que el resumen de cobro se corte por la mitad */
+          /* 5. MAGIA DE PAGINACIÓN DE TABLAS LARGAS */
+          .items-table { 
+            page-break-inside: auto !important; 
+          }
+          .items-table tr { 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important;
+            page-break-after: auto !important; 
+          }
+          .items-table thead { 
+            display: table-header-group !important; /* Repite la cabecera en la Pág 2 */
+          } 
+          
+          /* Evita que los bloques de cobro se corten por la mitad */
+          .totales-grid, .seccion-cliente, .recuadro-documento { 
+            page-break-inside: avoid !important; 
+            break-inside: avoid !important;
+          }
 
+          /* --- RESTAURACIÓN DE ESTILOS ESTÉTICOS --- */
           .header-table { width: 100%; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px; }
           .empresa-info h1 { font-size: 22px; margin: 0; font-weight: 900; letter-spacing: -1px; }
           .empresa-info p { margin: 2px 0; font-size: 10px; text-transform: uppercase; }
@@ -115,7 +142,7 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
           .items-table td {
             padding: 7px 4px;
             border-bottom: 1px solid #eee;
-            font-weight: 600; /* Cuerpo de tabla más visible */
+            font-weight: 600;
           }
 
           .totales-grid {
