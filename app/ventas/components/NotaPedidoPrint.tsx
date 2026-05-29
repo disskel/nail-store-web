@@ -57,7 +57,9 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
           .nota-pedido-container, .nota-pedido-container * { visibility: visible; }
           
           .nota-pedido-container {
-            position: absolute; /* VOLVEMOS A ABSOLUTE: Evita el recorte en blanco en móviles */
+            /* SOLUCIÓN AL CORTE: Cambiamos absolute por relative. 
+               El 'absolute' convierte la tabla en una imagen estática que no puede dividirse en 2 páginas. */
+            position: relative; 
             left: 0;
             top: 0;
             width: 100%;
@@ -70,6 +72,12 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
             font-size: 10px;
             line-height: 1.4;
           }
+
+          /* --- MAGIA DE PAGINACIÓN DE TABLAS LARGAS --- */
+          .items-table { page-break-inside: auto; }
+          .items-table tr { page-break-inside: avoid; page-break-after: auto; }
+          .items-table thead { display: table-header-group; } /* Repite las cabeceras (CÓDIGO, CANT, etc.) en la Pág 2 */
+          .totales-grid, .seccion-cliente { page-break-inside: avoid; } /* Evita que el resumen de cobro se corte por la mitad */
 
           .header-table { width: 100%; margin-bottom: 20px; border-bottom: 2px solid black; padding-bottom: 10px; }
           .empresa-info h1 { font-size: 22px; margin: 0; font-weight: 900; letter-spacing: -1px; }
