@@ -1487,3 +1487,116 @@ def liquidar_pago_completo(
     except Exception as e:
         print(f"Error en transacción Trujillo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Fallo crítico: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 19. MÓDULO DE ANALÍTICA CRM (ALIANZAS Y FIDELIZACIÓN)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/reportes/analitica-crm")
+@app.get("/reportes/analitica-crm")
+def obtener_analitica_crm(
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Genera los 4 KPIs estratégicos de las alianzas usando RLS y zona horaria de Trujillo, Perú."""
+    try:
+        # Extraemos el pasaporte de seguridad para saltar el RLS
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Ajuste estricto de Zona Horaria (Trujillo, Perú UTC-5)
+        # Esto garantiza que el mes se calcule con la hora real de tu negocio, no del servidor de Vercel.
+        from datetime import datetime, timezone, timedelta
+        huso_horario_peru = timezone(timedelta(hours=-5))
+        hoy = datetime.now(huso_horario_peru)
+        primer_dia_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+        # 2. Obtener todas las VENTAS COMPLETADAS del mes actual con RLS seguro
+        ventas_res = supabase.postgrest.auth(token).table("ventas")\
+            .select("monto_neto, monto_descuento, id_cliente, clientes(nombre_razon_social, id_academia, academias(id, nombre))")\
+            .eq("estado", "COMPLETADA")\
+            .gte("fecha", primer_dia_mes)\
+            .execute()
+
+        # 3. Obtener el universo total de CLIENTES VINCLUADOS A ACADEMIAS para la Tasa de Conversión
+        clientes_res = supabase.postgrest.auth(token).table("clientes")\
+            .select("id, id_academia")\
+            .not_is("id_academia", "null")\
+            .eq("activo", True)\
+            .execute()
+
+        # --- PROCESAMIENTO DE DATOS EN MEMORIA (PYTHON) ---
+        analitica_academias = {}
+        top_clientes = {}
+        total_alumnas_por_academia = {}
+
+        # A. Contar cuántas alumnas existen por cada academia en la base de datos
+        for c in clientes_res.data:
+            ac_id = c.get("id_academia")
+            total_alumnas_por_academia[ac_id] = total_alumnas_por_academia.get(ac_id, 0) + 1
+
+        # B. Procesar las ventas del mes
+        for v in ventas_res.data:
+            cli = v.get("clientes")
+            if not cli: continue
+            
+            ac = cli.get("academias")
+            # Solo analizamos ventas de clientas que pertenecen a una alianza (academia)
+            if ac:
+                ac_nombre = ac.get("nombre", "SIN NOMBRE")
+                ac_id = ac.get("id")
+                cli_nombre = cli.get("nombre_razon_social", "DESCONOCIDO")
+                neto = float(v.get("monto_neto") or 0.0)
+                dscto = float(v.get("monto_descuento") or 0.0)
+
+                # Agrupar por Academia (KPI 1: Ventas y KPI 2: Descuentos)
+                if ac_nombre not in analitica_academias:
+                    analitica_academias[ac_nombre] = {
+                        "ventas": 0.0, 
+                        "descuentos": 0.0, 
+                        "id": ac_id, 
+                        "compradoras_unicas": set()
+                    }
+                
+                analitica_academias[ac_nombre]["ventas"] += neto
+                analitica_academias[ac_nombre]["descuentos"] += dscto
+                analitica_academias[ac_nombre]["compradoras_unicas"].add(cli_nombre)
+
+                # Agrupar por Cliente (KPI 4: Top Embajadoras)
+                if cli_nombre not in top_clientes:
+                    top_clientes[cli_nombre] = {"total_comprado": 0.0, "academia": ac_nombre}
+                top_clientes[cli_nombre]["total_comprado"] += neto
+
+        # C. Formatear y calcular porcentajes finales
+        ranking_alianzas = []
+        for nombre, datos in analitica_academias.items():
+            total_alumnas = total_alumnas_por_academia.get(datos["id"], 0)
+            compradoras = len(datos["compradoras_unicas"])
+            # Cálculo de KPI 3: Tasa de Conversión
+            conversion = (compradoras / total_alumnas * 100) if total_alumnas > 0 else 0
+
+            ranking_alianzas.append({
+                "academia": nombre,
+                "total_generado": round(datos["ventas"], 2),
+                "total_descuento_cedido": round(datos["descuentos"], 2),
+                "tasa_conversion": round(conversion, 1),
+                "alumnas_registradas": total_alumnas,
+                "alumnas_compradoras": compradoras
+            })
+
+        # Ordenar Academia de Mayor a Menor Venta
+        ranking_alianzas = sorted(ranking_alianzas, key=lambda x: x["total_generado"], reverse=True)
+
+        # Ordenar Alumnas de Mayor a Menor Compra (Top 5)
+        embajadoras = [{"cliente": k, "academia": v["academia"], "total": round(v["total_comprado"], 2)} for k, v in top_clientes.items()]
+        embajadoras = sorted(embajadoras, key=lambda x: x["total"], reverse=True)[:5] 
+
+        # Respuesta estructurada para el Dashboard de Next.js
+        return {
+            "mes_analisis": hoy.strftime("%m/%Y"),
+            "ranking_alianzas": ranking_alianzas,
+            "top_embajadoras": embajadoras
+        }
+
+    except Exception as e:
+        print(f"Error crítico en analítica CRM: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Fallo en procesamiento de analítica: {str(e)}")

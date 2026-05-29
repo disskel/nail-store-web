@@ -574,5 +574,24 @@ export const apiService = {
 
     return res.json();
   },
+
+  // -------------------------------------------------------------------------
+  // 13. MÓDULO DE ANALÍTICA CRM (ALIANZAS Y FIDELIZACIÓN)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Recupera los 4 KPIs estratégicos de las alianzas (Academias).
+   * Procesado en Python con Zona Horaria de Trujillo (UTC-5) y seguridad RLS.
+   */
+  async getAnaliticaCRM() {
+    const res = await fetch(`${API_URL}/reportes/analitica-crm`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.detail || 'Error al cargar la analítica del CRM');
+    }
+    return res.json();
+  },
   
 };

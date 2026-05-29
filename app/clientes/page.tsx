@@ -33,6 +33,29 @@ export default function ModuloClientes() {
   // NUEVO ESTADO: CONTROL DEL MANTENEDOR DE ACADEMIAS
   const [showAcademias, setShowAcademias] = useState(false);
 
+  // --- NUEVO: ESTADOS PARA ANALÍTICA DE ALIANZAS ---
+  const [vistaActual, setVistaActual] = useState<'DIRECTORIO' | 'ANALITICA'>('DIRECTORIO');
+  const [analiticaDatos, setAnaliticaDatos] = useState<any>(null);
+  const [cargandoAnalitica, setCargandoAnalitica] = useState(false);
+
+  const cargarAnalitica = async () => {
+    setCargandoAnalitica(true);
+    try {
+      const data = await apiService.getAnaliticaCRM();
+      setAnaliticaDatos(data);
+    } catch (error) {
+      setMensaje({ texto: '❌ ERROR AL CARGAR ANALÍTICA', tipo: 'error' });
+    } finally {
+      setCargandoAnalitica(false);
+    }
+  };
+
+  useEffect(() => {
+    if (vistaActual === 'ANALITICA' && !analiticaDatos) {
+      cargarAnalitica();
+    }
+  }, [vistaActual]);
+
   // --- 4. CARGA INICIAL DE CLIENTES DESDE EL BACKEND ---
   async function cargarDatos() {
     try {
@@ -119,15 +142,31 @@ export default function ModuloClientes() {
       )}
 
       {/* CABECERA DEL MÓDULO */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="mb-10 flex flex-col md:flex-row md:items-start lg:items-center justify-between gap-6">
         <div>
           <h1 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase italic transition-colors">Gestión de Clientes</h1>
           <p className="text-emerald-600 dark:text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic transition-colors">
             Trazabilidad y Fidelización • Jean Nails Store
           </p>
+          
+          {/* NUEVO: TOGGLE SWITCH (DIRECTORIO / ANALÍTICA) */}
+          <div className="mt-6 flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-2xl w-fit border border-zinc-200 dark:border-zinc-800 shadow-inner">
+            <button 
+              onClick={() => setVistaActual('DIRECTORIO')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'DIRECTORIO' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+            >
+              👥 Directorio CRM
+            </button>
+            <button 
+              onClick={() => setVistaActual('ANALITICA')}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'ANALITICA' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+            >
+              📊 Analítica de Alianzas
+            </button>
+          </div>
         </div>
         
-        <div className="flex items-center gap-4 lg:gap-6">
+        <div className="flex items-center gap-4 lg:gap-6 mt-4 md:mt-0">
           <button 
             onClick={() => setShowAcademias(true)}
             className="px-6 py-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-black rounded-2xl uppercase text-[9px] tracking-widest border border-indigo-200 dark:border-indigo-500/20 transition-all active:scale-95 flex items-center gap-2"
@@ -147,10 +186,11 @@ export default function ModuloClientes() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        
-        {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3 DE LA PANTALLA) */}
-        <div className="lg:col-span-2 space-y-6">
+      {vistaActual === 'DIRECTORIO' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in duration-500">
+          
+          {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3 DE LA PANTALLA) */}
+          <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-100/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <input 
               placeholder="BUSCAR POR NOMBRE O DNI/RUC..." 
@@ -298,7 +338,91 @@ export default function ModuloClientes() {
             </div>
           </section>
         </div>
-      </div>
+        </div>
+      ) : (
+        /* --- VISTA DE ANALÍTICA DE ALIANZAS --- */
+        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-700">
+          {cargandoAnalitica || !analiticaDatos ? (
+            <div className="flex flex-col items-center justify-center py-32 opacity-60">
+              <span className="text-6xl mb-6 animate-bounce">📊</span>
+              <p className="text-xs font-black text-zinc-500 tracking-widest uppercase animate-pulse">Procesando cubos de datos y rentabilidad...</p>
+            </div>
+          ) : (
+            <>
+              {/* SECCIÓN 1: RANKING DE ALIANZAS */}
+              <div>
+                <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter mb-6 flex items-center gap-2 transition-colors">
+                  <span className="text-indigo-500">🏆</span> Rendimiento por Academia <span className="text-[10px] text-zinc-500 font-bold tracking-widest ml-2 non-italic">({analiticaDatos.mes_analisis})</span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {analiticaDatos.ranking_alianzas.length === 0 ? (
+                    <p className="text-zinc-500 text-xs font-bold italic col-span-full bg-zinc-100 dark:bg-zinc-900 p-6 rounded-2xl text-center">No hay ventas registradas en alianzas este mes.</p>
+                  ) : (
+                    analiticaDatos.ranking_alianzas.map((alianza: any, idx: number) => (
+                      <div key={idx} className={`p-8 rounded-[2.5rem] border relative overflow-hidden transition-all duration-300 hover:-translate-y-2 ${idx === 0 ? 'bg-gradient-to-br from-indigo-600 to-purple-700 border-transparent text-white shadow-2xl shadow-indigo-900/30' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-xl hover:border-indigo-400 dark:hover:border-indigo-600'}`}>
+                        {idx === 0 && <div className="absolute -right-8 -top-8 text-[10rem] opacity-10">🥇</div>}
+                        <p className={`text-[9px] font-black uppercase tracking-widest ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Ranking #{idx + 1}</p>
+                        <h3 className="text-2xl font-black uppercase leading-tight mt-1 truncate">{alianza.academia}</h3>
+                        
+                        <div className="mt-8 space-y-6">
+                          <div>
+                            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Volumen de Ventas</p>
+                            <p className="text-4xl font-black italic tracking-tighter">S/ {alianza.total_generado.toFixed(2)}</p>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4 border-t pt-6 border-black/5 dark:border-white/10">
+                            <div>
+                              <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Tasa Conversión</p>
+                              <p className="text-lg font-black">{alianza.tasa_conversion}%</p>
+                              <p className={`text-[9px] font-bold mt-1 ${idx === 0 ? 'text-indigo-300' : 'text-zinc-500'}`}>{alianza.alumnas_compradoras} de {alianza.alumnas_registradas} alumnas</p>
+                            </div>
+                            <div>
+                              <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>ROI (Dscto Cedido)</p>
+                              <p className={`text-lg font-black ${idx === 0 ? 'text-rose-200' : 'text-rose-500'}`}>S/ {alianza.total_descuento_cedido.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* SECCIÓN 2: TOP EMBAJADORAS */}
+              <div className="pt-6">
+                <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter mb-6 flex items-center gap-2 transition-colors">
+                  <span className="text-emerald-500">💎</span> Top Embajadoras VIP
+                </h2>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-4 shadow-xl transition-colors">
+                  {analiticaDatos.top_embajadoras.length === 0 ? (
+                    <p className="p-10 text-zinc-500 text-xs font-bold italic text-center uppercase tracking-widest">Aún no hay datos de embajadoras para generar el ranking.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {analiticaDatos.top_embajadoras.map((embajadora: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 hover:border-emerald-500/30 rounded-3xl transition-all hover:shadow-lg">
+                          <div className="flex items-center gap-4 overflow-hidden">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 ${idx === 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
+                              #{idx + 1}
+                            </div>
+                            <div className="truncate pr-2">
+                              <p className="font-black text-sm text-zinc-900 dark:text-white uppercase truncate">{embajadora.cliente}</p>
+                              <p className="text-[9px] font-black text-indigo-500 tracking-widest uppercase truncate mt-1">🎓 {embajadora.academia}</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 pl-2">
+                            <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Compras</p>
+                            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 italic tracking-tighter">S/ {embajadora.total.toFixed(2)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* SISTEMA DE NOTIFICACIONES TOAST (UI FEEDBACK) */}
       {mensaje.texto && (
