@@ -1504,7 +1504,6 @@ def obtener_analitica_crm(
         token = authorization.split(" ")[1] if authorization else None
         
         # 1. Ajuste estricto de Zona Horaria (Trujillo, Perú UTC-5)
-        # Esto garantiza que el mes se calcule con la hora real de tu negocio, no del servidor de Vercel.
         from datetime import datetime, timezone, timedelta
         huso_horario_peru = timezone(timedelta(hours=-5))
         hoy = datetime.now(huso_horario_peru)
@@ -1517,10 +1516,9 @@ def obtener_analitica_crm(
             .gte("fecha", primer_dia_mes)\
             .execute()
 
-        # 3. Obtener el universo total de CLIENTES VINCLUADOS A ACADEMIAS para la Tasa de Conversión
+        # 3. SOLUCIÓN ERROR 500: Traemos todos los clientes activos y filtramos en Python
         clientes_res = supabase.postgrest.auth(token).table("clientes")\
             .select("id, id_academia")\
-            .not_is("id_academia", "null")\
             .eq("activo", True)\
             .execute()
 
@@ -1529,10 +1527,11 @@ def obtener_analitica_crm(
         top_clientes = {}
         total_alumnas_por_academia = {}
 
-        # A. Contar cuántas alumnas existen por cada academia en la base de datos
+        # A. Contar cuántas alumnas existen por cada academia (Filtro seguro de nulos)
         for c in clientes_res.data:
             ac_id = c.get("id_academia")
-            total_alumnas_por_academia[ac_id] = total_alumnas_por_academia.get(ac_id, 0) + 1
+            if ac_id: # Solo procesamos si el cliente tiene una academia vinculada
+                total_alumnas_por_academia[ac_id] = total_alumnas_por_academia.get(ac_id, 0) + 1
 
         # B. Procesar las ventas del mes
         for v in ventas_res.data:
@@ -1540,7 +1539,7 @@ def obtener_analitica_crm(
             if not cli: continue
             
             ac = cli.get("academias")
-            # Solo analizamos ventas de clientas que pertenecen a una alianza (academia)
+            # Solo analizamos ventas de clientas que pertenecen a una alianza
             if ac:
                 ac_nombre = ac.get("nombre", "SIN NOMBRE")
                 ac_id = ac.get("id")
