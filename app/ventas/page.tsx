@@ -325,8 +325,9 @@ export default function ModuloVentas() {
     <div className="p-4 lg:p-6 max-w-[100%] mx-auto animate-in fade-in duration-700">
       
       {/* COMPONENTE DE IMPRESIÓN (VISIBLE SOLO AL IMPRIMIR) */}
+      {/* CIRUGÍA: Eliminamos print:absolute y print:inset-0 para permitir páginas múltiples */}
       {datosImpresion && (
-        <div className="hidden print:block print:absolute print:inset-0 print:z-[500] print:bg-white">
+        <div className="hidden print:block print:w-full print:bg-white">
            <NotaPedidoPrint data={datosImpresion} />
         </div>
       )}
