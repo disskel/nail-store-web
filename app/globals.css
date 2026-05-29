@@ -46,3 +46,21 @@
     border-radius: 9999px;
   }
 }
+
+/* ==========================================================================
+   REGLAS GLOBALES DE IMPRESIÓN (OVERRIDE DE NEXT.JS Y TAILWIND)
+   Propósito: Anular el "h-screen", "min-h-screen" y "overflow-hidden" del 
+   layout principal para permitir que los PDFs (como la Nota de Pedido) 
+   generen múltiples páginas sin cortarse.
+   ========================================================================== */
+
+@media print {
+  html, body, main, section, #__next, .h-screen, .h-full, .min-h-screen, .max-h-screen {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    display: block !important;
+  }
+}
