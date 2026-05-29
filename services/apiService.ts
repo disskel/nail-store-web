@@ -581,12 +581,22 @@ export const apiService = {
 
   /**
    * Recupera los 4 KPIs estratégicos de las alianzas (Academias).
+   * Acepta filtros de fecha opcionales para análisis temporal.
    * Procesado en Python con Zona Horaria de Trujillo (UTC-5) y seguridad RLS.
    */
-  async getAnaliticaCRM() {
-    const res = await fetch(`${API_URL}/reportes/analitica-crm`, {
+  async getAnaliticaCRM(desde?: string, hasta?: string) {
+    // 1. Preparamos la URL base
+    let url = `${API_URL}/reportes/analitica-crm`;
+    
+    // 2. Si el usuario seleccionó fechas, construimos la ruta (Query Parameters)
+    if (desde && hasta) {
+      url += `?desde=${desde}&hasta=${hasta}`;
+    }
+
+    const res = await fetch(url, {
       headers: getHeaders()
     });
+    
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
       throw new Error(error.detail || 'Error al cargar la analítica del CRM');

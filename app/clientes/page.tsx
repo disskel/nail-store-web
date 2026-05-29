@@ -37,11 +37,19 @@ export default function ModuloClientes() {
   const [vistaActual, setVistaActual] = useState<'DIRECTORIO' | 'ANALITICA'>('DIRECTORIO');
   const [analiticaDatos, setAnaliticaDatos] = useState<any>(null);
   const [cargandoAnalitica, setCargandoAnalitica] = useState(false);
+  
+  // NUEVO: Estados para los Filtros Temporales (Calendarios)
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
 
   const cargarAnalitica = async () => {
     setCargandoAnalitica(true);
     try {
-      const data = await apiService.getAnaliticaCRM();
+      // Inyectamos las fechas en el conector. Si están vacías, viajan como undefined.
+      const data = await apiService.getAnaliticaCRM(
+        fechaDesde || undefined, 
+        fechaHasta || undefined
+      );
       setAnaliticaDatos(data);
     } catch (error) {
       setMensaje({ texto: '❌ ERROR AL CARGAR ANALÍTICA', tipo: 'error' });
@@ -149,20 +157,49 @@ export default function ModuloClientes() {
             Trazabilidad y Fidelización • Jean Nails Store
           </p>
           
-          {/* NUEVO: TOGGLE SWITCH (DIRECTORIO / ANALÍTICA) */}
-          <div className="mt-6 flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-2xl w-fit border border-zinc-200 dark:border-zinc-800 shadow-inner">
-            <button 
-              onClick={() => setVistaActual('DIRECTORIO')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'DIRECTORIO' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-            >
-              👥 Directorio CRM
-            </button>
-            <button 
-              onClick={() => setVistaActual('ANALITICA')}
-              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'ANALITICA' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-            >
-              📊 Analítica de Alianzas
-            </button>
+          {/* NUEVO: PANEL DE CONTROLES (TOGGLE + FILTROS DE FECHA) */}
+          <div className="mt-6 flex flex-col md:flex-row items-start md:items-center gap-4">
+            
+            {/* TOGGLE SWITCH */}
+            <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-2xl w-fit border border-zinc-200 dark:border-zinc-800 shadow-inner">
+              <button 
+                onClick={() => setVistaActual('DIRECTORIO')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'DIRECTORIO' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                👥 Directorio CRM
+              </button>
+              <button 
+                onClick={() => setVistaActual('ANALITICA')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'ANALITICA' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+              >
+                📊 Analítica de Alianzas
+              </button>
+            </div>
+
+            {/* CALENDARIOS DE FILTRADO (SOLO VISIBLES EN MODO ANALÍTICA) */}
+            {vistaActual === 'ANALITICA' && (
+              <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-4 duration-300">
+                <input 
+                  type="date" 
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 rounded-xl text-[10px] font-black text-zinc-600 dark:text-zinc-400 outline-none focus:ring-1 focus:ring-indigo-500 uppercase transition-all shadow-sm"
+                />
+                <span className="text-zinc-400 text-[10px] font-black">AL</span>
+                <input 
+                  type="date" 
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 rounded-xl text-[10px] font-black text-zinc-600 dark:text-zinc-400 outline-none focus:ring-1 focus:ring-indigo-500 uppercase transition-all shadow-sm"
+                />
+                <button 
+                  onClick={cargarAnalitica}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md shadow-indigo-900/20 transition-all active:scale-95 flex items-center gap-2"
+                >
+                  <span className="text-xs">🔍</span> Filtrar
+                </button>
+              </div>
+            )}
           </div>
         </div>
         

@@ -1495,30 +1495,49 @@ def liquidar_pago_completo(
 @app.get("/api/reportes/analitica-crm")
 @app.get("/reportes/analitica-crm")
 def obtener_analitica_crm(
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
     user = Depends(validar_token),
     authorization: str = Header(None)
 ):
-    """Genera los 4 KPIs estratégicos de las alianzas usando RLS y zona horaria de Trujillo, Perú."""
+    """Genera los 4 KPIs estratégicos con filtros de fecha y podio garantizado."""
     try:
         # Extraemos el pasaporte de seguridad para saltar el RLS
         token = authorization.split(" ")[1] if authorization else None
         
-        # 1. Ajuste estricto de Zona Horaria (Trujillo, Perú UTC-5)
+        # 1. Ajuste estricto de Zona Horaria (Trujillo, Perú UTC-5) e Inteligencia de Fechas
         from datetime import datetime, timezone, timedelta
         huso_horario_peru = timezone(timedelta(hours=-5))
         hoy = datetime.now(huso_horario_peru)
-        primer_dia_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
 
-        # 2. Obtener todas las VENTAS COMPLETADAS del mes actual con RLS seguro
+        if desde and hasta:
+            fecha_inicio = desde
+            # Si mandan solo la fecha (YYYY-MM-DD), aseguramos que cubra hasta las 23:59 de ese día
+            fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
+            # Formato estético para el frontend (ej. "2026-05-01 AL 2026-05-28")
+            mes_str = f"{desde[:10]} AL {hasta[:10]}"
+        else:
+            fecha_inicio = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+            fecha_fin = hoy.isoformat()
+            mes_str = hoy.strftime("%m/%Y")
+
+        # 2. Obtener todas las VENTAS COMPLETADAS en el rango de fechas con RLS seguro
         ventas_res = supabase.postgrest.auth(token).table("ventas")\
             .select("monto_neto, monto_descuento, id_cliente, clientes(nombre_razon_social, id_academia, academias(id, nombre))")\
             .eq("estado", "COMPLETADA")\
-            .gte("fecha", primer_dia_mes)\
+            .gte("fecha", fecha_inicio)\
+            .lte("fecha", fecha_fin)\
             .execute()
 
-        # 3. SOLUCIÓN ERROR 500: Traemos todos los clientes activos y filtramos en Python
+        # 3. Traemos todos los clientes activos
         clientes_res = supabase.postgrest.auth(token).table("clientes")\
             .select("id, id_academia")\
+            .eq("activo", True)\
+            .execute()
+
+        # 4. Traemos TODAS las academias activas para garantizar que salgan en el podio (incluso con 0.00)
+        academias_res = supabase.postgrest.auth(token).table("academias")\
+            .select("id, nombre")\
             .eq("activo", True)\
             .execute()
 
@@ -1527,19 +1546,27 @@ def obtener_analitica_crm(
         top_clientes = {}
         total_alumnas_por_academia = {}
 
-        # A. Contar cuántas alumnas existen por cada academia (Filtro seguro de nulos)
+        # A. Pre-poblar el diccionario con todas las academias existentes (El truco del Podio)
+        for ac in academias_res.data:
+            analitica_academias[ac["nombre"]] = {
+                "ventas": 0.0, 
+                "descuentos": 0.0, 
+                "id": ac["id"], 
+                "compradoras_unicas": set()
+            }
+
+        # B. Contar cuántas alumnas existen por cada academia (Filtro seguro de nulos)
         for c in clientes_res.data:
             ac_id = c.get("id_academia")
-            if ac_id: # Solo procesamos si el cliente tiene una academia vinculada
+            if ac_id:
                 total_alumnas_por_academia[ac_id] = total_alumnas_por_academia.get(ac_id, 0) + 1
 
-        # B. Procesar las ventas del mes
+        # C. Procesar las ventas del rango de fechas
         for v in ventas_res.data:
             cli = v.get("clientes")
             if not cli: continue
             
             ac = cli.get("academias")
-            # Solo analizamos ventas de clientas que pertenecen a una alianza
             if ac:
                 ac_nombre = ac.get("nombre", "SIN NOMBRE")
                 ac_id = ac.get("id")
@@ -1547,7 +1574,7 @@ def obtener_analitica_crm(
                 neto = float(v.get("monto_neto") or 0.0)
                 dscto = float(v.get("monto_descuento") or 0.0)
 
-                # Agrupar por Academia (KPI 1: Ventas y KPI 2: Descuentos)
+                # Si por alguna razón la academia no estaba pre-poblada (ej. fue borrada lógicamente pero tiene ventas históricas)
                 if ac_nombre not in analitica_academias:
                     analitica_academias[ac_nombre] = {
                         "ventas": 0.0, 
@@ -1565,7 +1592,7 @@ def obtener_analitica_crm(
                     top_clientes[cli_nombre] = {"total_comprado": 0.0, "academia": ac_nombre}
                 top_clientes[cli_nombre]["total_comprado"] += neto
 
-        # C. Formatear y calcular porcentajes finales
+        # D. Formatear y calcular porcentajes finales
         ranking_alianzas = []
         for nombre, datos in analitica_academias.items():
             total_alumnas = total_alumnas_por_academia.get(datos["id"], 0)
@@ -1591,7 +1618,7 @@ def obtener_analitica_crm(
 
         # Respuesta estructurada para el Dashboard de Next.js
         return {
-            "mes_analisis": hoy.strftime("%m/%Y"),
+            "mes_analisis": mes_str,
             "ranking_alianzas": ranking_alianzas,
             "top_embajadoras": embajadoras
         }
