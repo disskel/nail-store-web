@@ -70,7 +70,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex flex-col lg:flex-row h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans transition-colors duration-300">
         
         {/* --- BARRA LATERAL (PC / DESKTOP) --- */}
-        <aside className="hidden lg:flex w-72 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 flex-col p-6 shadow-2xl transition-colors duration-300">
+        {/* CIRUGÍA: print:hidden oculta todo el menú lateral al imprimir */}
+        <aside className="hidden lg:flex print:hidden w-72 bg-zinc-50 dark:bg-black border-r border-zinc-200 dark:border-zinc-800 flex-col p-6 shadow-2xl transition-colors duration-300">
           
           {/* CABECERA LATERAL: Logo y Notificaciones */}
           <div className="flex items-center justify-between mb-10 px-2">
@@ -148,7 +149,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </aside>
 
         {/* --- NAVEGACIÓN MÓVIL (BOTTOM / TOP BAR) --- */}
-        <nav className="lg:hidden flex justify-around items-center bg-zinc-50 dark:bg-black border-b border-zinc-200 dark:border-zinc-800 p-4 sticky top-0 z-50 transition-colors duration-300 overflow-x-auto no-scrollbar">
+        {/* CIRUGÍA: print:hidden oculta la barra de iconos móviles al imprimir */}
+        <nav className="lg:hidden print:hidden flex justify-around items-center bg-zinc-50 dark:bg-black border-b border-zinc-200 dark:border-zinc-800 p-4 sticky top-0 z-50 transition-colors duration-300 overflow-x-auto no-scrollbar">
           <Link href="/" className="text-xl px-2">🏠</Link>
           <Link href="/ventas" className="text-xl px-2">🛍️</Link>
           <Link href="/clientes" className="text-xl px-2">👤</Link>
