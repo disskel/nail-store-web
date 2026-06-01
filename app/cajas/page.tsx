@@ -124,11 +124,14 @@ export default function HistorialCajas() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 relative transition-colors duration-300">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 relative transition-colors duration-300 print:p-0 print:m-0">
       
-      {/* CAPA DE IMPRESIÓN (AISLADA MEDIANTE Z-INDEX Y FONDO BLANCO PARA PAPEL) */}
+      {/* CAPA DE IMPRESIÓN (TOTALMENTE AISLADA PARA PDF) */}
+      {/* CIRUGÍA: Eliminamos 'absolute inset-0' para arreglar el bug de celulares.
+          Usamos 'hidden print:block' igual que en el módulo de Ventas para asegurar 
+          la paginación múltiple y destruir los "fantasmas" de los inputs. */}
       {datosImpresion && (
-        <div className="absolute inset-0 z-[999] bg-white print:block">
+        <div className="hidden print:block print:w-full print:bg-white">
            <NotaPedidoPrint data={datosImpresion} />
         </div>
       )}
