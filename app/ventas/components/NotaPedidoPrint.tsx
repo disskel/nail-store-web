@@ -50,15 +50,14 @@ export default function NotaPedidoPrint({ data }: NotaPedidoPrintProps) {
         @media print {
           @page { margin: 0.5cm; size: auto; }
           
-          /* 1. CIRUGÍA MAESTRA: Anular las paredes de Modales y Tailwind CSS */
-          /* Esto fuerza a que todos los contenedores padre liberen la altura y permitan crear la Página 2 */
-          html, body, #__next, div, main, section {
+          /* 1. CIRUGÍA MAESTRA: Liberar altura solo de los contenedores principales */
+          /* Eliminamos 'div', 'section' y 'display: block !important' para evitar mostrar campos de búsqueda por error */
+          html, body, #__next, main {
             position: static !important;
             overflow: visible !important;
             height: auto !important;
             min-height: 0 !important;
             max-height: none !important;
-            display: block !important; 
           }
 
           /* 2. Ocultar la interfaz web del fondo */

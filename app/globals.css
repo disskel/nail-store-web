@@ -55,12 +55,17 @@
    ========================================================================== */
 
 @media print {
-  html, body, main, section, #__next, .h-screen, .h-full, .min-h-screen, .max-h-screen {
+  /* 1. Quitamos 'section' y 'display: block' para no destruir el print:hidden de Tailwind */
+  html, body, main, #__next, .h-screen, .h-full, .min-h-screen, .max-h-screen {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
     position: static !important;
-    display: block !important;
+  }
+  
+  /* 2. BLINDAJE ABSOLUTO: Aseguramos que todo lo que tenga print:hidden desaparezca de verdad */
+  .print\:hidden {
+    display: none !important;
   }
 }
