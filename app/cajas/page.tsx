@@ -108,7 +108,9 @@ export default function HistorialCajas() {
       // de ocultar el resto del sistema (incluyendo modales) durante el proceso.
       setTimeout(() => { 
         window.print(); 
-        setDatosImpresion(null); // Limpiamos para evitar mezclas en la siguiente impresión
+        // CIRUGÍA: Eliminamos setDatosImpresion(null) para compatibilidad móvil.
+        // Los celulares no pausan el código en window.print(), si lo borramos aquí, 
+        // el PDF sale en blanco. Al dejarlo, el PDF se genera perfecto.
       }, 700); 
 
     } catch (error) { 
@@ -150,12 +152,13 @@ export default function HistorialCajas() {
 
       {/* SECCIÓN DE FILTROS */}
       <section className="bg-zinc-100/50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] mb-10 flex flex-wrap gap-4 print:hidden shadow-inner transition-colors">
-        <input type="date" onChange={(e) => setFiltro(e.target.value)} className="bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all cursor-pointer" />
-        <input placeholder="BUSCAR POR ESTADO O FECHA..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="flex-1 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all uppercase placeholder:text-zinc-300 dark:placeholder:text-zinc-800" />
+        {/* CIRUGÍA: Añadimos print:hidden directo a inputs y botones para matar los fantasmas en celulares */}
+        <input type="date" onChange={(e) => setFiltro(e.target.value)} className="print:hidden bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all cursor-pointer" />
+        <input placeholder="BUSCAR POR ESTADO O FECHA..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="print:hidden flex-1 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl text-zinc-900 dark:text-white font-black outline-none focus:ring-2 focus:ring-indigo-600 transition-all uppercase placeholder:text-zinc-300 dark:placeholder:text-zinc-800" />
         
         <button 
           onClick={() => setMostrarSoloDescuadres(!mostrarSoloDescuadres)}
-          className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
+          className={`print:hidden px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
             mostrarSoloDescuadres 
             ? 'bg-red-600 text-white border-red-400 shadow-lg shadow-red-500/20' 
             : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 border-zinc-300 dark:border-zinc-700 hover:text-zinc-900 dark:hover:text-white'
