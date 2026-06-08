@@ -159,7 +159,7 @@ export default function DevolucionesPage() {
               <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-500 tracking-widest mb-1">Documento Encontrado</p>
               <p className="text-sm font-black text-zinc-900 dark:text-white mb-2">{ventaData.clientes?.nombre_razon_social || 'PÚBLICO GENERAL'}</p>
               <div className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 space-y-1">
-                <div className="flex justify-between"><span>FECHA:</span> <span>{new Date(ventaData.fecha_emision).toLocaleDateString()}</span></div>
+                <div className="flex justify-between"><span>FECHA:</span> <span>{new Date(ventaData.fecha).toLocaleDateString()}</span></div>
                 <div className="flex justify-between"><span>TOTAL ORIGINAL:</span> <span>S/ {ventaData.monto_neto.toFixed(2)}</span></div>
               </div>
             </div>
