@@ -253,6 +253,7 @@ export default function DevolucionesPage() {
                     <option value="EFECTIVO">💵 EFECTIVO (CAJÓN)</option>
                     <option value="YAPE">📱 YAPE</option>
                     <option value="PLIN">📱 PLIN</option>
+                    <option value="TRANSFERENCIA">📱 TRANSFERENCIA</option>
                   </select>
                 </div>
               </div>
