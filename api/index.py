@@ -1643,3 +1643,220 @@ def obtener_analitica_crm(
     except Exception as e:
         print(f"Error crítico en analítica CRM: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Fallo en procesamiento de analítica: {str(e)}")
+
+    # -----------------------------------------------------------------------------
+# 20. MÓDULO DE DEVOLUCIONES Y NOTAS DE CRÉDITO (DOBLE PARTIDA CONTABLE)
+# Propósito: Rastrear devoluciones exactas, reingresar stock, auditar mermas
+# y ajustar automáticamente la caja de HOY sin romper el historial pasado.
+# -----------------------------------------------------------------------------
+
+class ItemDevolucion(BaseModel):
+    id_producto: str
+    cantidad_devuelta: int
+    precio_unitario: float
+    estado_inventario: Literal['REINGRESADO_BUENO', 'MERMA']
+
+class ItemCambio(BaseModel):
+    id_producto: str
+    cantidad: int
+    precio_unitario: float
+
+class DevolucionRequest(BaseModel):
+    id_venta_original: str
+    correlativo_original: str
+    tipo_operacion: Literal['TOTAL', 'PARCIAL', 'CAMBIO']
+    monto_devuelto: float # Valor absoluto de la diferencia en dinero
+    es_saldo_a_favor_empresa: bool = False # True si en un CAMBIO el cliente pagó extra
+    metodo_reembolso: Literal['EFECTIVO', 'YAPE', 'PLIN', 'TRANSFERENCIA']
+    motivo: str
+    items_devueltos: List[ItemDevolucion]
+    items_nuevos: Optional[List[ItemCambio]] = []
+
+@app.get("/api/devoluciones/consultar/{correlativo}")
+@app.get("/devoluciones/consultar/{correlativo}")
+def consultar_venta_para_devolucion(
+    correlativo: str,
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """
+    Busca una venta por su correlativo (Ej. P001-0000179) y verifica en la
+    tabla devoluciones_detalle si algún ítem ya fue devuelto antes, 
+    devolviendo solo el saldo disponible para evitar doble fraude.
+    """
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Traemos la cabecera de la Venta
+        venta_res = supabase.postgrest.auth(token).table("ventas")\
+            .select("*, clientes(nombre_razon_social, numero_documento)")\
+            .eq("correlativo_nota", correlativo.upper()).single().execute()
+            
+        if not venta_res.data:
+            raise HTTPException(status_code=404, detail="DOCUMENTO NO ENCONTRADO EN LA BASE DE DATOS")
+            
+        id_venta = venta_res.data["id"]
+
+        # 2. Traemos el detalle original de la venta (Las salidas de Kardex)
+        items_res = supabase.postgrest.auth(token).table("movimientos_inventario")\
+            .select("id_producto, cantidad, precio_momento, productos(nombre, sku)")\
+            .eq("id_venta", id_venta)\
+            .eq("tipo_movimiento", "SALIDA").execute()
+
+        # 3. Traemos el historial de devoluciones de esta venta (Si existe)
+        devs_res = supabase.postgrest.auth(token).table("devoluciones")\
+            .select("id").eq("id_venta_original", id_venta).execute()
+        
+        ids_devoluciones = [d["id"] for d in devs_res.data]
+        
+        items_ya_devueltos = {}
+        if ids_devoluciones:
+            detalles_dev = supabase.postgrest.auth(token).table("devoluciones_detalle")\
+                .select("id_producto, cantidad_devuelta")\
+                .in_("id_devolucion", ids_devoluciones).execute()
+                
+            for det in detalles_dev.data:
+                prod_id = det["id_producto"]
+                items_ya_devueltos[prod_id] = items_ya_devueltos.get(prod_id, 0) + det["cantidad_devuelta"]
+
+        # 4. Cruzamos datos para saber qué queda disponible para devolver
+        items_disponibles = []
+        for item in items_res.data:
+            prod_id = item["id_producto"]
+            cant_original = item["cantidad"]
+            cant_devuelta = items_ya_devueltos.get(prod_id, 0)
+            cant_restante = cant_original - cant_devuelta
+            
+            if cant_restante > 0:
+                items_disponibles.append({
+                    "id_producto": prod_id,
+                    "sku": item["productos"]["sku"],
+                    "nombre": item["productos"]["nombre"],
+                    "precio_unitario": item["precio_momento"],
+                    "cantidad_disponible": cant_restante
+                })
+
+        return {
+            "venta": venta_res.data,
+            "items_disponibles": items_disponibles
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/devoluciones/procesar")
+@app.post("/devoluciones/procesar")
+def procesar_devolucion_y_cambio(
+    req: DevolucionRequest,
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """
+    Motor central: Registra la auditoría, restaura el stock, 
+    y genera una Nota de Crédito (Venta Negativa) para cuadrar la caja de HOY.
+    """
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Obtener la sesión de caja activa de HOY (Para sacar/meter el dinero)
+        sesion_activa = supabase.postgrest.auth(token).table("sesiones_caja")\
+            .select("id").eq("estado", "ABIERTA")\
+            .order("fecha_apertura", desc=True).limit(1).execute()
+            
+        if not sesion_activa.data:
+            raise HTTPException(status_code=400, detail="ERROR: NO HAY TURNO DE CAJA ABIERTO PARA EXTRAER EL DINERO")
+            
+        id_caja_hoy = sesion_activa.data[0]["id"]
+
+        # 2. Registrar Cabecera de Auditoría en la nueva tabla 'devoluciones'
+        res_dev = supabase.postgrest.auth(token).table("devoluciones").insert({
+            "id_venta_original": req.id_venta_original,
+            "id_sesion_caja": id_caja_hoy,
+            "tipo_operacion": req.tipo_operacion,
+            "monto_devuelto": req.monto_devuelto if not req.es_saldo_a_favor_empresa else -req.monto_devuelto,
+            "metodo_reembolso": req.metodo_reembolso,
+            "motivo": req.motivo.upper()
+        }).execute()
+        
+        id_nueva_devolucion = res_dev.data[0]["id"]
+
+        # =====================================================================
+        # MAGIA FINANCIERA: Crear "Nota de Crédito" en la tabla de Ventas
+        # Si devolvemos dinero: Monto Negativo. Si el cliente pagó extra: Positivo.
+        # =====================================================================
+        monto_contable = req.monto_devuelto if req.es_saldo_a_favor_empresa else -req.monto_devuelto
+        
+        res_nota_credito = supabase.postgrest.auth(token).table("ventas").insert({
+            "id_sesion_caja": id_caja_hoy,
+            "correlativo_nota": f"DEV-{req.correlativo_original}",
+            "monto_bruto": monto_contable,
+            "monto_descuento": 0.00,
+            "monto_neto": monto_contable,
+            "medio_pago": req.metodo_reembolso,
+            "motivo_descuento": f"NOTA DE CRÉDITO POR {req.tipo_operacion}",
+            "estado": "COMPLETADA"
+        }).execute()
+        
+        id_venta_compensatoria = res_nota_credito.data[0]["id"]
+
+        # 3. Procesar los Productos Devueltos
+        for item in req.items_devueltos:
+            # A) Guardar rastro en devoluciones_detalle
+            supabase.postgrest.auth(token).table("devoluciones_detalle").insert({
+                "id_devolucion": id_nueva_devolucion,
+                "id_producto": item.id_producto,
+                "cantidad_devuelta": item.cantidad_devuelta,
+                "precio_unitario": item.precio_unitario,
+                "estado_inventario": item.estado_inventario
+            }).execute()
+
+            # B) Si el producto está BUENO, restaurar stock e inyectar al Kardex
+            if item.estado_inventario == 'REINGRESADO_BUENO':
+                # Obtenemos stock actual y costo maestro
+                prod = supabase.postgrest.auth(token).table("productos")\
+                    .select("stock_actual, costo_unidad").eq("id", item.id_producto).single().execute()
+                
+                # Restauramos la unidad física
+                nuevo_stock = int(prod.data.get('stock_actual') or 0) + item.cantidad_devuelta
+                supabase.postgrest.auth(token).table("productos")\
+                    .update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
+                
+                # Inyectamos ENTRADA al Kardex (Esto corrige la vista de Utilidades)
+                supabase.postgrest.auth(token).table("movimientos_inventario").insert({
+                    "id_producto": item.id_producto,
+                    "tipo_movimiento": "ENTRADA",
+                    "cantidad": item.cantidad_devuelta,
+                    "precio_momento": prod.data.get('costo_unidad'), # Costo real, no precio de venta
+                    "id_sesion_caja": id_caja_hoy,
+                    "medio_pago": req.metodo_reembolso,
+                    "id_venta": id_venta_compensatoria,
+                    "referencia": f"DEVOLUCIÓN {req.correlativo_original}"
+                }).execute()
+
+        # 4. Procesar los Productos Nuevos (Solo si es un CAMBIO)
+        if req.tipo_operacion == 'CAMBIO' and req.items_nuevos:
+            for nuevo in req.items_nuevos:
+                prod = supabase.postgrest.auth(token).table("productos")\
+                    .select("stock_actual").eq("id", nuevo.id_producto).single().execute()
+                
+                # Descontamos la unidad física que se está llevando
+                nuevo_stock = int(prod.data.get('stock_actual') or 0) - nuevo.cantidad
+                supabase.postgrest.auth(token).table("productos")\
+                    .update({"stock_actual": nuevo_stock}).eq("id", nuevo.id_producto).execute()
+                
+                # Inyectamos SALIDA al Kardex
+                supabase.postgrest.auth(token).table("movimientos_inventario").insert({
+                    "id_producto": nuevo.id_producto,
+                    "tipo_movimiento": "SALIDA",
+                    "cantidad": nuevo.cantidad,
+                    "precio_momento": nuevo.precio_unitario,
+                    "id_sesion_caja": id_caja_hoy,
+                    "medio_pago": req.metodo_reembolso,
+                    "id_venta": id_venta_compensatoria,
+                    "referencia": f"SALIDA POR CAMBIO DE {req.correlativo_original}"
+                }).execute()
+
+        return {"status": "success", "message": "OPERACIÓN REGISTRADA CON ÉXITO"}
+        
+    except Exception as e:
+        print(f"Error crítico procesando devolución: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Fallo en transacción: {str(e)}")

@@ -603,5 +603,40 @@ export const apiService = {
     }
     return res.json();
   },
+
+  // -------------------------------------------------------------------------
+  // 14. MÓDULO DE DEVOLUCIONES Y NOTAS DE CRÉDITO
+  // -------------------------------------------------------------------------
+
+  /**
+   * Consulta una Nota de Venta y verifica qué productos aún pueden ser devueltos.
+   */
+  async consultarVentaParaDevolucion(correlativo: string) {
+    const res = await fetch(`${API_URL}/devoluciones/consultar/${correlativo}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'No se pudo consultar el documento');
+    }
+    return res.json();
+  },
+
+  /**
+   * Envía la orden matemática para registrar la devolución, ajustar el Kardex
+   * y generar la Nota de Crédito en la sesión de caja actual.
+   */
+  async procesarDevolucion(data: any) {
+    const res = await fetch(`${API_URL}/devoluciones/procesar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Fallo crítico al procesar la devolución');
+    }
+    return res.json();
+  }
   
 };
