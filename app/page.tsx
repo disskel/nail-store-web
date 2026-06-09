@@ -96,6 +96,7 @@ export default function Dashboard() {
           <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-6">Operaciones Críticas</h2>
           <div className="grid grid-cols-2 gap-4">
             <QuickActionButton href="/ventas" label="Nueva Venta" desc="Punto de Venta (POS)" icon="🛍️" />
+            <QuickActionButton href="/devoluciones" label="Devoluciones" desc="Cambios y Notas de Crédito" icon="🔄" />
             <QuickActionButton href="/clientes" label="Clientes" desc="Gestión de Cartera" icon="👥" />
             <QuickActionButton href="/inventario/ingreso" label="Entradas" desc="Cargar Almacén" icon="📥" />
             <QuickActionButton href="/inventario/nuevo" label="Catálogo" desc="Crear Producto" icon="✨" />

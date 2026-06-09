@@ -98,6 +98,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-lg">🏠</span> Dashboard
             </Link>
 
+            <Link href="/devoluciones" className="flex items-center gap-4 px-6 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white group rounded-xl">
+              <span className="text-xl group-hover:scale-110 transition-transform">🔄</span>
+              <span className="font-bold text-sm">Devoluciones</span>
+            </Link>
+
             <Link href="/ventas" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">🛍️</span> Ventas
             </Link>
@@ -154,7 +159,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="text-xl px-2">🏠</Link>
           <Link href="/ventas" className="text-xl px-2">🛍️</Link>
           <Link href="/clientes" className="text-xl px-2">👤</Link>
-          
+          {/* NUEVO ACCESO MÓVIL A DEVOLUCIONES */}
+          <Link href="/devoluciones" className="text-xl px-2">🔄</Link>
+
           {/* INTEGRACIÓN: CAMPANA DE NOTIFICACIONES MÓVIL */}
           {/* Permite a Jean ver las alertas desde su celular en la tienda */}
           <NotificationBell />
