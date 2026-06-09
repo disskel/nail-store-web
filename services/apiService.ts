@@ -637,6 +637,14 @@ export const apiService = {
       throw new Error(errorData.detail || 'Fallo crítico al procesar la devolución');
     }
     return res.json();
-  }
+  },
   
+  async getProductosActivos() {
+    const res = await fetch(`${API_URL}/productos`, { headers: getHeaders() });
+    if (!res.ok) throw new Error('Error al cargar catálogo');
+    const data = await res.json();
+    // Filtramos solo los que tienen stock para evitar vender aire en un cambio
+    return data.filter((p: any) => p.stock_actual > 0 && p.activo);
+  },
+
 };
