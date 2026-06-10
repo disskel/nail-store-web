@@ -3,48 +3,42 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '@/services/apiService';
 
+/**
+ * MÓDULO DE CREACIÓN DE CATÁLOGO - ALTA DENSIDAD PRO
+ * Diseño Full-Width corporativo, sin espacios muertos, botones en Toolbar.
+ */
 export default function NuevoProducto() {
   const [categorias, setCategorias] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
   const [cargando, setCargando] = useState(false);
 
+  // MODAL MAESTROS
   const [showModal, setShowModal] = useState({ open: false, tipo: '', modo: 'create' });
   const [selectedId, setSelectedId] = useState('');
   const [modalData, setModalData] = useState({ name: '', info: '' });
 
+  // DATOS DEL PRODUCTO
   const [formData, setFormData] = useState({
     sku: '', nombre: '', id_proveedor: '', id_categoria: '',
-    costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0
+    costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0 // Stock siempre viaja en 0
   });
 
-  // -------------------------------------------------------------------------
-  // 1. CARGA DE MAESTROS (PROVEEDORES Y CATEGORÍAS)
-  // -------------------------------------------------------------------------
+  // --- 1. CARGA DE MAESTROS ---
   async function cargarMaestros() {
     try {
-      const [cats, provs] = await Promise.all([
-        apiService.getCategorias(), 
-        apiService.getProveedores()
-      ]);
+      const [cats, provs] = await Promise.all([apiService.getCategorias(), apiService.getProveedores()]);
       setCategorias(cats);
       setProveedores(provs);
-    } catch (error) {
-      setMensaje({ texto: '❌ Error al conectar con la base de datos.', tipo: 'error' });
-    }
+    } catch (error) { setMensaje({ texto: '❌ Error al sincronizar maestros.', tipo: 'error' }); }
   }
 
   useEffect(() => { cargarMaestros(); }, []);
 
-  // -------------------------------------------------------------------------
-  // 2. GESTIÓN DE MODALES PARA CREACIÓN RÁPIDA
-  // -------------------------------------------------------------------------
+  // --- 2. GESTIÓN DE MODALES (CAT / PROV) ---
   const openMaestroModal = (tipo: 'cat' | 'prov', modo: 'create' | 'edit') => {
     if (modo === 'edit') {
-      const item: any = tipo === 'cat' 
-        ? categorias.find((c: any) => c.id === formData.id_categoria)
-        : proveedores.find((p: any) => p.id === formData.id_proveedor);
-      
+      const item: any = tipo === 'cat' ? categorias.find((c: any) => c.id === formData.id_categoria) : proveedores.find((p: any) => p.id === formData.id_proveedor);
       if (!item) return alert("Seleccione un elemento primero");
       setModalData({ name: item.nombre, info: item.descripcion || item.contacto || '' });
       setSelectedId(item.id);
@@ -59,96 +53,73 @@ export default function NuevoProducto() {
     try {
       let res;
       if (showModal.modo === 'create') {
-        res = showModal.tipo === 'cat' 
-          ? await apiService.createCategoria(modalData.name, modalData.info)
-          : await apiService.createProveedor(modalData.name, modalData.info);
+        res = showModal.tipo === 'cat' ? await apiService.createCategoria(modalData.name, modalData.info) : await apiService.createProveedor(modalData.name, modalData.info);
       } else {
-        res = showModal.tipo === 'cat'
-          ? await apiService.updateCategoria(selectedId, modalData.name, modalData.info)
-          : await apiService.updateProveedor(selectedId, modalData.name, modalData.info);
+        res = showModal.tipo === 'cat' ? await apiService.updateCategoria(selectedId, modalData.name, modalData.info) : await apiService.updateProveedor(selectedId, modalData.name, modalData.info);
       }
-
-      setMensaje({ texto: `✅ ${res.message || 'Operación exitosa'}`, tipo: 'success' });
+      setMensaje({ texto: `✅ ${res.message || 'Maestro actualizado'}`, tipo: 'success' });
       await cargarMaestros();
       setShowModal({ open: false, tipo: '', modo: 'create' });
-      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
-    } catch (err: any) {
-      setMensaje({ texto: `❌ ${err.message}`, tipo: 'error' });
-    } finally {
-      setCargando(false);
-    }
+    } catch (err: any) { setMensaje({ texto: `❌ ${err.message}`, tipo: 'error' }); } 
+    finally { setCargando(false); setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000); }
   };
 
   const handleDeleteMaestro = async (tipo: 'cat' | 'prov') => {
     const id = tipo === 'cat' ? formData.id_categoria : formData.id_proveedor;
     if (!id) return;
     if (!confirm("¿Desea eliminar este registro de la vista? (Borrado Lógico)")) return;
-
     setCargando(true);
     try {
       tipo === 'cat' ? await apiService.deleteCategoria(id) : await apiService.deleteProveedor(id);
-      setMensaje({ texto: '✅ Registro deshabilitado correctamente', tipo: 'success' });
+      setMensaje({ texto: '✅ Registro deshabilitado', tipo: 'success' });
       if (tipo === 'cat') setFormData({...formData, id_categoria: ''});
       else setFormData({...formData, id_proveedor: ''});
       await cargarMaestros();
-      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000);
-    } catch (err: any) {
-      setMensaje({ texto: '❌ Error al eliminar', tipo: 'error' });
-    } finally {
-      setCargando(false);
-    }
+    } catch (err: any) { setMensaje({ texto: '❌ Error al eliminar', tipo: 'error' }); } 
+    finally { setCargando(false); setTimeout(() => setMensaje({ texto: '', tipo: '' }), 3000); }
   };
 
-  // -------------------------------------------------------------------------
-  // 3. LÓGICA DE ENVÍO DEL PRODUCTO
-  // -------------------------------------------------------------------------
+  // --- 3. ENVÍO DEL PRODUCTO ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCargando(true);
     setMensaje({ texto: '', tipo: '' });
     try {
-      // Enviamos el formData. El backend forzará stock_actual a 0 por seguridad[cite: 21]
       await apiService.registrarProducto(formData);
-      setMensaje({ texto: '✅ REGISTRO DE PRODUCTO EXITOSO EN NAIL-STORE', tipo: 'success' });
+      setMensaje({ texto: '✅ PRODUCTO AÑADIDO AL CATÁLOGO MAESTRO', tipo: 'success' });
       setFormData({ sku: '', nombre: '', id_proveedor: '', id_categoria: '', costo_unidad: 0, precio_menor: 0, precio_mayor: 0, stock_actual: 0 });
-      // Limpiar mensaje tras 5 segundos
-      setTimeout(() => setMensaje({ texto: '', tipo: '' }), 5000);
-    } catch (err: any) {
-      setMensaje({ texto: `❌ ERROR AL GUARDAR: ${err.message}`, tipo: 'error' });
-    } finally {
-      setCargando(false);
-    }
+    } catch (err: any) { setMensaje({ texto: `❌ ERROR AL GUARDAR: ${err.message}`, tipo: 'error' }); } 
+    finally { setCargando(false); setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000); }
+  };
+
+  const parseInput = (val: string) => {
+    if (val === '') return 0;
+    const n = parseFloat(val);
+    return isNaN(n) ? 0 : n;
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-500 relative transition-colors duration-300">
+    <div className="p-4 lg:p-6 w-full max-w-[1600px] mx-auto animate-in fade-in duration-500 text-xs transition-colors duration-300">
       
-      {/* MODAL DE MAESTROS (ADAPTADO A MODO CLARO) */}
+      {/* MODAL DE MAESTROS (COMPACTO) */}
       {showModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-md p-4 transition-colors">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl transition-colors">
-            <h2 className="text-2xl font-black mb-6 text-zinc-900 dark:text-white tracking-tight transition-colors">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-in zoom-in duration-200">
+            <h2 className="text-lg font-black mb-4 text-zinc-900 dark:text-white uppercase italic tracking-tighter border-b border-zinc-200 dark:border-zinc-800 pb-2">
               {showModal.modo === 'edit' ? 'Editar' : 'Nuevo'} {showModal.tipo === 'cat' ? 'Categoría' : 'Proveedor'}
             </h2>
-            <div className="space-y-4">
-              <input 
-                placeholder="Nombre..."
-                value={modalData.name}
-                onChange={e => setModalData({...modalData, name: e.target.value.toUpperCase()})}
-                className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-zinc-900 dark:text-white font-medium placeholder:text-zinc-300 dark:placeholder:text-zinc-800"
-              />
-              <input 
-                placeholder={showModal.tipo === 'cat' ? "Descripción..." : "Contacto..."}
-                value={modalData.info}
-                onChange={e => setModalData({...modalData, info: e.target.value.toUpperCase()})}
-                className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-zinc-900 dark:text-white font-medium placeholder:text-zinc-300 dark:placeholder:text-zinc-800"
-              />
-              <div className="flex gap-4 pt-6">
-                <button onClick={() => setShowModal({ ...showModal, open: false })} className="flex-1 py-4 text-zinc-400 dark:text-zinc-500 font-bold hover:text-zinc-900 dark:hover:text-white transition-colors uppercase text-[10px]">Cancelar</button>
-                <button 
-                  onClick={handleSaveMaestro}
-                  className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all uppercase text-[10px]"
-                >
+            <div className="space-y-3">
+              <div>
+                <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">Nombre</label>
+                <input value={modalData.name} onChange={e => setModalData({...modalData, name: e.target.value.toUpperCase()})} className="w-full p-2.5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-indigo-500 transition-colors text-zinc-900 dark:text-white font-bold uppercase text-[10px]" />
+              </div>
+              <div>
+                <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">{showModal.tipo === 'cat' ? "Descripción" : "Contacto"}</label>
+                <input value={modalData.info} onChange={e => setModalData({...modalData, info: e.target.value.toUpperCase()})} className="w-full p-2.5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-indigo-500 transition-colors text-zinc-900 dark:text-white font-bold uppercase text-[10px]" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowModal({ ...showModal, open: false })} className="flex-1 py-2.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-black rounded-lg uppercase text-[10px] hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">Cancelar</button>
+                <button type="button" onClick={handleSaveMaestro} className="flex-1 py-2.5 bg-indigo-600 text-white font-black rounded-lg hover:bg-indigo-500 shadow-md active:scale-95 transition-all uppercase text-[10px]">
                   {showModal.modo === 'edit' ? 'Actualizar' : 'Guardar'}
                 </button>
               </div>
@@ -157,135 +128,129 @@ export default function NuevoProducto() {
         </div>
       )}
 
-      <header className="mb-12">
-        <a href="/inventario" className="text-zinc-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 mb-4 inline-flex items-center gap-2 transition-colors font-bold text-sm">
-          <span>←</span> VOLVER AL INVENTARIO
-        </a>
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-indigo-600 rounded-[1.25rem] flex items-center justify-center text-3xl shadow-xl shadow-indigo-600/20">✨</div>
-          <div>
-            <h1 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter transition-colors">Nuevo Producto</h1>
-            <p className="text-zinc-400 dark:text-zinc-500 font-bold mt-1 uppercase text-xs tracking-widest transition-colors">Catálogo Maestro de Trujillo</p>
-          </div>
-        </div>
-      </header>
-
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <form onSubmit={handleSubmit} className="flex flex-col h-[calc(100vh-100px)]">
         
-        <div className="lg:col-span-2 space-y-10">
-          {/* SECCIÓN 1: INFORMACIÓN BÁSICA (CAMBIO DINÁMICO) */}
-          <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
-            <h3 className="text-sm font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-8 flex items-center gap-3 transition-colors">
-              <span className="w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full"></span> Información del Item
+        {/* CABECERA CORPORATIVA Y TOOLBAR (IN-LINE) */}
+        <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900 text-white p-4 rounded-xl shadow-md flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <a href="/inventario" className="w-8 h-8 flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded-lg text-white font-black transition-colors" title="Volver al Inventario">←</a>
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tighter italic">Nuevo Producto</h1>
+              <p className="text-indigo-400 font-bold uppercase text-[9px] tracking-widest mt-0.5">Catálogo Maestro • Creación de Perfil</p>
+            </div>
+          </div>
+          
+          <button type="submit" disabled={cargando} className={`w-full md:w-auto px-8 py-3 rounded-lg font-black text-[10px] tracking-widest shadow-md transition-all uppercase ${cargando ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-95'}`}>
+            {cargando ? 'PROCESANDO...' : '💾 GUARDAR EN CATÁLOGO'}
+          </button>
+        </header>
+
+        {/* GRID DE DATOS (ALTA DENSIDAD 3 COLUMNAS) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
+          
+          {/* BLOQUE 1: IDENTIDAD */}
+          <section className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm h-fit transition-colors">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-4 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+              <span className="w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full"></span> 1. Información Básica
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Nombre Comercial</label>
-                <input required placeholder="Ej: Esmalte Gel" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-200 dark:placeholder:text-zinc-800" />
+            <div className="space-y-4">
+              <div>
+                <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">Nombre Comercial</label>
+                <input required placeholder="EJ: ESMALTE GEL BASE" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value.toUpperCase()})} className="w-full p-3 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-indigo-500 transition-colors font-bold text-zinc-900 dark:text-white text-[10px] uppercase placeholder:text-zinc-400 dark:placeholder:text-zinc-700" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Código SKU / EAN</label>
-                <input required placeholder="NS-000" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all font-bold text-zinc-900 dark:text-white placeholder:text-zinc-200 dark:placeholder:text-zinc-800" />
+              <div>
+                <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">Código SKU / EAN</label>
+                <input required placeholder="EJ: NS-0001" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})} className="w-full p-3 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none focus:border-indigo-500 transition-colors font-bold text-zinc-900 dark:text-white text-[10px] uppercase placeholder:text-zinc-400 dark:placeholder:text-zinc-700" />
               </div>
             </div>
           </section>
 
-          {/* SECCIÓN 2: FINANZAS (CAMBIO DINÁMICO) */}
-          <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
-            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-8 flex items-center gap-3 transition-colors">
-              <span className="w-1.5 h-1.5 bg-emerald-600 dark:bg-emerald-400 rounded-full"></span> Finanzas y Márgenes
+          {/* BLOQUE 2: CLASIFICACIÓN */}
+          <section className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm h-fit transition-colors">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 mb-4 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+              <span className="w-1.5 h-1.5 bg-zinc-400 dark:bg-zinc-500 rounded-full"></span> 2. Clasificación Logística
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Costo (S/)</label>
-                <input required type="number" step="0.01" value={formData.costo_unidad === 0 ? '' : formData.costo_unidad} onChange={e => setFormData({...formData, costo_unidad: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Menor (S/)</label>
-                <input required type="number" step="0.01" value={formData.precio_menor === 0 ? '' : formData.precio_menor} onChange={e => setFormData({...formData, precio_menor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Mayor (S/)</label>
-                <input required type="number" step="0.01" value={formData.precio_mayor === 0 ? '' : formData.precio_mayor} onChange={e => setFormData({...formData, precio_mayor: parseFloat(e.target.value) || 0})} className="w-full p-5 bg-white dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-black text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-10">
-          {/* SECCIÓN 3: CLASIFICACIÓN (CAMBIO DINÁMICO) */}
-          <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
-            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 mb-8 flex items-center gap-3 transition-colors">
-              <span className="w-1.5 h-1.5 bg-zinc-400 dark:bg-zinc-300 rounded-full"></span> Clasificación
-            </h3>
-            <div className="space-y-8">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase transition-colors">Proveedor</label>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => openMaestroModal('prov', 'create')} className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black hover:text-indigo-400 dark:hover:text-white transition-colors">+ AÑADIR</button>
+            <div className="space-y-4">
+              
+              {/* CAMPO PROVEEDOR */}
+              <div className="bg-zinc-50 dark:bg-black p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-[9px] font-black text-zinc-500 uppercase">Proveedor Central</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => openMaestroModal('prov', 'create')} className="text-indigo-600 dark:text-indigo-400 text-[8px] font-black hover:underline uppercase">+ Añadir</button>
                     {formData.id_proveedor && (
                       <>
-                        <button type="button" onClick={() => openMaestroModal('prov', 'edit')} className="text-amber-600 dark:text-amber-400 text-[10px] font-black hover:text-white transition-colors">EDITAR</button>
-                        <button type="button" onClick={() => handleDeleteMaestro('prov')} className="text-red-500 dark:text-red-400 text-[10px] font-black hover:text-white transition-colors">BORRAR</button>
+                        <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                        <button type="button" onClick={() => openMaestroModal('prov', 'edit')} className="text-amber-600 dark:text-amber-500 text-[8px] font-black hover:underline uppercase">Editar</button>
+                        <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                        <button type="button" onClick={() => handleDeleteMaestro('prov')} className="text-red-500 dark:text-red-400 text-[8px] font-black hover:underline uppercase">Quitar</button>
                       </>
                     )}
                   </div>
                 </div>
-                <select required value={formData.id_proveedor} onChange={e => setFormData({...formData, id_proveedor: e.target.value})} className="w-full p-5 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 appearance-none cursor-pointer font-bold text-zinc-900 dark:text-white transition-colors">
-                  <option value="">Seleccionar...</option>
+                <select required value={formData.id_proveedor} onChange={e => setFormData({...formData, id_proveedor: e.target.value})} className="w-full bg-transparent outline-none font-black text-zinc-900 dark:text-white uppercase text-[10px] cursor-pointer">
+                  <option value="" className="text-zinc-400">-- SELECCIONE --</option>
                   {proveedores.map((p: any) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                 </select>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase transition-colors">Categoría</label>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={() => openMaestroModal('cat', 'create')} className="text-indigo-600 dark:text-indigo-400 text-[10px] font-black hover:text-indigo-400 dark:hover:text-white transition-colors">+ AÑADIR</button>
+              {/* CAMPO CATEGORÍA */}
+              <div className="bg-zinc-50 dark:bg-black p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-[9px] font-black text-zinc-500 uppercase">Familia / Categoría</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => openMaestroModal('cat', 'create')} className="text-indigo-600 dark:text-indigo-400 text-[8px] font-black hover:underline uppercase">+ Añadir</button>
                     {formData.id_categoria && (
                       <>
-                        <button type="button" onClick={() => openMaestroModal('cat', 'edit')} className="text-amber-600 dark:text-amber-400 text-[10px] font-black hover:text-white transition-colors">EDITAR</button>
-                        <button type="button" onClick={() => handleDeleteMaestro('cat')} className="text-red-500 dark:text-red-400 text-[10px] font-black hover:text-white transition-colors">BORRAR</button>
+                        <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                        <button type="button" onClick={() => openMaestroModal('cat', 'edit')} className="text-amber-600 dark:text-amber-500 text-[8px] font-black hover:underline uppercase">Editar</button>
+                        <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                        <button type="button" onClick={() => handleDeleteMaestro('cat')} className="text-red-500 dark:text-red-400 text-[8px] font-black hover:underline uppercase">Quitar</button>
                       </>
                     )}
                   </div>
                 </div>
-                <select required value={formData.id_categoria} onChange={e => setFormData({...formData, id_categoria: e.target.value})} className="w-full p-5 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-600 appearance-none cursor-pointer font-bold text-zinc-900 dark:text-white transition-colors">
-                  <option value="">Seleccionar...</option>
+                <select required value={formData.id_categoria} onChange={e => setFormData({...formData, id_categoria: e.target.value})} className="w-full bg-transparent outline-none font-black text-zinc-900 dark:text-white uppercase text-[10px] cursor-pointer">
+                  <option value="" className="text-zinc-400">-- SELECCIONE --</option>
                   {categorias.map((c: any) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+              </div>
+
+            </div>
+          </section>
+
+          {/* BLOQUE 3: FINANZAS */}
+          <section className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl shadow-sm h-fit transition-colors">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-4 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+              <span className="w-1.5 h-1.5 bg-emerald-600 dark:bg-emerald-400 rounded-full"></span> 3. Base Financiera
+            </h3>
+            <div className="space-y-4">
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800/30">
+                <label className="text-[9px] font-black text-emerald-700 dark:text-emerald-500 uppercase block mb-1">Costo Unitario Base (S/)</label>
+                <input required type="number" step="0.01" value={formData.costo_unidad === 0 ? '' : formData.costo_unidad} onChange={e => setFormData({...formData, costo_unidad: parseInput(e.target.value)})} className="w-full bg-transparent outline-none font-black text-emerald-700 dark:text-emerald-400 text-lg" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-zinc-50 dark:bg-black p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <label className="text-[9px] font-black text-zinc-500 uppercase block mb-1">P. Menor (S/)</label>
+                  <input required type="number" step="0.01" value={formData.precio_menor === 0 ? '' : formData.precio_menor} onChange={e => setFormData({...formData, precio_menor: parseInput(e.target.value)})} className="w-full bg-transparent outline-none font-black text-zinc-900 dark:text-white text-base" />
+                </div>
+                <div className="bg-zinc-50 dark:bg-black p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <label className="text-[9px] font-black text-zinc-500 uppercase block mb-1">P. Mayor (S/)</label>
+                  <input required type="number" step="0.01" value={formData.precio_mayor === 0 ? '' : formData.precio_mayor} onChange={e => setFormData({...formData, precio_mayor: parseInput(e.target.value)})} className="w-full bg-transparent outline-none font-black text-zinc-900 dark:text-white text-base" />
+                </div>
               </div>
             </div>
           </section>
 
-          {/* SECCIÓN 4: STOCK (CAMBIO DINÁMICO) */}
-          <section className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] backdrop-blur-xl transition-colors">
-            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-300 mb-8 flex items-center gap-3 transition-colors">
-              <span className="w-1.5 h-1.5 bg-zinc-200 dark:bg-zinc-300 rounded-full"></span> Stock Inicial
-            </h3>
-            <input 
-              readOnly 
-              type="number" 
-              value={0} 
-              className="w-full p-5 bg-zinc-100 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50 rounded-2xl outline-none font-black text-2xl text-center text-zinc-400 dark:text-zinc-600 cursor-not-allowed transition-colors" 
-            />
-            <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold uppercase mt-4 text-center tracking-tighter transition-colors">
-              El stock se habilita desde el menú "Registrar Ingreso"
-            </p>
-          </section>
-
-          <button type="submit" disabled={cargando} className={`w-full py-7 rounded-[2rem] font-black text-xl tracking-tight shadow-2xl transition-all active:scale-95 ${cargando ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/40'}`}>
-            {cargando ? 'GUARDANDO...' : '💾 GUARDAR PRODUCTO'}
-          </button>
-
-          {mensaje.texto && (
-            <div className={`p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-xl transition-colors ${mensaje.tipo === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400'}`}>
-              {mensaje.texto.toUpperCase()}
-            </div>
-          )}
         </div>
       </form>
+
+      {/* NOTIFICACIONES TOAST */}
+      {mensaje.texto && (
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-center font-black text-[9px] uppercase tracking-widest shadow-2xl z-[100] transition-all animate-in slide-in-from-bottom duration-300 ${mensaje.tipo === 'success' ? 'bg-emerald-500 border border-emerald-400 text-white' : 'bg-red-500 border border-red-400 text-white'}`}>
+          {mensaje.texto}
+        </div>
+      )}
     </div>
   );
 }
