@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 
 /**
- * MÓDULO DE INVENTARIO - ALTA DENSIDAD PRO
- * Diseño Full-Width corporativo, filtros en línea y tabla compacta.
+ * MÓDULO DE INVENTARIO - ALTA DENSIDAD PRO (CON PAGINACIÓN)
+ * Diseño Full-Width corporativo, filtros en línea, tabla compacta y paginación.
  */
 export default function InventarioDetallado() {
   const [productos, setProductos] = useState<any[]>([]);
@@ -13,6 +13,10 @@ export default function InventarioDetallado() {
   const [productoSel, setProductoSel] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
+
+  // --- NUEVO: ESTADOS DE PAGINACIÓN ---
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 12; // Cantidad de productos visibles por página
 
   // ESTADOS MODAL DE AJUSTE RÁPIDO
   const [showAjuste, setShowAjuste] = useState(false);
@@ -52,6 +56,18 @@ export default function InventarioDetallado() {
       return matchesTexto && matchesCategoria && matchesProveedor && matchesStock;
     });
   }, [productos, busqueda, filtroCategoria, filtroProveedor, soloBajoStock]);
+
+  // --- LÓGICA DE PAGINACIÓN ---
+  // Si el usuario escribe en el buscador o usa un filtro, lo regresamos a la página 1 automáticamente
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [busqueda, filtroCategoria, filtroProveedor, soloBajoStock, mostrarInactivos]);
+
+  const totalPaginas = Math.ceil(productosFiltrados.length / itemsPorPagina);
+  const productosPaginados = productosFiltrados.slice(
+    (paginaActual - 1) * itemsPorPagina,
+    paginaActual * itemsPorPagina
+  );
 
   const toggleEstado = async (id: string, estadoActual: boolean) => {
     try {
@@ -145,7 +161,7 @@ export default function InventarioDetallado() {
       <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900 text-white p-4 rounded-xl shadow-md">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-tighter italic">Inventario Mestro</h1>
+            <h1 className="text-xl font-black uppercase tracking-tighter italic">Inventario Maestro</h1>
             <p className="text-indigo-400 font-bold uppercase text-[9px] tracking-widest mt-1">Control de Existencias • Catálogo</p>
           </div>
           <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`hidden md:block px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${mostrarInactivos ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-md' : 'bg-black border-zinc-700 text-zinc-400 hover:text-white'}`}>
@@ -192,7 +208,7 @@ export default function InventarioDetallado() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-[10px]">
-                {productosFiltrados.map((p) => (
+                {productosPaginados.map((p) => (
                   <tr key={p.id} className={`transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${!p.activo ? 'opacity-40 bg-zinc-50 dark:bg-zinc-950' : ''} ${productoSel?.id === p.id ? 'bg-indigo-50 dark:bg-indigo-500/10' : ''}`}>
                     
                     {/* PRODUCTO Y SKU */}
@@ -249,6 +265,20 @@ export default function InventarioDetallado() {
               <div className="text-center py-10 text-[10px] font-black text-zinc-400 uppercase italic">No se encontraron productos con estos filtros</div>
             )}
           </div>
+
+          {/* --- CONTROLES DE PAGINACIÓN --- */}
+          {productosFiltrados.length > 0 && (
+            <div className="bg-zinc-50 dark:bg-black border-t border-zinc-200 dark:border-zinc-800 p-3 flex justify-between items-center text-[10px]">
+              <span className="font-black text-zinc-500 uppercase tracking-widest hidden md:inline">
+                Mostrando {(paginaActual - 1) * itemsPorPagina + 1} - {Math.min(paginaActual * itemsPorPagina, productosFiltrados.length)} de {productosFiltrados.length}
+              </span>
+              <div className="flex gap-2 items-center w-full md:w-auto justify-between md:justify-end">
+                <button disabled={paginaActual === 1} onClick={() => setPaginaActual(p => p - 1)} className="px-3 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-black uppercase disabled:opacity-50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Anterior</button>
+                <span className="font-black text-zinc-900 dark:text-white px-2">Pág. {paginaActual} de {totalPaginas || 1}</span>
+                <button disabled={paginaActual >= totalPaginas} onClick={() => setPaginaActual(p => p + 1)} className="px-3 py-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-black uppercase disabled:opacity-50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Siguiente</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* COLUMNA DERECHA (25%): PANEL DE TRAZABILIDAD (STICKY) */}
