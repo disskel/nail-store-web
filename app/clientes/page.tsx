@@ -85,7 +85,7 @@ export default function ModuloClientes() {
   const clientesFiltrados = useMemo(() => {
     return clientes.filter(c => 
       c.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase()) ||
-      c.numero_documento.includes(busqueda)
+      c.numero_documento.includes(busqueda) ||
       (c.academias && c.academias.nombre.toLowerCase().includes(busqueda.toLocaleLowerCase()))
     );
   }, [busqueda, clientes]);
