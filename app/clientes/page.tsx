@@ -2,50 +2,43 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
-// IMPORTACIÓN DEL COMPONENTE DE FORMULARIO PARA REGISTRO/EDICIÓN
 import ClienteForm from './components/ClienteForm';
-// IMPORTACIÓN DEL MANTENEDOR CENTRAL DE ACADEMIAS
 import AcademiasModal from './components/AcademiasModal';
 
 /**
- * MÓDULO DE GESTIÓN Y SEGUIMIENTO DE CLIENTES (CRM) - VERSIÓN 1.0.36
- * Propósito: Listar clientes registrados, realizar búsquedas dinámicas,
- * registrar nuevos perfiles y visualizar el historial de ventas (Hoja de Vida).
- * Actualización: Soporte para Modo Claro/Oscuro y optimización de contraste CRM.
+ * MÓDULO DE GESTIÓN DE CLIENTES Y CRM DE ALIANZAS - ALTA DENSIDAD PRO
+ * Optimizado para pantallas de escritorio de oficina y adaptabilidad móvil.
  */
-
 export default function ModuloClientes() {
-  // --- 1. ESTADOS DE CARGA Y DATOS GLOBALES ---
+  // --- 1. ESTADOS GLOBALES ---
   const [clientes, setClientes] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
-  // --- 2. ESTADOS PARA VISTA DE DETALLE (TRAZABILIDAD) ---
+  // --- 2. TRAZABILIDAD (DETALLE LATERAL) ---
   const [clienteSeleccionado, setClienteSeleccionado] = useState<any>(null);
   const [historialCompras, setHistorialCompras] = useState<any[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
-  // --- 3. ESTADO PARA CONTROL DE MODAL DE REGISTRO Y EDICIÓN ---
+  // --- 3. CONTROLES DE INTERFAZ Y MODALES ---
   const [showForm, setShowForm] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(null);
-  
-  // NUEVO ESTADO: CONTROL DEL MANTENEDOR DE ACADEMIAS
   const [showAcademias, setShowAcademias] = useState(false);
-
-  // --- NUEVO: ESTADOS PARA ANALÍTICA DE ALIANZAS ---
   const [vistaActual, setVistaActual] = useState<'DIRECTORIO' | 'ANALITICA'>('DIRECTORIO');
+  
+  // --- 4. ANALÍTICA Y FILTROS INTERACTIVOS ---
   const [analiticaDatos, setAnaliticaDatos] = useState<any>(null);
   const [cargandoAnalitica, setCargandoAnalitica] = useState(false);
-  
-  // NUEVO: Estados para los Filtros Temporales (Calendarios)
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
+  
+  // NUEVO ESTADO: Almacena la academia seleccionada para el filtro interactivo del Top VIP
+  const [academiaFiltrada, setAcademiaFiltrada] = useState<string | null>(null);
 
   const cargarAnalitica = async () => {
     setCargandoAnalitica(true);
     try {
-      // Inyectamos las fechas en el conector. Si están vacías, viajan como undefined.
       const data = await apiService.getAnaliticaCRM(
         fechaDesde || undefined, 
         fechaHasta || undefined
@@ -59,16 +52,14 @@ export default function ModuloClientes() {
   };
 
   useEffect(() => {
-    if (vistaActual === 'ANALITICA' && !analiticaDatos) {
+    if (vistaActual === 'ANALITICA') {
       cargarAnalitica();
     }
   }, [vistaActual]);
 
-  // --- 4. CARGA INICIAL DE CLIENTES DESDE EL BACKEND ---
   async function cargarDatos() {
     try {
       setCargando(true);
-      // Consumo de endpoint en backend v1.0.13
       const data = await apiService.getClientes(); 
       setClientes(data);
     } catch (error) {
@@ -78,25 +69,37 @@ export default function ModuloClientes() {
     }
   }
 
-  // Disparo automático de carga al montar el componente
   useEffect(() => { cargarDatos(); }, []);
 
-  // --- 5. FILTRADO INTELIGENTE (OPTIMIZADO EN FRONTEND) ---
+  // --- 5. FILTRADO INTELIGENTE (DIRECTORIO) ---
   const clientesFiltrados = useMemo(() => {
     return clientes.filter(c => 
       c.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (c.numero_documento.includes(busqueda)) ||
-      (c.academias && c.academias.nombre.toLowerCase().includes(busqueda.toLocaleLowerCase()))
+      (c.numero_documento && c.numero_documento.includes(busqueda)) ||
+      (c.academias && c.academias.nombre.toLowerCase().includes(busqueda.toLowerCase()))
     );
   }, [busqueda, clientes]);
 
-  // --- 6. LÓGICA DE SEGUIMIENTO: HOJA DE VIDA DEL CLIENTE ---
+  // --- NUEVO: FILTRADO DINÁMICO DE EMBAJADORAS (CONTRATO CLIC INTERACTIVO) ---
+  const embajadorasVisualizadas = useMemo(() => {
+    if (!analiticaDatos?.top_embajadoras) return [];
+    
+    // Si hay una academia seleccionada por clic, filtramos su top de forma atómica
+    if (academiaFiltrada) {
+      return analiticaDatos.top_embajadoras
+        .filter((emb: any) => emb.academia.toUpperCase() === academiaFiltrada.toUpperCase())
+        .slice(0, 5); // Tomamos las top 5 de esa academia
+    }
+    
+    // Si es null, mostramos el top 5 global de toda la tienda
+    return analiticaDatos.top_embajadoras.slice(0, 5);
+  }, [analiticaDatos, academiaFiltrada]);
+
   const verDetalleCliente = async (cliente: any) => {
     setClienteSeleccionado(cliente);
     setHistorialCompras([]);
     setCargandoHistorial(true);
     try {
-      // Obtiene todas las ventas previas vinculadas al ID único en Supabase
       const historial = await apiService.getHistorialCliente(cliente.id);
       setHistorialCompras(historial);
     } catch (error) {
@@ -106,7 +109,6 @@ export default function ModuloClientes() {
     }
   };
 
-  // --- 7. MANEJADORES DE ÉXITO Y BORRADO LÓGICO ---
   const manejarExitoRegistro = () => {
     setShowForm(false);
     setClienteAEditar(null);
@@ -127,17 +129,21 @@ export default function ModuloClientes() {
     }
   };
 
-  // Pantalla de carga profesional mientras se sincroniza con Trujillo
+  // CONTROL INTERACTIVO DE CLIC EN ACADEMIAS
+  const manejarClicAcademia = (nombreAcademia: string) => {
+    setAcademiaFiltrada(prev => prev === nombreAcademia ? null : nombreAcademia);
+  };
+
   if (cargando) return (
-    <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950 text-emerald-600 dark:text-emerald-500 font-black tracking-widest uppercase italic animate-pulse transition-colors duration-300">
+    <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950 text-emerald-600 dark:text-emerald-500 font-black tracking-widest uppercase italic animate-pulse">
       Cargando Base de Clientes...
     </div>
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
+    <div className="p-2 lg:p-4 w-full max-w-[1600px] mx-auto animate-in fade-in duration-500 text-xs">
       
-      {/* MODALES DEL MÓDULO */}
+      {/* MODALES REUTILIZABLES */}
       {showForm && (
         <ClienteForm 
           clienteInicial={clienteAEditar}
@@ -150,324 +156,256 @@ export default function ModuloClientes() {
         <AcademiasModal onClose={() => setShowAcademias(false)} />
       )}
 
-      {/* CABECERA DEL MÓDULO */}
-      <header className="mb-10 flex flex-col md:flex-row md:items-start lg:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-5xl font-black text-zinc-900 dark:text-white tracking-tighter uppercase italic transition-colors">Gestión de Clientes</h1>
-          <p className="text-emerald-600 dark:text-emerald-500 font-bold uppercase text-[10px] tracking-[0.3em] mt-2 italic transition-colors">
-            Trazabilidad y Fidelización • Jean Nails Store
-          </p>
-          
-          {/* NUEVO: PANEL DE CONTROLES (TOGGLE + FILTROS DE FECHA) */}
-          <div className="mt-6 flex flex-col md:flex-row items-start md:items-center gap-4">
-            
-            {/* TOGGLE SWITCH */}
-            <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-2xl w-fit border border-zinc-200 dark:border-zinc-800 shadow-inner">
-              <button 
-                onClick={() => setVistaActual('DIRECTORIO')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'DIRECTORIO' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-              >
-                👥 Directorio CRM
-              </button>
-              <button 
-                onClick={() => setVistaActual('ANALITICA')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActual === 'ANALITICA' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
-              >
-                📊 Analítica de Alianzas
-              </button>
-            </div>
-
-            {/* CALENDARIOS DE FILTRADO (SOLO VISIBLES EN MODO ANALÍTICA) */}
-            {vistaActual === 'ANALITICA' && (
-              <div className="flex flex-wrap items-center gap-2 animate-in slide-in-from-left-4 duration-300">
-                <input 
-                  type="date" 
-                  value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 rounded-xl text-[10px] font-black text-zinc-600 dark:text-zinc-400 outline-none focus:ring-1 focus:ring-indigo-500 uppercase transition-all shadow-sm"
-                />
-                <span className="text-zinc-400 text-[10px] font-black">AL</span>
-                <input 
-                  type="date" 
-                  value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
-                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-2.5 rounded-xl text-[10px] font-black text-zinc-600 dark:text-zinc-400 outline-none focus:ring-1 focus:ring-indigo-500 uppercase transition-all shadow-sm"
-                />
-                <button 
-                  onClick={cargarAnalitica}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-md shadow-indigo-900/20 transition-all active:scale-95 flex items-center gap-2"
-                >
-                  <span className="text-xs">🔍</span> Filtrar
-                </button>
-              </div>
-            )}
+      {/* CABECERA COMPACTA DE OFICINA */}
+      <header className="mb-3 flex flex-col md:flex-row items-center justify-between bg-zinc-900 text-white p-3 rounded-xl shadow-md gap-3">
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+          <div>
+            <h1 className="text-lg font-black uppercase tracking-tighter italic">Gestión de Clientes</h1>
+            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Trazabilidad • Fidelización • Alianzas</p>
           </div>
+
+          {/* CONTROLES DE VISTA COMPACTOS */}
+          <div className="flex bg-black p-1 rounded-lg border border-zinc-800">
+            <button 
+              onClick={() => setVistaActual('DIRECTORIO')}
+              className={`px-3 py-1 rounded text-[10px] font-black uppercase transition-all ${vistaActual === 'DIRECTORIO' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              👥 Directorio
+            </button>
+            <button 
+              onClick={() => setVistaActual('ANALITICA')}
+              className={`px-3 py-1 rounded text-[10px] font-black uppercase transition-all ${vistaActual === 'ANALITICA' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              📊 Analítica
+            </button>
+          </div>
+
+          {/* FILTROS CALENDARIO COMPACTOS */}
+          {vistaActual === 'ANALITICA' && (
+            <div className="flex items-center gap-1 bg-black/50 p-1 rounded-lg border border-zinc-800 animate-in fade-in">
+              <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded text-[9px] font-black text-white outline-none" />
+              <span className="text-zinc-500 font-bold text-[9px]">AL</span>
+              <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="bg-zinc-900 border border-zinc-700 px-2 py-1 rounded text-[9px] font-black text-white outline-none" />
+              <button onClick={cargarAnalitica} className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[9px] font-black uppercase">🔍 OK</button>
+            </div>
+          )}
         </div>
         
-        <div className="flex items-center gap-4 lg:gap-6 mt-4 md:mt-0">
-          <button 
-            onClick={() => setShowAcademias(true)}
-            className="px-6 py-4 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-black rounded-2xl uppercase text-[9px] tracking-widest border border-indigo-200 dark:border-indigo-500/20 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <span className="text-sm">🎓</span> Gestionar Academias
-          </button>
-          <button 
-            onClick={() => { setClienteAEditar(null); setShowForm(true); }}
-            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-900/20 transition-all active:scale-95"
-          >
-            ➕ Nuevo Cliente
-          </button>
-          <div className="hidden sm:block bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-2xl text-right transition-colors">
-            <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest">Total Registrados</p>
-            <p className="text-2xl text-zinc-900 dark:text-white font-black transition-colors">{clientes.length}</p>
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <button onClick={() => setShowAcademias(true)} className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black rounded-lg uppercase text-[9px] tracking-wider transition-all">🎓 Academias</button>
+          <button onClick={() => { setClienteAEditar(null); setShowForm(true); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-lg uppercase text-[9px] tracking-wider transition-all shadow-md">➕ Nuevo Cliente</button>
+          <div className="bg-zinc-800 px-3 py-1 rounded-lg text-right hidden sm:block">
+            <span className="text-[8px] text-zinc-400 font-black uppercase block">Registrados</span>
+            <span className="text-sm text-white font-black">{clientes.length}</span>
           </div>
         </div>
       </header>
 
-      {vistaActual === 'DIRECTORIO' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in duration-500">
+      {/* ======================================================================= */}
+      {/* SECCIÓN VISTA 1: DIRECTORIO CRM (ALTA DENSIDAD SPLIT SCREEN) */}
+      {/* ======================================================================= */}
+      {vistaActual === 'DIRECTORIO' && (
+        <div className="flex flex-col lg:flex-row gap-2 h-[calc(100vh-120px)]">
           
-          {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA (OCUPA 2/3 DE LA PANTALLA) */}
-          <div className="lg:col-span-2 space-y-6">
-          <section className="bg-zinc-100/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl transition-colors">
-            <input 
-              placeholder="BUSCAR POR NOMBRE, DNI/RUC O ACADEMIA..." 
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full p-5 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-zinc-900 dark:text-white uppercase transition-all shadow-inner"
-            />
-          </section>
+          {/* COLUMNA IZQUIERDA: BUSCADOR Y LISTA COMPACTA */}
+          <div className="w-full lg:w-7/10 flex flex-col bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+            <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
+              <input 
+                placeholder="🔍 BUSCAR POR NOMBRE, DNI/RUC O ACADEMIA..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                className="w-full p-2 bg-white dark:bg-black border border-zinc-300 dark:border-zinc-700 rounded-lg outline-none focus:border-emerald-500 font-bold text-zinc-900 dark:text-white uppercase transition-all shadow-inner text-[10px]"
+              />
+            </div>
 
-          {/* LISTA DE TARJETAS DE CLIENTES CON SCROLL PERSONALIZADO */}
-          <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
-            {clientesFiltrados.map(c => (
-              <div 
-                key={c.id} 
-                onClick={() => verDetalleCliente(c)}
-                className={`p-6 border rounded-3xl text-left transition-all active:scale-[0.98] group flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer ${
-                  clienteSeleccionado?.id === c.id 
-                  ? 'bg-emerald-50 dark:bg-emerald-600/10 border-emerald-500 shadow-sm' 
-                  : 'bg-zinc-50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600'
-                }`}
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-[9px] font-black bg-white dark:bg-black px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors">
-                      {c.tipo_documento}
-                    </span>
-                    <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 transition-colors">{c.numero_documento}</span>
-                    
-                    {/* ETIQUETA WOW DE ACADEMIA */}
-                    {c.academias && (
-                      <span className="text-[9px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/20">
-                        🎓 {c.academias.nombre}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-black text-zinc-900 dark:text-white text-lg uppercase group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    {c.nombre_razon_social}
-                  </h3>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-500 font-medium mt-1 transition-colors flex gap-4">
-                    <span>📍 {c.direccion || 'S/D'}</span>
-                    <span>📱 {c.celular || 'S/N'}</span>
-                  </p>
-                </div>
-                
-                {/* BOTONES DE ADMINISTRACIÓN (EDITAR / OCULTAR) */}
-                <div className="flex gap-2">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setClienteAEditar(c); setShowForm(true); }}
-                    className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); ocultarCliente(c.id, c.nombre_razon_social); }}
-                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
-                  >
-                    Ocultar
-                  </button>
-                </div>
-              </div>
-            ))}
-            {clientesFiltrados.length === 0 && (
-              <div className="py-20 text-center text-zinc-400 dark:text-zinc-700 font-black uppercase italic tracking-widest transition-colors">
-                No se encontraron coincidencias en la base de datos
-              </div>
-            )}
+            {/* TABLA DE REGISTROS CON ESPACIADO CERO */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-zinc-100 dark:bg-zinc-900 sticky top-0 z-10 text-[9px] uppercase text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+                  <tr>
+                    <th className="p-2 font-black">Datos del Perfil</th>
+                    <th className="p-2 font-black">Ubicación / Contacto</th>
+                    <th className="p-2 font-black text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {clientesFiltrados.map(c => (
+                    <tr 
+                      key={c.id} onClick={() => verDetalleCliente(c)}
+                      className={`hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors cursor-pointer ${clienteSeleccionado?.id === c.id ? 'bg-emerald-500/10 dark:bg-emerald-500/10' : ''}`}
+                    >
+                      <td className="p-1.5 max-w-xs truncate">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[8px] font-black bg-zinc-200 dark:bg-zinc-800 px-1 rounded text-zinc-600 dark:text-zinc-400">{c.tipo_documento}: {c.numero_documento}</span>
+                          {c.academias && (
+                            <span className="text-[8px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 rounded border border-indigo-500/10">🎓 {c.academias.nombre}</span>
+                          )}
+                        </div>
+                        <h3 className="font-black text-zinc-900 dark:text-white uppercase text-[11px] mt-0.5">{c.nombre_razon_social}</h3>
+                      </td>
+                      <td className="p-1.5 text-zinc-500 dark:text-zinc-400 font-medium">
+                        <p className="truncate">📍 {c.direccion || 'S/D'}</p>
+                        <p className="text-[9px] font-bold text-zinc-400">📱 {c.celular || 'S/N'}</p>
+                      </td>
+                      <td className="p-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => { setClienteAEditar(c); setShowForm(true); }} className="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded font-black text-[9px] uppercase">Editar</button>
+                          <button onClick={() => ocultarCliente(c.id, c.nombre_razon_social)} className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-black text-[9px] uppercase">Ocultar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {clientesFiltrados.length === 0 && (
+                <div className="py-10 text-center text-zinc-400 dark:text-zinc-600 font-bold uppercase italic tracking-widest">No hay coincidencias en el sistema</div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* COLUMNA DERECHA: FICHA DE SEGUIMIENTO (OCUPA 1/3 DE LA PANTALLA) */}
-        <div className="space-y-6">
-          <section className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-8 flex flex-col min-h-[700px] shadow-2xl relative transition-colors">
+          {/* COLUMNA DERECHA: FICHA DE TRAZABILIDAD (HOJA DE VIDA) */}
+          <div className="w-full lg:w-3/10 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 flex flex-col overflow-hidden">
             {!clienteSeleccionado ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-30">
-                <div className="text-6xl">👤</div>
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-900 dark:text-zinc-500 transition-colors">
-                  Seleccione un cliente para ver su historial de compras
-                </p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center opacity-30 gap-2">
+                <div className="text-3xl">👤</div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Seleccione un cliente para auditar historial</p>
               </div>
             ) : (
-              <div className="animate-in fade-in duration-500 space-y-8">
-                {/* FICHA DE CONTACTO RÁPIDA */}
-                <div className="space-y-2">
-                  <h2 className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-500 transition-colors">
-                    Ficha de Seguimiento
-                  </h2>
-                  <p className="text-2xl font-black text-zinc-900 dark:text-white leading-tight uppercase italic tracking-tighter transition-colors">
-                    {clienteSeleccionado.nombre_razon_social}
-                  </p>
-                  <div className="pt-4 space-y-3">
-                     <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400 transition-colors">
-                        <span className="text-lg">📱</span>
-                        <span className="text-sm font-bold">{clienteSeleccionado.celular || 'Sin celular'}</span>
-                     </div>
-                  </div>
+              <div className="flex flex-col h-full justify-between space-y-3">
+                <div className="space-y-1">
+                  <h2 className="text-[9px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500">Ficha de Seguimiento</h2>
+                  <p className="text-sm font-black text-zinc-900 dark:text-white uppercase italic tracking-tight truncate">{clienteSeleccionado.nombre_razon_social}</p>
+                  <p className="text-zinc-500 font-bold text-[10px]">📱 {clienteSeleccionado.celular || 'Sin celular'}</p>
                 </div>
-
-                <hr className="border-zinc-200 dark:border-zinc-800 transition-colors" />
-
-                {/* HISTORIAL CRONOLÓGICO DE NOTAS DE PEDIDO */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500 transition-colors">
-                    Últimas Notas de Pedido
-                  </h3>
-                  
-                  <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+                <hr className="border-zinc-200 dark:border-zinc-800" />
+                
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <h3 className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-2">Últimas Notas de Pedido</h3>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1">
                     {cargandoHistorial ? (
-                      <p className="text-center py-10 text-[10px] font-black text-zinc-400 dark:text-zinc-700 animate-pulse transition-colors">RECUPERANDO HISTORIAL...</p>
+                      <p className="text-center py-5 font-black text-zinc-400 animate-pulse text-[9px]">RECUPERANDO HISTORIAL...</p>
                     ) : historialCompras.map((compra, idx) => (
-                      <div key={idx} className="p-4 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-2 transition-colors">
-                        <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-black text-zinc-900 dark:text-white italic transition-colors">
-                            {compra.correlativo_nota || 'S/N'}
-                          </span>
-                          <span className={`text-[8px] font-black px-2 py-0.5 rounded transition-colors ${
-                            compra.estado === 'COMPLETADA' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-amber-500/10 text-amber-600 dark:text-amber-500'
-                          }`}>
-                            {compra.estado}
-                          </span>
+                      <div key={idx} className="p-2 bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-zinc-800 rounded-lg flex justify-between items-center text-[10px]">
+                        <div>
+                          <span className="font-black text-zinc-900 dark:text-white block">{compra.correlativo_nota || 'S/N'}</span>
+                          <span className="text-[8px] font-bold text-zinc-400">{new Date(compra.fecha).toLocaleDateString('es-PE')}</span>
                         </div>
-                        <div className="flex justify-between items-end">
-                          <p className="text-[9px] text-zinc-400 dark:text-zinc-600 font-bold transition-colors">
-                            {new Date(compra.fecha).toLocaleDateString('es-PE')}
-                          </p>
-                          <p className="text-lg font-black text-zinc-900 dark:text-white italic transition-colors">
-                            S/ {Number(compra.monto_neto).toFixed(2)}
-                          </p>
+                        <div className="text-right">
+                          <span className="font-black text-zinc-900 dark:text-white block">S/ {Number(compra.monto_neto).toFixed(2)}</span>
+                          <span className={`text-[7px] font-black px-1 rounded ${compra.estado === 'COMPLETADA' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>{compra.estado}</span>
                         </div>
                       </div>
                     ))}
                     {!cargandoHistorial && historialCompras.length === 0 && (
-                      <p className="text-center py-10 text-[9px] font-bold text-zinc-400 dark:text-zinc-700 uppercase italic transition-colors">
-                        El cliente no registra compras previas
-                      </p>
+                      <p className="text-center py-5 text-[9px] font-bold text-zinc-400 uppercase italic">Sin compras registradas</p>
                     )}
                   </div>
                 </div>
+                <div className="text-center border-t border-zinc-200 dark:border-zinc-800 pt-2 text-[8px] font-black text-zinc-400 uppercase italic">CRM Trujillo • Nails Pro</div>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
-            <div className="mt-auto pt-6 border-t border-zinc-200 dark:border-zinc-800 transition-colors">
-              <p className="text-[8px] text-zinc-400 dark:text-zinc-600 font-black uppercase text-center tracking-tighter italic">
-                Módulo CRM Trujillo - Jean Nails Store
-              </p>
-            </div>
-          </section>
-        </div>
-        </div>
-      ) : (
-        /* --- VISTA DE ANALÍTICA DE ALIANZAS --- */
-        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-700">
+      {/* ======================================================================= */}
+      {/* SECCIÓN VISTA 2: ANALÍTICA DE ALIANZAS (INTERACTIVA DE ALTA DENSIDAD) */}
+      {/* ======================================================================= */}
+      {vistaActual === 'ANALITICA' && (
+        <div className="space-y-4 h-[calc(100vh-120px)] flex flex-col overflow-hidden">
           {cargandoAnalitica || !analiticaDatos ? (
-            <div className="flex flex-col items-center justify-center py-32 opacity-60">
-              <span className="text-6xl mb-6 animate-bounce">📊</span>
-              <p className="text-xs font-black text-zinc-500 tracking-widest uppercase animate-pulse">Procesando cubos de datos y rentabilidad...</p>
+            <div className="flex-1 flex flex-col items-center justify-center opacity-60">
+              <span className="text-3xl mb-2 animate-bounce">📊</span>
+              <p className="text-[10px] font-black text-zinc-500 tracking-widest uppercase animate-pulse">Procesando métricas de alianzas...</p>
             </div>
           ) : (
-            <>
-              {/* SECCIÓN 1: RANKING DE ALIANZAS */}
-              <div>
-                <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter mb-6 flex items-center gap-2 transition-colors">
-                  <span className="text-indigo-500">🏆</span> Rendimiento por Academia <span className="text-[10px] text-zinc-500 font-bold tracking-widest ml-2 non-italic">({analiticaDatos.mes_analisis})</span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {analiticaDatos.ranking_alianzas.length === 0 ? (
-                    <p className="text-zinc-500 text-xs font-bold italic col-span-full bg-zinc-100 dark:bg-zinc-900 p-6 rounded-2xl text-center">No hay ventas registradas en alianzas este mes.</p>
-                  ) : (
-                    analiticaDatos.ranking_alianzas.map((alianza: any, idx: number) => (
-                      <div key={idx} className={`p-8 rounded-[2.5rem] border relative overflow-hidden transition-all duration-300 hover:-translate-y-2 ${idx === 0 ? 'bg-gradient-to-br from-indigo-600 to-purple-700 border-transparent text-white shadow-2xl shadow-indigo-900/30' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white shadow-xl hover:border-indigo-400 dark:hover:border-indigo-600'}`}>
-                        {idx === 0 && <div className="absolute -right-8 -top-8 text-[10rem] opacity-10">🥇</div>}
-                        <p className={`text-[9px] font-black uppercase tracking-widest ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Ranking #{idx + 1}</p>
-                        <h3 className="text-2xl font-black uppercase leading-tight mt-1 truncate">{alianza.academia}</h3>
-                        
-                        <div className="mt-8 space-y-6">
-                          <div>
-                            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Volumen de Ventas</p>
-                            <p className="text-4xl font-black italic tracking-tighter">S/ {alianza.total_generado.toFixed(2)}</p>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 border-t pt-6 border-black/5 dark:border-white/10">
-                            <div>
-                              <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>Tasa Conversión</p>
-                              <p className="text-lg font-black">{alianza.tasa_conversion}%</p>
-                              <p className={`text-[9px] font-bold mt-1 ${idx === 0 ? 'text-indigo-300' : 'text-zinc-500'}`}>{alianza.alumnas_compradoras} de {alianza.alumnas_registradas} alumnas</p>
-                            </div>
-                            <div>
-                              <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${idx === 0 ? 'text-indigo-200' : 'text-zinc-400'}`}>ROI (Dscto Cedido)</p>
-                              <p className={`text-lg font-black ${idx === 0 ? 'text-rose-200' : 'text-rose-500'}`}>S/ {alianza.total_descuento_cedido.toFixed(2)}</p>
-                            </div>
-                          </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 overflow-hidden">
+              
+              {/* IZQUIERDA (2/3): TABLA COMPACTA DE RENDIMIENTO POR ACADEMIA */}
+              <div className="lg:col-span-2 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+                <div className="bg-zinc-900 text-white p-2 font-black uppercase text-[9px] tracking-wider flex justify-between items-center">
+                  <span>🏆 RENDIMIENTO POR ACADEMIA ({analiticaDatos.mes_analisis})</span>
+                  {academiaFiltrada && (
+                    <button onClick={() => setAcademiaFiltrada(null)} className="bg-red-600 hover:bg-red-500 px-2 py-0.5 rounded text-[8px] font-black text-white transition-all">❌ QUITAR FILTRO</button>
+                  )}
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-zinc-100 dark:bg-zinc-900 text-[9px] uppercase text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 sticky top-0">
+                      <tr>
+                        <th className="p-2 font-black">Academia / Alianza</th>
+                        <th className="p-2 font-black text-right">Vol. Ventas</th>
+                        <th className="p-2 font-black text-center">Conversión</th>
+                        <th className="p-2 font-black text-right">ROI (Dscto)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-[11px]">
+                      {analiticaDatos.ranking_alianzas.map((alianza: any, idx: number) => {
+                        const estaSeleccionada = academiaFiltrada?.toUpperCase() === alianza.academia.toUpperCase();
+                        return (
+                          <tr 
+                            key={idx} onClick={() => manejarClicAcademia(alianza.academia)}
+                            className={`cursor-pointer transition-colors ${estaSeleccionada ? 'bg-indigo-600/10 dark:bg-indigo-600/20 font-black' : idx === 0 ? 'bg-emerald-500/5 dark:bg-emerald-500/5 hover:bg-zinc-100 dark:hover:bg-zinc-900/40' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900/40'}`}
+                          >
+                            <td className="p-2 flex items-center gap-2 max-w-xs truncate">
+                              <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-black ${idx === 0 ? 'bg-amber-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>{idx + 1}</span>
+                              <span className="uppercase">{alianza.academia}</span>
+                            </td>
+                            <td className="p-2 text-right font-black text-zinc-900 dark:text-white">S/ {alianza.total_generado.toFixed(2)}</td>
+                            <td className="p-2 text-center">
+                              <span className="font-bold">{alianza.tasa_conversion}%</span>
+                              <span className="text-[8px] text-zinc-400 block font-normal">{alianza.alumnas_compradoras} de {alianza.alumnas_registradas} alumnas</span>
+                            </td>
+                            <td className="p-2 text-right font-black text-red-500">S/ {alianza.total_descuento_cedido.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* DERECHA (1/3): TOP EMBAJADORAS VIP DINÁMICO */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+                <div className="bg-emerald-600 text-white p-2 font-black uppercase text-[9px] tracking-wider flex justify-between items-center">
+                  <span>💎 TOP EMBAJADORAS VIP</span>
+                  <span className="bg-emerald-700 px-2 py-0.5 rounded text-[8px] font-black">{academiaFiltrada ? 'FILTRADO' : 'GLOBAL'}</span>
+                </div>
+                
+                <div className="p-2 bg-zinc-50 dark:bg-zinc-950/40 text-[9px] border-b border-zinc-200 dark:border-zinc-800 font-bold text-zinc-500 uppercase">
+                  {academiaFiltrada ? `Mostrando compras de: ${academiaFiltrada}` : 'Mostrando las alumnas con mayor compra del mes general'}
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                  {embajadorasVisualizadas.map((embajadora: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg text-[10px]">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className={`w-5 h-5 rounded-md flex items-center justify-center font-black text-[9px] ${idx === 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400'}`}>#{idx + 1}</span>
+                        <div className="truncate">
+                          <p className="font-black text-zinc-900 dark:text-white uppercase truncate">{embajadora.cliente}</p>
+                          <p className="text-[8px] font-bold text-indigo-500 uppercase truncate">🎓 {embajadora.academia}</p>
                         </div>
                       </div>
-                    ))
+                      <div className="text-right flex-shrink-0 pl-1">
+                        <span className="text-[8px] text-zinc-400 block font-bold">COMPRADO</span>
+                        <span className="font-black text-emerald-600 dark:text-emerald-400 italic">S/ {embajadora.total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {embajadorasVisualizadas.length === 0 && (
+                    <div className="text-center text-zinc-400 py-10 uppercase italic font-bold text-[9px]">No hay compras registradas para esta academia en el rango seleccionado</div>
                   )}
                 </div>
               </div>
 
-              {/* SECCIÓN 2: TOP EMBAJADORAS */}
-              <div className="pt-6">
-                <h2 className="text-xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter mb-6 flex items-center gap-2 transition-colors">
-                  <span className="text-emerald-500">💎</span> Top Embajadoras VIP
-                </h2>
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-4 shadow-xl transition-colors">
-                  {analiticaDatos.top_embajadoras.length === 0 ? (
-                    <p className="p-10 text-zinc-500 text-xs font-bold italic text-center uppercase tracking-widest">Aún no hay datos de embajadoras para generar el ranking.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {analiticaDatos.top_embajadoras.map((embajadora: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800/50 hover:border-emerald-500/30 rounded-3xl transition-all hover:shadow-lg">
-                          <div className="flex items-center gap-4 overflow-hidden">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black flex-shrink-0 ${idx === 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-                              #{idx + 1}
-                            </div>
-                            <div className="truncate pr-2">
-                              <p className="font-black text-sm text-zinc-900 dark:text-white uppercase truncate">{embajadora.cliente}</p>
-                              <p className="text-[9px] font-black text-indigo-500 tracking-widest uppercase truncate mt-1">🎓 {embajadora.academia}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0 pl-2">
-                            <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Compras</p>
-                            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 italic tracking-tighter">S/ {embajadora.total.toFixed(2)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
+            </div>
           )}
         </div>
       )}
 
-      {/* SISTEMA DE NOTIFICACIONES TOAST (UI FEEDBACK) */}
+      {/* TOAST NOTIFICACIONES */}
       {mensaje.texto && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 p-6 rounded-2xl text-center font-black text-sm border animate-in slide-in-from-bottom duration-300 shadow-2xl z-[100] ${
-          mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'
-        }`}>
-          {mensaje.texto.toUpperCase()}
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-center font-black text-[9px] uppercase border shadow-2xl z-[200] animate-in slide-in-from-bottom duration-300 ${mensaje.tipo === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 'bg-red-500 border-red-400 text-white'}`}>
+          {mensaje.texto}
         </div>
       )}
     </div>

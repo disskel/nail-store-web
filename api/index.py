@@ -1629,9 +1629,9 @@ def obtener_analitica_crm(
         # Ordenar Academia de Mayor a Menor Venta
         ranking_alianzas = sorted(ranking_alianzas, key=lambda x: x["total_generado"], reverse=True)
 
-        # Ordenar Alumnas de Mayor a Menor Compra (Top 5)
+        # Ordenar Alumnas de Mayor a Menor Compra (Lista Completa para Filtrado Interactivo)
         embajadoras = [{"cliente": k, "academia": v["academia"], "total": round(v["total_comprado"], 2)} for k, v in top_clientes.items()]
-        embajadoras = sorted(embajadoras, key=lambda x: x["total"], reverse=True)[:5] 
+        embajadoras = sorted(embajadoras, key=lambda x: x["total"], reverse=True) 
 
         # Respuesta estructurada para el Dashboard de Next.js
         return {
