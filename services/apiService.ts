@@ -500,6 +500,18 @@ export const apiService = {
     return res.json();
   },
 
+  /**
+   * Obtiene el desglose exacto de en qué se gastó el dinero (Luz, Alquiler, etc.)
+   * Requerido para el Tooltip de Auditoría en el Dashboard de Utilidades.
+   */
+  async getDetalleGastos(desde: string, hasta: string) {
+    const res = await fetch(`${API_URL}/gastos?desde=${desde}&hasta=${hasta}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al cargar detalle de gastos');
+    return res.json();
+  },
+
   // -------------------------------------------------------------------------
   // 12. MÓDULO DE OBLIGACIONES Y NOTIFICACIONES (v1.1.2)
   // -------------------------------------------------------------------------

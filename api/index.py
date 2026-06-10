@@ -1337,6 +1337,31 @@ def registrar_gasto(
         # Devolvemos el error detallado para ver cualquier otro problema en la consola
         raise HTTPException(status_code=500, detail=f"Error al registrar gasto: {str(e)}")
 
+@app.get("/api/gastos")
+@app.get("/gastos")
+def listar_gastos_rango(
+    desde: str, 
+    hasta: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Lista el detalle de gastos operativos para el tooltip de Utilidades."""
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # Aseguramos que cubra hasta las 23:59 del día de fin
+        fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
+        
+        res = supabase.postgrest.auth(token).table("gastos_operativos")\
+            .select("*")\
+            .gte("fecha_gasto", desde)\
+            .lte("fecha_gasto", fecha_fin)\
+            .order("fecha_gasto", desc=True)\
+            .execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al listar detalle de gastos: {str(e)}")
+
 @app.get("/api/reportes/utilidad")
 @app.get("/reportes/utilidad")
 def obtener_reporte_utilidad(
