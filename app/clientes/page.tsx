@@ -86,6 +86,7 @@ export default function ModuloClientes() {
     return clientes.filter(c => 
       c.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase()) ||
       c.numero_documento.includes(busqueda)
+      (c.academias && c.academias.nombre.toLowerCase().includes(busqueda.toLocaleLowerCase()))
     );
   }, [busqueda, clientes]);
 
@@ -230,7 +231,7 @@ export default function ModuloClientes() {
           <div className="lg:col-span-2 space-y-6">
           <section className="bg-zinc-100/50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-6 rounded-[2.5rem] backdrop-blur-xl transition-colors">
             <input 
-              placeholder="BUSCAR POR NOMBRE O DNI/RUC..." 
+              placeholder="BUSCAR POR NOMBRE, DNI/RUC O ACADEMIA..." 
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               className="w-full p-5 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-3xl outline-none focus:ring-2 focus:ring-emerald-600 font-bold text-zinc-900 dark:text-white uppercase transition-all shadow-inner"
