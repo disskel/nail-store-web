@@ -4,41 +4,31 @@ import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 
 /**
- * COMPONENTE: Inventario Detallado - JEAN NAILS STORE
- * Versión 1.0.14: Incluye Edición de Nombre y Borrado Lógico.
- * Propósito: Control maestro de existencias, auditoría de stock y gestión de catálogo.
+ * MÓDULO DE INVENTARIO - ALTA DENSIDAD PRO
+ * Diseño Full-Width corporativo, filtros en línea y tabla compacta.
  */
-
 export default function InventarioDetallado() {
-  // -------------------------------------------------------------------------
-  // 1. ESTADOS DEL COMPONENTE: Memoria reactiva de la interfaz
-  // -------------------------------------------------------------------------
   const [productos, setProductos] = useState<any[]>([]);
   const [historial, setHistorial] = useState<any[]>([]);
   const [productoSel, setProductoSel] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState('');
 
-  // ESTADOS PARA EL MODAL DE AJUSTE RÁPIDO DE PRECIOS
+  // ESTADOS MODAL DE AJUSTE RÁPIDO
   const [showAjuste, setShowAjuste] = useState(false);
   const [itemAjuste, setItemAjuste] = useState<any>(null);
   const [ajusteForm, setAjusteForm] = useState({ costo: 0, menor: 0, mayor: 0 });
   const [guardando, setGuardando] = useState(false);
 
-  // ESTADOS PARA FILTROS AVANZADOS Y GESTIÓN DE ESTADO (BORRADO LÓGICO)
-  const [showFiltros, setShowFiltros] = useState(false); 
+  // FILTROS EN LÍNEA Y ESTADO
   const [busqueda, setBusqueda] = useState(''); 
   const [filtroCategoria, setFiltroCategoria] = useState('TODAS'); 
   const [filtroProveedor, setFiltroProveedor] = useState('TODOS'); 
   const [soloBajoStock, setSoloBajoStock] = useState(false); 
-  const [mostrarInactivos, setMostrarInactivos] = useState(false); // Switch maestro para ver "basura" o inactivos
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
 
-  // -------------------------------------------------------------------------
-  // 2. CARGA DINÁMICA DE PRODUCTOS: Sincronización con el Backend v1.0.14
-  // -------------------------------------------------------------------------
   async function cargarDatos() {
     try {
-      // Se pasa el parámetro al backend para decidir si incluir productos archivados
       const data = await apiService.getProductosConMargen(mostrarInactivos);
       setProductos(data);
     } catch (error) {
@@ -48,63 +38,38 @@ export default function InventarioDetallado() {
     }
   }
 
-  // Recarga automática cuando el usuario cambia el filtro de inactivos
   useEffect(() => { cargarDatos(); }, [mostrarInactivos]);
 
-  // -------------------------------------------------------------------------
-  // 3. LÓGICA DE FILTRADO INTELIGENTE: Procesamiento en cliente para velocidad
-  // -------------------------------------------------------------------------
-  const categoriasUnicas = useMemo(() => 
-    ['TODAS', ...Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))], 
-  [productos]);
-
-  const proveedoresUnicos = useMemo(() => 
-    ['TODOS', ...Array.from(new Set(productos.map(p => p.proveedor).filter(Boolean)))], 
-  [productos]);
+  const categoriasUnicas = useMemo(() => ['TODAS', ...Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))], [productos]);
+  const proveedoresUnicos = useMemo(() => ['TODOS', ...Array.from(new Set(productos.map(p => p.proveedor).filter(Boolean)))], [productos]);
 
   const productosFiltrados = useMemo(() => {
     return productos.filter(p => {
-      const matchesTexto = 
-        p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        p.sku?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        p.proveedor?.toLowerCase().includes(busqueda.toLowerCase());
-      
+      const matchesTexto = p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || p.sku?.toLowerCase().includes(busqueda.toLowerCase()) || p.proveedor?.toLowerCase().includes(busqueda.toLowerCase());
       const matchesCategoria = filtroCategoria === 'TODAS' || p.categoria === filtroCategoria;
       const matchesProveedor = filtroProveedor === 'TODOS' || p.proveedor === filtroProveedor;
       const matchesStock = !soloBajoStock || (p.stock || 0) < 10;
-
       return matchesTexto && matchesCategoria && matchesProveedor && matchesStock;
     });
   }, [productos, busqueda, filtroCategoria, filtroProveedor, soloBajoStock]);
 
-  // -------------------------------------------------------------------------
-  // 4. LÓGICA DE GESTIÓN: Edición rápida y Borrado Lógico
-  // -------------------------------------------------------------------------
-  
-  // Función para alternar entre Activo e Inactivo (Ocultar "Basura")
   const toggleEstado = async (id: string, estadoActual: boolean) => {
     try {
       await apiService.updateProducto(id, { activo: !estadoActual });
-      cargarDatos(); // Refrescar lista para aplicar el borrado lógico en la vista
-    } catch (error) {
-      alert("Error al cambiar estado del producto");
-    }
+      cargarDatos(); 
+    } catch (error) { alert("Error al cambiar estado del producto"); }
   };
 
-  // Función para corregir errores tipográficos en el nombre directamente
   const editarNombre = async (id: string, nombreActual: string) => {
     const nuevoNombre = prompt("CORREGIR NOMBRE DEL PRODUCTO:", nombreActual);
     if (nuevoNombre && nuevoNombre.trim() !== "" && nuevoNombre !== nombreActual) {
       try {
         await apiService.updateProducto(id, { nombre: nuevoNombre.trim().toUpperCase() });
         cargarDatos();
-      } catch (error) {
-        alert("Error al actualizar el nombre");
-      }
+      } catch (error) { alert("Error al actualizar el nombre"); }
     }
   };
 
-  // Lógica de Precios
   const parseInput = (val: string) => {
     if (val === '') return 0;
     const n = parseFloat(val);
@@ -127,199 +92,204 @@ export default function InventarioDetallado() {
       });
       setShowAjuste(false);
       await cargarDatos(); 
-    } catch (e) {
-      alert("Error al actualizar precios");
-    } finally {
-      setGuardando(false);
-    }
+    } catch (e) { alert("Error al actualizar precios"); } 
+    finally { setGuardando(false); }
   };
 
-  // -------------------------------------------------------------------------
-  // 5. LÓGICA DE TRAZABILIDAD: Auditoría histórica de movimientos
-  // -------------------------------------------------------------------------
   const verTrazabilidad = async (prod: any) => {
     try {
       setProductoSel(prod);
       const data = await apiService.getHistorialProducto(prod.id);
       setHistorial(data);
-    } catch (error) {
-      alert("Error al cargar historial");
-    }
+    } catch (error) { alert("Error al cargar historial"); }
   };
 
-  if (cargando) return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950">
-      <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
+  if (cargando) return <div className="flex h-screen items-center justify-center bg-zinc-950 text-indigo-500 font-black tracking-widest uppercase animate-pulse">Sincronizando Catálogo...</div>;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-700 transition-colors duration-300">
+    <div className="p-4 lg:p-6 w-full max-w-[1600px] mx-auto animate-in fade-in duration-500 text-xs transition-colors duration-300">
       
-      {/* MODAL DE AJUSTE RÁPIDO DE PRECIOS */}
+      {/* MODAL DE AJUSTE RÁPIDO COMPACTO */}
       {showAjuste && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/90 dark:bg-black/90 backdrop-blur-md p-4 transition-colors">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300 transition-colors">
-            <div className="mb-8">
-              <h2 className="text-3xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">Ajuste Rápido</h2>
-              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1 transition-colors">Sincronización Manual de Precios</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
+            <div className="mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h2 className="text-lg font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter">Ajuste Rápido</h2>
+              <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-0.5">{itemAjuste?.nombre}</p>
             </div>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">Costo Unidad (S/)</label>
-                <input type="number" step="0.01" value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-emerald-600 dark:text-emerald-400 font-black text-2xl text-center outline-none focus:ring-2 focus:ring-emerald-600 transition-all" />
+            <div className="space-y-4">
+              <div>
+                <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">Costo Unidad (S/)</label>
+                <input type="number" step="0.01" value={ajusteForm.costo === 0 ? '' : ajusteForm.costo} onChange={e => setAjusteForm({...ajusteForm, costo: parseInput(e.target.value)})} className="w-full p-3 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg text-emerald-600 dark:text-emerald-400 font-black text-lg text-center outline-none focus:border-emerald-500 transition-colors" />
               </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Menor (S/)</label>
-                  <input type="number" step="0.01" value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">P. Menor (S/)</label>
+                  <input type="number" step="0.01" value={ajusteForm.menor === 0 ? '' : ajusteForm.menor} onChange={e => setAjusteForm({...ajusteForm, menor: parseInput(e.target.value)})} className="w-full p-3 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-white font-black text-center outline-none focus:border-indigo-500 transition-colors" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase ml-2 transition-colors">P. Mayor (S/)</label>
-                  <input type="number" step="0.01" value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} className="w-full p-5 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-black text-xl text-center outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
+                <div>
+                  <label className="text-[9px] font-black text-zinc-500 uppercase ml-1 block mb-1">P. Mayor (S/)</label>
+                  <input type="number" step="0.01" value={ajusteForm.mayor === 0 ? '' : ajusteForm.mayor} onChange={e => setAjusteForm({...ajusteForm, mayor: parseInput(e.target.value)})} className="w-full p-3 bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-white font-black text-center outline-none focus:border-indigo-500 transition-colors" />
                 </div>
               </div>
-              <div className="flex gap-4 pt-6">
-                <button onClick={() => setShowAjuste(false)} className="flex-1 py-4 text-zinc-400 dark:text-zinc-500 font-bold hover:text-zinc-900 dark:hover:text-white transition-colors uppercase text-[10px]">Cancelar</button>
-                <button disabled={guardando} onClick={guardarCambiosPrecio} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-500 shadow-xl transition-all uppercase text-[10px]">{guardando ? 'Guardando...' : 'Actualizar'}</button>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowAjuste(false)} className="flex-1 py-3 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-black rounded-lg uppercase text-[10px] hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors">Cancelar</button>
+                <button disabled={guardando} onClick={guardarCambiosPrecio} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-lg uppercase text-[10px] shadow-md transition-all">{guardando ? '...' : 'Actualizar'}</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* CABECERA RESPONSIVA */}
-      <header className="mb-8 flex flex-col gap-6">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-black text-zinc-900 dark:text-white uppercase italic tracking-tighter transition-colors">Inventario</h1>
-          <div className="flex flex-wrap gap-2 mt-4">
-             <button onClick={() => setShowFiltros(!showFiltros)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${showFiltros ? 'bg-indigo-600 text-white shadow-lg' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-              {showFiltros ? '✕ Filtros' : '⚡ Filtros'}
-             </button>
-             <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase transition-all ${mostrarInactivos ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600'}`}>
-              {mostrarInactivos ? '👁️ Inactivos' : '🙈 Activos'}
-             </button>
+      {/* CABECERA CORPORATIVA Y TOOLBAR DE FILTROS IN-LINE */}
+      <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900 text-white p-4 rounded-xl shadow-md">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tighter italic">Inventario Mestro</h1>
+            <p className="text-indigo-400 font-bold uppercase text-[9px] tracking-widest mt-1">Control de Existencias • Catálogo</p>
           </div>
+          <button onClick={() => setMostrarInactivos(!mostrarInactivos)} className={`hidden md:block px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${mostrarInactivos ? 'bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-md' : 'bg-black border-zinc-700 text-zinc-400 hover:text-white'}`}>
+            {mostrarInactivos ? '👁️ Viendo Inactivos' : '🙈 Ocultando Inactivos'}
+          </button>
         </div>
-        <div className="bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl transition-colors">
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase">Resultados</p>
-          <p className="text-xl font-black text-zinc-900 dark:text-white transition-colors">{productosFiltrados.length} ÍTEMS</p>
+        
+        {/* BARRA DE HERRAMIENTAS DE FILTRADO */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <input 
+            type="text" placeholder="🔍 BUSCAR PRODUCTO O SKU..." value={busqueda} onChange={(e) => setBusqueda(e.target.value.toUpperCase())}
+            className="flex-1 md:w-56 bg-black border border-zinc-700 px-3 py-2 rounded-lg text-white font-black text-[10px] outline-none focus:border-indigo-500 uppercase placeholder:text-zinc-600"
+          />
+          <select 
+            value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)}
+            className="bg-black border border-zinc-700 px-2 py-2 rounded-lg text-white font-black text-[10px] outline-none cursor-pointer max-w-[140px] truncate"
+          >
+            {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
+          </select>
+          <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`px-3 py-2 rounded-lg font-black uppercase text-[9px] border transition-all ${soloBajoStock ? 'bg-amber-500/20 text-amber-400 border-amber-500/50' : 'bg-black border-zinc-700 text-zinc-400 hover:text-white'}`}>
+            {soloBajoStock ? '⚠️ Críticos' : '📦 Todos'}
+          </button>
+          
+          <div className="bg-zinc-800 px-3 py-1 rounded-lg text-right hidden lg:block">
+            <span className="text-[8px] text-zinc-400 font-black uppercase block">Resultados</span>
+            <span className="text-sm text-white font-black">{productosFiltrados.length}</span>
+          </div>
         </div>
       </header>
 
-      {/* PANEL DE FILTROS MÓVIL */}
-      {showFiltros && (
-        <div className="mb-8 p-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-4 shadow-inner transition-colors">
-          <input type="text" placeholder="Buscar..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full p-4 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-colors" />
-          <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)} className="w-full p-4 bg-white dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-2xl text-zinc-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-colors">
-            {proveedoresUnicos.map(prov => <option key={prov} value={prov}>{prov.toUpperCase()}</option>)}
-          </select>
-          <button onClick={() => setSoloBajoStock(!soloBajoStock)} className={`w-full p-4 rounded-2xl font-black uppercase text-[10px] border transition-all ${soloBajoStock ? 'bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-500' : 'bg-white dark:bg-black border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500'}`}>
-            {soloBajoStock ? '⚠️ Solo Críticos' : '📦 Todo el Stock'}
-          </button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-2">
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-[2rem] overflow-hidden transition-colors">
-            <table className="w-full">
-              {/* HEADERS: Ocultos en móvil */}
-              <thead className="hidden md:table-header-group bg-zinc-100 dark:bg-black/40 text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 transition-colors">
+      {/* GRID DE ALTA DENSIDAD (TABLA + TRAZABILIDAD) */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        
+        {/* COLUMNA IZQUIERDA (75%): TABLA DE PRODUCTOS */}
+        <div className="lg:col-span-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm flex flex-col h-[calc(100vh-140px)]">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse whitespace-nowrap md:whitespace-normal">
+              <thead className="bg-zinc-100 dark:bg-black/60 sticky top-0 z-10 text-[9px] font-black uppercase text-zinc-500 tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="p-6 text-left">Producto</th>
-                  <th className="p-6 text-center">Stock</th>
-                  <th className="p-6 text-right">Costo / Precio</th>
-                  <th className="p-6 text-center">Gestión</th>
+                  <th className="p-3 w-1/2">Producto y Detalles</th>
+                  <th className="p-3 text-center">Stock</th>
+                  <th className="p-3 text-right">Análisis Financiero</th>
+                  <th className="p-3 text-center">Gestión</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-[10px]">
                 {productosFiltrados.map((p) => (
-                  <tr key={p.id} className={`flex flex-col md:table-row transition-all ${!p.activo ? 'opacity-30' : ''} ${productoSel?.id === p.id ? 'bg-indigo-600/5 dark:bg-indigo-600/10' : 'hover:bg-zinc-50 dark:hover:bg-white/5'}`}>
+                  <tr key={p.id} className={`transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40 ${!p.activo ? 'opacity-40 bg-zinc-50 dark:bg-zinc-950' : ''} ${productoSel?.id === p.id ? 'bg-indigo-50 dark:bg-indigo-500/10' : ''}`}>
                     
-                    {/* INFO PRINCIPAL */}
-                    <td className="p-4 md:p-6">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${p.activo ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-700'}`}></div>
+                    {/* PRODUCTO Y SKU */}
+                    <td className="p-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${p.activo ? 'bg-emerald-500' : 'bg-zinc-400 dark:bg-zinc-600'}`}></div>
                         <div>
-                          <div className="font-black text-zinc-900 dark:text-white text-base md:text-lg uppercase leading-tight transition-colors">{p.nombre}</div>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded font-bold uppercase transition-colors">{p.categoria}</span>
-                            <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-bold uppercase mt-1 transition-colors">📦 {p.proveedor}</span>
+                          <div className="font-black text-zinc-900 dark:text-white text-xs uppercase leading-tight truncate max-w-[200px] md:max-w-md" title={p.nombre}>{p.nombre}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[8px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1 rounded uppercase">🏷️ {p.categoria}</span>
+                            <span className="text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase truncate max-w-[100px]">📦 {p.proveedor}</span>
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* STOCK: Estilo diferente en móvil */}
-                    <td className="px-4 md:p-6 md:text-center flex justify-between md:table-cell border-t border-zinc-100 dark:border-none py-3 transition-colors">
-                      <span className="md:hidden text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase mt-1">Stock Actual</span>
-                      <div className={`px-4 py-1 rounded-xl font-black text-xs inline-block ${ (p.stock || 0) < 10 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-500' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' }`}>
+                    {/* STOCK ALERTA */}
+                    <td className="p-2.5 text-center align-middle">
+                      <div className={`px-2 py-1 rounded font-black inline-block text-[10px] ${ (p.stock || 0) < 10 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-500' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300' }`}>
                         {p.stock || 0} UNID
                       </div>
                     </td>
 
-                    {/* COLUMNA FINANCIERA: Costo vs Precios (Menor/Mayor) */}
-                  <td className="px-4 md:p-6 md:text-right flex justify-between md:table-cell py-3 border-t border-zinc-100 dark:border-none transition-colors">
-                    <span className="md:hidden text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase mt-1">Análisis Financiero</span>
-                    
-                    <div className="flex flex-col md:items-end gap-1">
-                      {/* Costo Maestro (Principal) */}
-                      <div className="font-mono font-black text-zinc-900 dark:text-white text-lg leading-none transition-colors">
-                        S/ {Number(p.costo || 0).toFixed(2)}
-                      </div>
-                      
-                      {/* Precios de Venta (Secundarios) */}
-                      <div className="flex flex-col md:items-end gap-0.5">
-                        <div className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter transition-colors">
-                          <span className="text-amber-600 dark:text-amber-500/80 mr-1">MEN:</span> 
-                          <span className="text-zinc-600 dark:text-zinc-300">S/ {Number(p.precio || 0).toFixed(2)}</span>
+                    {/* FINANZAS COMPACTAS */}
+                    <td className="p-2.5 text-right align-middle">
+                      <div className="flex flex-col items-end">
+                        <div className="font-black text-zinc-900 dark:text-white text-sm">
+                          S/ {Number(p.costo || 0).toFixed(2)}
                         </div>
-                        <div className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tighter transition-colors">
-                          <span className="text-indigo-600 dark:text-indigo-400/80 mr-1">MAY:</span> 
-                          <span className="text-zinc-600 dark:text-zinc-300">S/ {Number(p.precio_mayor || 0).toFixed(2)}</span>
+                        <div className="flex gap-2 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase mt-0.5">
+                          <span>Men: <span className="text-zinc-700 dark:text-zinc-300">S/{Number(p.precio || 0).toFixed(2)}</span></span>
+                          <span>May: <span className="text-zinc-700 dark:text-zinc-300">S/{Number(p.precio_mayor || 0).toFixed(2)}</span></span>
                         </div>
-                      </div>
-                    </div>
-                  </td>
-
-                    {/* ACCIONES: Siempre visibles y centradas */}
-                    <td className="p-4 md:p-6 text-center border-t border-zinc-100 dark:border-none transition-colors">
-                      <div className="flex justify-center md:justify-center gap-3">
-                        <button onClick={() => editarNombre(p.id, p.nombre)} className="flex-1 md:flex-none p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl active:scale-90 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-700">✏️</button>
-                        <button onClick={() => abrirAjuste(p)} className="flex-1 md:flex-none p-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-white rounded-xl active:scale-90 transition-all hover:bg-zinc-200 dark:hover:bg-zinc-700">🏷️</button>
-                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`flex-1 md:flex-none p-3 rounded-xl transition-all ${p.activo ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 hover:bg-red-500/10 hover:text-red-500' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'}`}>
-                          {p.activo ? '🗑️' : '✅'}
-                        </button>
-                        <button onClick={() => verTrazabilidad(p)} className={`flex-1 md:flex-none p-3 rounded-xl transition-all ${productoSel?.id === p.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-400 hover:text-indigo-600'}`}>🔍</button>
                       </div>
                     </td>
+
+                    {/* BOTONES DE ACCIÓN */}
+                    <td className="p-2.5 text-center align-middle">
+                      <div className="flex justify-center gap-1.5">
+                        <button onClick={() => editarNombre(p.id, p.nombre)} className="p-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded transition-colors" title="Editar Nombre">✏️</button>
+                        <button onClick={() => abrirAjuste(p)} className="p-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded transition-colors" title="Ajustar Precio">🏷️</button>
+                        <button onClick={() => toggleEstado(p.id, p.activo)} className={`p-1.5 rounded transition-colors ${p.activo ? 'bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/10 hover:text-red-500 text-zinc-400' : 'bg-emerald-600 text-white shadow-sm'}`} title={p.activo ? "Ocultar" : "Activar"}>
+                          {p.activo ? '🗑️' : '✅'}
+                        </button>
+                        <button onClick={() => verTrazabilidad(p)} className={`p-1.5 rounded transition-colors ${productoSel?.id === p.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'}`} title="Ver Trazabilidad">🔍</button>
+                      </div>
+                    </td>
+
                   </tr>
                 ))}
               </tbody>
             </table>
+            {productosFiltrados.length === 0 && (
+              <div className="text-center py-10 text-[10px] font-black text-zinc-400 uppercase italic">No se encontraron productos con estos filtros</div>
+            )}
           </div>
         </div>
 
-        {/* PANEL DE TRAZABILIDAD (STICKY) */}
-        <div className="space-y-8">
-          <section className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-[2.5rem] p-10 backdrop-blur-2xl shadow-2xl sticky top-8 transition-colors">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-8 flex items-center gap-3 transition-colors"><span className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></span> Trazabilidad del Ítem</h3>
-            {productoSel ? (
-              <div className="space-y-8 animate-in slide-in-from-right duration-500">
-                <div className="pb-6 border-b border-zinc-200 dark:border-zinc-800 transition-colors"><div className="text-2xl font-black text-zinc-900 dark:text-white uppercase tracking-tighter transition-colors">{productoSel.nombre}</div></div>
-                <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
-                  {historial.map((m, i) => (
-                    <div key={i} className="p-5 bg-white dark:bg-black/40 rounded-[1.5rem] border border-zinc-100 dark:border-zinc-800/50 flex justify-between items-center group hover:border-indigo-300 dark:hover:border-zinc-700 transition-all shadow-sm">
-                      <div className="space-y-1"><div className={`text-[10px] font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{m.tipo_movimiento}</div><div className="text-xs font-black text-zinc-400 dark:text-zinc-300 transition-colors">{new Date(m.fecha).toLocaleDateString()}</div></div>
-                      <div className="text-xl font-black text-zinc-900 dark:text-white transition-colors">{m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}</div>
-                    </div>
-                  ))}
-                </div>
+        {/* COLUMNA DERECHA (25%): PANEL DE TRAZABILIDAD (STICKY) */}
+        <div className="lg:col-span-1 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col h-[calc(100vh-140px)] shadow-inner">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3 flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+            <span className="w-1.5 h-1.5 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></span> 
+            Trazabilidad del Ítem
+          </h3>
+          
+          {productoSel ? (
+            <div className="flex-1 flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-300">
+              <div className="mb-4">
+                <div className="text-sm font-black text-zinc-900 dark:text-white uppercase leading-tight">{productoSel.nombre}</div>
+                <div className="text-[9px] font-bold text-zinc-500 mt-1 uppercase">SKU: {productoSel.sku || 'S/N'}</div>
               </div>
-            ) : (<div className="text-center py-32 opacity-20"><div className="text-5xl mb-4 grayscale">📈</div><p className="text-[10px] font-black uppercase text-zinc-900 dark:text-white transition-colors">Seleccione un producto</p></div>)}
-          </section>
+              
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                {historial.map((m, i) => (
+                  <div key={i} className="p-3 bg-white dark:bg-black/40 rounded-lg border border-zinc-200 dark:border-zinc-800 flex justify-between items-center text-[10px]">
+                    <div>
+                      <div className={`font-black ${m.tipo_movimiento === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{m.tipo_movimiento}</div>
+                      <div className="font-bold text-zinc-400 mt-0.5">{new Date(m.fecha).toLocaleDateString()}</div>
+                    </div>
+                    <div className="text-lg font-black text-zinc-900 dark:text-white">
+                      {m.tipo_movimiento === 'ENTRADA' ? '+' : '-'}{m.cantidad}
+                    </div>
+                  </div>
+                ))}
+                {historial.length === 0 && (
+                  <p className="text-center text-[9px] font-bold text-zinc-400 uppercase italic py-10">Sin movimientos registrados</p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center">
+              <div className="text-4xl mb-2 grayscale">📈</div>
+              <p className="text-[9px] font-black uppercase text-zinc-900 dark:text-white">Seleccione un producto<br/>para ver su historial</p>
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   );
