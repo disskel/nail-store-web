@@ -562,6 +562,9 @@ def actualizar_cliente(
             
         if "celular" in campos_recibidos:
             update_data["celular"] = req.celular
+
+        if "numero_documento" in campos_recibidos:
+            update_data["numero_documento"] = req.numero_documento
             
         if "activo" in campos_recibidos:
             update_data["activo"] = req.activo
