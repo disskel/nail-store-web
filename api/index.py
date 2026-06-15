@@ -159,6 +159,8 @@ class ClienteRequest(BaseModel):
 
 class ClienteUpdateRequest(BaseModel):
     """Modelo para edición y borrado lógico de clientes"""
+    tipo_documento: Optional[str] = None
+    numero_documento: Optional[str] = None
     nombre_razon_social: Optional[str] = None
     direccion: Optional[str] = None
     celular: Optional[str] = None
@@ -552,7 +554,32 @@ def actualizar_cliente(
         # SOLUCIÓN: exclude_unset=True captura exactamente lo que el frontend envió,
         # permitiendo diferenciar entre "no me enviaron el id_academia" y "enviaron id_academia = null"
         campos_recibidos = req.dict(exclude_unset=True)
+
+        # =================================================================
+        # BLOQUEO INTELIGENTE DE AUDITORÍA (OPCIÓN B)
+        # =================================================================
+        intentando_editar_documento = ("numero_documento" in campos_recibidos) or ("tipo_documento" in campos_recibidos)
+        
+        if intentando_editar_documento:
+            # Buscamos si este cliente ya tiene alguna venta registrada
+            ventas_historial = supabase.postgrest.auth(token).table("ventas")\
+                .select("id").eq("id_cliente", id_cliente).limit(1).execute()
+                
+            if ventas_historial.data and len(ventas_historial.data) > 0:
+                # Si tiene ventas, bloqueamos la API con un error 403 (Prohibido)
+                raise HTTPException(
+                    status_code=403, 
+                    detail="BLOQUEO DE AUDITORÍA: No se puede editar el DNI/RUC de un cliente que ya tiene historial de compras. Por favor, registre un cliente nuevo."
+                )
+        # =================================================================
+
         update_data = {}
+
+        if "tipo_documento" in campos_recibidos and req.tipo_documento:
+            update_data["tipo_documento"] = req.tipo_documento.upper()
+            
+        if "numero_documento" in campos_recibidos and req.numero_documento:
+            update_data["numero_documento"] = req.numero_documento
 
         if "nombre_razon_social" in campos_recibidos and req.nombre_razon_social:
             update_data["nombre_razon_social"] = req.nombre_razon_social.upper()

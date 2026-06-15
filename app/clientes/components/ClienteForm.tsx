@@ -107,7 +107,7 @@ export default function ClienteForm({ clienteInicial, onSuccess, onCancel }: Cli
       }
       onSuccess();
     } catch (err: any) {
-      setError('ERROR AL GUARDAR: VERIFIQUE LOS DATOS O EL DNI');
+      setError(err.message || 'ERROR AL GUARDAR: VERIFIQUE LOS DATOS');
     } finally {
       setGuardando(false);
     }
