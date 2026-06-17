@@ -13,7 +13,12 @@ const getHeaders = () => {
 
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    // --- PARCHE DE SEGURIDAD PARA SAFARI (IPHONE/MAC) ---
+    // Obliga al motor WebKit de Apple a consultar siempre la Base de Datos
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   };
 };
 
