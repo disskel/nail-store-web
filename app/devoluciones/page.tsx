@@ -76,16 +76,30 @@ export default function DevolucionesPage() {
     }
   };
 
-  // 3. MATEMÁTICA EN TIEMPO REAL
+  // 3. MATEMÁTICA EN TIEMPO REAL CON PRORRATEO DE DESCUENTOS
   const calcularFinanzas = () => {
-    let deja = 0;
+    let dejaBruto = 0;
     let lleva = 0;
 
-    // Calcular lo que DEJA
+    // Calcular lo que DEJA (A precio de etiqueta)
     if (tipoOperacion === 'TOTAL') {
-      deja = itemsDisponibles.reduce((sum, item) => sum + (item.cantidad_disponible * item.precio_unitario), 0);
+      dejaBruto = itemsDisponibles.reduce((sum, item) => sum + (item.cantidad_disponible * item.precio_unitario), 0);
     } else {
-      deja = itemsDisponibles.reduce((sum, item) => sum + ((cantidadesParciales[item.id_producto] || 0) * item.precio_unitario), 0);
+      dejaBruto = itemsDisponibles.reduce((sum, item) => sum + ((cantidadesParciales[item.id_producto] || 0) * item.precio_unitario), 0);
+    }
+
+    // --- MAGIA MATEMÁTICA: PRORRATEO DEL DESCUENTO GLOBAL ---
+    let proporcion = 0;
+    let descuentoAplicado = 0;
+    let dejaNeto = 0;
+
+    if (ventaData && ventaData.monto_bruto > 0) {
+      // ¿Qué porcentaje del total de la factura original representa esta devolución?
+      proporcion = dejaBruto / ventaData.monto_bruto;
+      // Le quitamos esa misma proporción al descuento global que se le dio
+      descuentoAplicado = ventaData.monto_descuento * proporcion;
+      // Lo que realmente se le va a devolver en dinero
+      dejaNeto = dejaBruto - descuentoAplicado;
     }
 
     // Calcular lo que LLEVA (Solo en modo CAMBIO)
@@ -93,11 +107,11 @@ export default function DevolucionesPage() {
       lleva = itemsNuevos.reduce((sum, item) => sum + (item.cantidad * item.precio_menor), 0);
     }
 
-    const diferencia = lleva - deja; // Positivo = Cliente paga / Negativo = Tienda devuelve
-    return { deja, lleva, diferencia };
+    const diferencia = lleva - dejaNeto; // Positivo = Cliente paga / Negativo = Tienda devuelve
+    return { dejaBruto, descuentoAplicado, deja: dejaNeto, lleva, diferencia };
   };
 
-  const { deja, lleva, diferencia } = calcularFinanzas();
+  const { dejaBruto, descuentoAplicado, deja, lleva, diferencia } = calcularFinanzas();
 
   // 4. CARRITO DE CAMBIOS (NUEVOS PRODUCTOS)
   const agregarAlCambio = (prod: any) => {
@@ -275,10 +289,24 @@ export default function DevolucionesPage() {
               </table>
             </div>
 
-            {/* TOTALIZADOR IZQUIERDO */}
-            <div className="bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 p-3 flex justify-between items-center">
-              <span className="text-[10px] font-black uppercase text-zinc-500">Saldo a favor del Cliente</span>
-              <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter">S/ {deja.toFixed(2)}</span>
+            {/* TOTALIZADOR IZQUIERDO CON DESGLOSE */}
+            <div className="bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 p-3 flex flex-col gap-1">
+              {descuentoAplicado > 0 && (
+                <div className="flex justify-between items-center text-[9px] font-bold text-zinc-500">
+                  <span>SUBTOTAL PRODUCTOS</span>
+                  <span>S/ {dejaBruto.toFixed(2)}</span>
+                </div>
+              )}
+              {descuentoAplicado > 0 && (
+                <div className="flex justify-between items-center text-[9px] font-black text-red-500">
+                  <span>(-) DESCUENTO PRORRATEADO</span>
+                  <span>- S/ {descuentoAplicado.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center mt-1 pt-1 border-t border-zinc-200 dark:border-zinc-700">
+                <span className="text-[10px] font-black uppercase text-zinc-500">Saldo Neto a favor del Cliente</span>
+                <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter">S/ {deja.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
