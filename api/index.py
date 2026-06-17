@@ -1884,7 +1884,7 @@ def procesar_devolucion_y_cambio(
                     "id_sesion_caja": id_caja_hoy,
                     "medio_pago": req.metodo_reembolso,
                     "id_venta": id_venta_compensatoria,
-                    "referencia": f"DEVOLUCIÓN {req.correlativo_original}"
+                    "referencia": f"DEVOLUCION {req.correlativo_original}"
                 }).execute()
 
         # 4. Procesar los Productos Nuevos (Solo si es un CAMBIO)
