@@ -320,6 +320,7 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
                     "stock": stock,
                     "activo": activo_status,
                     "margen_porcentaje": round(float(margen_porcentaje), 2)
+                    "margen_mayor": round(float(margen_mayor), 2) # <-- NUEVO DATO ENVIADO AL FRONTEND
                 })
             else:
                 resultado.append({

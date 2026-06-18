@@ -232,15 +232,30 @@ export default function InventarioDetallado() {
                       </div>
                     </td>
 
-                    {/* FINANZAS COMPACTAS */}
+                    {/* FINANZAS COMPACTAS CON MÁRGENES INTERACTIVOS */}
                     <td className="p-2.5 text-right align-middle">
                       <div className="flex flex-col items-end">
-                        <div className="font-black text-zinc-900 dark:text-white text-sm">
+                        <div className="font-black text-zinc-900 dark:text-white text-sm" title="Costo Unitario">
                           S/ {Number(p.costo || 0).toFixed(2)}
                         </div>
-                        <div className="flex gap-2 text-[8px] font-bold text-zinc-400 dark:text-zinc-500 uppercase mt-0.5">
-                          <span>Men: <span className="text-zinc-700 dark:text-zinc-300">S/{Number(p.precio || 0).toFixed(2)}</span></span>
-                          <span>May: <span className="text-zinc-700 dark:text-zinc-300">S/{Number(p.precio_mayor || 0).toFixed(2)}</span></span>
+                        <div className="flex flex-col md:flex-row gap-1 md:gap-3 text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase mt-1">
+                          
+                          {/* PRECIO MENOR + MARGEN */}
+                          <span className="bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-100 dark:border-zinc-800">
+                            Men: <span className="text-zinc-900 dark:text-zinc-300 font-black">S/{Number(p.precio || 0).toFixed(2)}</span>{' '}
+                            <span className={p.margen_porcentaje > 0 ? 'text-emerald-500' : p.margen_porcentaje < 0 ? 'text-red-500' : 'text-zinc-500'}>
+                              ({Number(p.margen_porcentaje || 0).toFixed(1)}%)
+                            </span>
+                          </span>
+
+                          {/* PRECIO MAYOR + MARGEN */}
+                          <span className="bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-100 dark:border-zinc-800">
+                            May: <span className="text-zinc-900 dark:text-zinc-300 font-black">S/{Number(p.precio_mayor || 0).toFixed(2)}</span>{' '}
+                            <span className={p.margen_mayor > 0 ? 'text-emerald-500' : p.margen_mayor < 0 ? 'text-red-500' : 'text-zinc-500'}>
+                              ({Number(p.margen_mayor || 0).toFixed(1)}%)
+                            </span>
+                          </span>
+
                         </div>
                       </div>
                     </td>
