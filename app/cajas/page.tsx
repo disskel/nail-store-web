@@ -222,10 +222,40 @@ export default function HistorialCajas() {
       {showReporteProd && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:hidden">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl w-full max-w-4xl shadow-2xl animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-4">
-              <h2 className="font-black text-lg text-zinc-900 dark:text-white uppercase italic">Detalle de Ventas</h2>
-              <button onClick={() => setShowReporteProd(false)} className="text-zinc-400 hover:text-red-500 font-black">✕ CERRAR</button>
-            </div>
+            
+            {/* CABECERA ANALÍTICA CON FUNCIÓN AUTO-EJECUTABLE */}
+            {(() => {
+              // 1. Matemáticas al vuelo (Suma de todo el turno)
+              const granTotalVenta = reporteAgrupado.reduce((acc, nota) => acc + (nota.total_venta || 0), 0);
+              const granTotalCosto = reporteAgrupado.reduce((acc, nota) => acc + (nota.costo_total || 0), 0);
+              const granMargen = granTotalVenta > 0 ? ((granTotalVenta - granTotalCosto) / granTotalVenta) * 100 : 0;
+
+              return (
+                <div className="flex flex-wrap lg:flex-nowrap justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-4 gap-4">
+                  <h2 className="font-black text-lg text-zinc-900 dark:text-white uppercase italic">Detalle de Ventas</h2>
+                  
+                  {/* GRAN RESUMEN DEL TURNO (Píldora Global) */}
+                  <div className="flex bg-zinc-50 dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
+                    <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Total Venta</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">S/ {granTotalVenta.toFixed(2)}</span>
+                    </div>
+                    <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Costo Stock</span>
+                      <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">S/ {granTotalCosto.toFixed(2)}</span>
+                    </div>
+                    <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/10">
+                      <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block">Margen Global</span>
+                      <span className="text-sm font-black text-indigo-700 dark:text-indigo-400">{granMargen.toFixed(2)}%</span>
+                    </div>
+                  </div>
+
+                  <button onClick={() => setShowReporteProd(false)} className="text-zinc-400 hover:text-red-500 font-black flex-shrink-0 transition-colors">
+                    ✕ CERRAR
+                  </button>
+                </div>
+              );
+            })()}
             
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 {reporteAgrupado.map((nota, idx) => (
