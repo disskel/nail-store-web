@@ -1806,112 +1806,65 @@ def procesar_devolucion_y_cambio(
     authorization: str = Header(None)
 ):
     """
-    Motor central: Registra la auditoría, restaura el stock, 
-    y genera una Nota de Crédito (Venta Negativa) para cuadrar la caja de HOY.
+    ARQUITECTURA ENTERPRISE V4: Transacción ACID con protecciones Anti-Fraude
+    y resolución de condiciones de carrera (Check-then-Act) a nivel BD.
     """
     try:
+        # =========================================================
+        # TRAMO 1: SEGURIDAD Y AUTENTICACIÓN
+        # Extraemos el pasaporte del usuario para que Supabase sepa 
+        # quién está ejecutando la acción (para auditoría y RLS).
+        # =========================================================
         token = authorization.split(" ")[1] if authorization else None
         
-        # 1. Obtener la sesión de caja activa de HOY (Para sacar/meter el dinero)
-        sesion_activa = supabase.postgrest.auth(token).table("sesiones_caja")\
-            .select("id").eq("estado", "ABIERTA")\
-            .order("fecha_apertura", desc=True).limit(1).execute()
-            
-        if not sesion_activa.data:
-            raise HTTPException(status_code=400, detail="ERROR: NO HAY TURNO DE CAJA ABIERTO PARA EXTRAER EL DINERO")
-            
-        id_caja_hoy = sesion_activa.data[0]["id"]
+        # =========================================================
+        # TRAMO 2: PREPARACIÓN DE DATOS (PAYLOAD)
+        # Convertimos los objetos de Python (req.items_devueltos) 
+        # en diccionarios JSON puros que PostgreSQL pueda entender nativamente.
+        # =========================================================
+        items_devueltos_json = [item.dict() for item in req.items_devueltos]
+        items_nuevos_json = [item.dict() for item in req.items_nuevos] if req.items_nuevos else []
 
-        # 2. Registrar Cabecera de Auditoría en la nueva tabla 'devoluciones'
-        res_dev = supabase.postgrest.auth(token).table("devoluciones").insert({
-            "id_venta_original": req.id_venta_original,
-            "id_sesion_caja": id_caja_hoy,
-            "tipo_operacion": req.tipo_operacion,
-            "monto_devuelto": req.monto_devuelto if not req.es_saldo_a_favor_empresa else -req.monto_devuelto,
-            "metodo_reembolso": req.metodo_reembolso,
-            "motivo": req.motivo.upper()
-        }).execute()
+        # Empaquetamos exactamente los parámetros que pide nuestra función SQL V4
+        params = {
+            "p_id_venta_original": req.id_venta_original,
+            "p_correlativo_original": req.correlativo_original,
+            "p_tipo_operacion": req.tipo_operacion,
+            "p_monto_devuelto": req.monto_devuelto,
+            "p_es_saldo_empresa": req.es_saldo_a_favor_empresa,
+            "p_metodo_reembolso": req.metodo_reembolso,
+            "p_motivo": req.motivo.upper(),
+            "p_items_devueltos": items_devueltos_json,
+            "p_items_nuevos": items_nuevos_json
+        }
+
+        # =========================================================
+        # TRAMO 3: EJECUCIÓN DE LA TRANSACCIÓN ATÓMICA
+        # En lugar de hacer múltiples inserciones desde Python, enviamos 
+        # un solo paquete a Supabase usando RPC (Remote Procedure Call). 
+        # La Base de Datos hace todo el trabajo pesado en 0.05 segundos.
+        # =========================================================
+        res = supabase.postgrest.auth(token).rpc("procesar_devolucion_transaccional_v4", params).execute()
         
-        id_nueva_devolucion = res_dev.data[0]["id"]
-
-        # =====================================================================
-        # MAGIA FINANCIERA: Crear "Nota de Crédito" en la tabla de Ventas
-        # Si devolvemos dinero: Monto Negativo. Si el cliente pagó extra: Positivo.
-        # =====================================================================
-        monto_contable = req.monto_devuelto if req.es_saldo_a_favor_empresa else -req.monto_devuelto
-        
-        res_nota_credito = supabase.postgrest.auth(token).table("ventas").insert({
-            "id_sesion_caja": id_caja_hoy,
-            "correlativo_nota": f"DEV-{req.correlativo_original}",
-            "monto_bruto": monto_contable,
-            "monto_descuento": 0.00,
-            "monto_neto": monto_contable,
-            "medio_pago": req.metodo_reembolso,
-            "motivo_descuento": f"NOTA DE CRÉDITO POR {req.tipo_operacion}",
-            "estado": "COMPLETADA"
-        }).execute()
-        
-        id_venta_compensatoria = res_nota_credito.data[0]["id"]
-
-        # 3. Procesar los Productos Devueltos
-        for item in req.items_devueltos:
-            # A) Guardar rastro en devoluciones_detalle
-            supabase.postgrest.auth(token).table("devoluciones_detalle").insert({
-                "id_devolucion": id_nueva_devolucion,
-                "id_producto": item.id_producto,
-                "cantidad_devuelta": item.cantidad_devuelta,
-                "precio_unitario": item.precio_unitario,
-                "estado_inventario": item.estado_inventario
-            }).execute()
-
-            # B) Si el producto está BUENO, restaurar stock e inyectar al Kardex
-            if item.estado_inventario == 'REINGRESADO_BUENO':
-                # Obtenemos stock actual y costo maestro
-                prod = supabase.postgrest.auth(token).table("productos")\
-                    .select("stock_actual, costo_unidad").eq("id", item.id_producto).single().execute()
-                
-                # Restauramos la unidad física
-                nuevo_stock = int(prod.data.get('stock_actual') or 0) + item.cantidad_devuelta
-                supabase.postgrest.auth(token).table("productos")\
-                    .update({"stock_actual": nuevo_stock}).eq("id", item.id_producto).execute()
-                
-                # Inyectamos ENTRADA al Kardex (Esto corrige la vista de Utilidades)
-                supabase.postgrest.auth(token).table("movimientos_inventario").insert({
-                    "id_producto": item.id_producto,
-                    "tipo_movimiento": "ENTRADA",
-                    "cantidad": item.cantidad_devuelta,
-                    "precio_momento": prod.data.get('costo_unidad'), # Costo real, no precio de venta
-                    "id_sesion_caja": id_caja_hoy,
-                    "medio_pago": req.metodo_reembolso,
-                    "id_venta": id_venta_compensatoria,
-                    "referencia": f"DEVOLUCION {req.correlativo_original}"
-                }).execute()
-
-        # 4. Procesar los Productos Nuevos (Solo si es un CAMBIO)
-        if req.tipo_operacion == 'CAMBIO' and req.items_nuevos:
-            for nuevo in req.items_nuevos:
-                prod = supabase.postgrest.auth(token).table("productos")\
-                    .select("stock_actual").eq("id", nuevo.id_producto).single().execute()
-                
-                # Descontamos la unidad física que se está llevando
-                nuevo_stock = int(prod.data.get('stock_actual') or 0) - nuevo.cantidad
-                supabase.postgrest.auth(token).table("productos")\
-                    .update({"stock_actual": nuevo_stock}).eq("id", nuevo.id_producto).execute()
-                
-                # Inyectamos SALIDA al Kardex
-                supabase.postgrest.auth(token).table("movimientos_inventario").insert({
-                    "id_producto": nuevo.id_producto,
-                    "tipo_movimiento": "SALIDA",
-                    "cantidad": nuevo.cantidad,
-                    "precio_momento": nuevo.precio_unitario,
-                    "id_sesion_caja": id_caja_hoy,
-                    "medio_pago": req.metodo_reembolso,
-                    "id_venta": id_venta_compensatoria,
-                    "referencia": f"SALIDA POR CAMBIO DE {req.correlativo_original}"
-                }).execute()
-
-        return {"status": "success", "message": "OPERACIÓN REGISTRADA CON ÉXITO"}
+        # Si la base de datos confirma el éxito, enviamos la data a React
+        return res.data
         
     except Exception as e:
-        print(f"Error crítico procesando devolución: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Fallo en transacción: {str(e)}")
+        # =========================================================
+        # TRAMO 4: MANEJO DE ERRORES FORMALES (ERRCODE)
+        # Si la base de datos detecta fraude o falta de stock, aborta la 
+        # operación y nos envía un código (Ej. CJA01). Aquí lo traducimos 
+        # para mostrarle una alerta visual en pantalla al cajero.
+        # =========================================================
+        error_dict = str(e)
+        print(f"Auditoría DB V4: {error_dict}")
+        
+        if "CJA01" in error_dict:
+            raise HTTPException(status_code=400, detail="OPERACIÓN CANCELADA: NO HAY TURNO DE CAJA ABIERTO.")
+        elif "STK01" in error_dict:
+            raise HTTPException(status_code=409, detail="CONFLICTO: STOCK INSUFICIENTE PARA REALIZAR EL CAMBIO.")
+        elif "DEV01" in error_dict:
+            raise HTTPException(status_code=403, detail="FRAUDE DETECTADO: LA CANTIDAD SUPERA EL SALDO DISPONIBLE DE LA VENTA.")
+            
+        # Fallback para errores de conectividad o de sistema inesperados
+        raise HTTPException(status_code=500, detail="ERROR CRÍTICO EN TRANSACCIÓN DE BASE DE DATOS.")
