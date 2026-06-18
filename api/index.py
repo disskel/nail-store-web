@@ -1256,53 +1256,67 @@ def listar_historial_cajas(
 @app.get("/caja/reporte-productos/{sesion_id}")
 def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),authorization: str = Header(None)):
     """
-    Genera un reporte agrupado por Nota de Venta. 
-    Propósito: Permitir reimpresiones intuitivas por bloque de productos.
+    Genera un reporte agrupado por Nota de Venta, incluyendo auditoría de 
+    costos y márgenes de ganancia exactos para la interfaz gerencial.
     """
     try:
         token = authorization.split(" ")[1] if authorization else None
-        # 1. Ampliamos la consulta para traer la 'llave' (id_venta) y el Correlativo formal
+        
+        # 1. Ampliamos la consulta: Traemos el 'costo_unidad' del producto y el 'monto_neto' real de la venta
         res = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, id_venta, "
-                    "productos(nombre, sku), "
-                    "ventas(id, correlativo_nota, id_cliente, clientes(nombre_razon_social))")\
+                    "productos(nombre, sku, costo_unidad), "
+                    "ventas(id, correlativo_nota, monto_neto, id_cliente, clientes(nombre_razon_social))")\
             .eq("id_sesion_caja", sesion_id)\
             .eq("tipo_movimiento", "SALIDA")\
             .execute()
             
-        # 2. Diccionario temporal para agrupar los productos por su ID de venta
         ventas_agrupadas = {}
         
         for m in res.data:
             id_v = m.get("id_venta")
-            venta_info = m.get("ventas", {})
+            if not id_v: continue # Ignoramos salidas manuales sin venta ligada
             
-            # Si es la primera vez que vemos esta venta, creamos su cabecera
+            venta_info = m.get("ventas") or {}
+            prod_info = m.get("productos") or {}
+            
+            # Inicializamos la cabecera de la venta si es la primera vez que la vemos
             if id_v not in ventas_agrupadas:
                 ventas_agrupadas[id_v] = {
                     "id_venta": id_v,
                     "correlativo": venta_info.get("correlativo_nota", "SIN CORRELATIVO"),
-                    "cliente": venta_info.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL"),
+                    "cliente": venta_info.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL") if venta_info.get("clientes") else "PÚBLICO GENERAL",
                     "productos": [],
-                    "total_nota": 0.0
+                    "total_venta": float(venta_info.get("monto_neto") or 0.0), # Lo que pagó realmente el cliente (incluye descuentos)
+                    "costo_total": 0.0 # Acumulador del costo de fábrica
                 }
             
-            # Calculamos el subtotal de este producto específico
+            # Matemáticas del ítem
             subtotal_item = float(m["cantidad"] * (m["precio_momento"] or 0.0))
+            costo_unitario = float(prod_info.get("costo_unidad") or 0.0)
+            costo_fila = float(m["cantidad"] * costo_unitario)
             
-            # Añadimos el producto a su grupo correspondiente
             ventas_agrupadas[id_v]["productos"].append({
-                "sku": m.get("productos", {}).get("sku"),
-                "nombre": m.get("productos", {}).get("nombre"),
+                "sku": prod_info.get("sku"),
+                "nombre": prod_info.get("nombre"),
                 "cantidad": m["cantidad"],
                 "precio_venta": float(m["precio_momento"] or 0.0),
                 "total_item": subtotal_item
             })
             
-            # Sumamos al total de la nota
-            ventas_agrupadas[id_v]["total_nota"] += subtotal_item
+            # Sumamos el costo de fábrica al total de esta nota
+            ventas_agrupadas[id_v]["costo_total"] += costo_fila
 
-        # 3. Retornamos una lista limpia de 'Notas de Venta' en lugar de productos sueltos
+        # 2. Calculamos el margen de ganancia final por cada nota
+        for id_v, data in ventas_agrupadas.items():
+            t_venta = data["total_venta"]
+            t_costo = data["costo_total"]
+            
+            if t_venta > 0:
+                data["porcentaje_ganancia"] = ((t_venta - t_costo) / t_venta) * 100
+            else:
+                data["porcentaje_ganancia"] = 0.0
+
         return list(ventas_agrupadas.values())
 
     except Exception as e:

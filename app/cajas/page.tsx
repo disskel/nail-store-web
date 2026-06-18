@@ -230,16 +230,39 @@ export default function HistorialCajas() {
             <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                 {reporteAgrupado.map((nota, idx) => (
                   <div key={idx} className="bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                    <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
-                       <div>
-                         <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block mb-0.5">Nota de Venta</span>
-                         <h3 className="text-zinc-900 dark:text-white font-black text-xs">{nota.correlativo}</h3>
+                    <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center">
+                       
+                       {/* SECCIÓN IDENTIDAD */}
+                       <div className="flex flex-1 items-center gap-4">
+                         <div>
+                           <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block mb-0.5">Nota de Venta</span>
+                           <h3 className="text-zinc-900 dark:text-white font-black text-sm">{nota.correlativo}</h3>
+                         </div>
+                         <div className="w-px h-8 bg-zinc-300 dark:bg-zinc-700"></div>
+                         <div>
+                           <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Cliente Atendido</span>
+                           <p className="text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px] max-w-[140px] truncate">{nota.cliente}</p>
+                         </div>
                        </div>
-                       <div className="text-right pr-4 border-r border-zinc-300 dark:border-zinc-700 mr-4">
-                         <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Cliente Atendido</span>
-                         <p className="text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[9px]">{nota.cliente}</p>
+
+                       {/* SECCIÓN AUDITORÍA FINANCIERA (Píldora Segmentada) */}
+                       <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
+                          <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800 bg-emerald-50 dark:bg-emerald-900/10">
+                            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest block">Total Venta</span>
+                            <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400">S/ {nota.total_venta?.toFixed(2)}</span>
+                          </div>
+                          <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800">
+                            <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block">Costo Stock</span>
+                            <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">S/ {nota.costo_total?.toFixed(2)}</span>
+                          </div>
+                          <div className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/10">
+                            <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block">% Margen</span>
+                            <span className="text-[11px] font-black text-indigo-700 dark:text-indigo-400">{nota.porcentaje_ganancia?.toFixed(2)}%</span>
+                          </div>
                        </div>
-                       <button onClick={() => ejecutarReimpresion(nota.id_venta)} disabled={cargandoDetalle} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-black text-[9px] uppercase transition-all shadow-md">
+
+                       {/* SECCIÓN ACCIÓN */}
+                       <button onClick={() => ejecutarReimpresion(nota.id_venta)} disabled={cargandoDetalle} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-black text-[9px] uppercase transition-all shadow-md shrink-0">
                          🖨️ Reimprimir
                        </button>
                     </div>
