@@ -251,6 +251,32 @@ def health_check():
 # -----------------------------------------------------------------------------
 # 5. MÓDULO DE PRODUCTOS E INVENTARIO
 # -----------------------------------------------------------------------------
+@app.get("/api/productos")
+@app.get("/productos")
+def listar_productos_activos(
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """
+    Endpoint ultra-ligero para el buscador del POS y Devoluciones.
+    Solo retorna campos esenciales para no saturar la red.
+    """
+    try:
+        # Extraemos el token para identificarnos ante la BD
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # Filtramos directamente desde SQL los que están activos
+        res = supabase.postgrest.auth(token).table("productos")\
+            .select("id, sku, nombre, precio_menor, stock_actual, activo")\
+            .eq("activo", True)\
+            .order("nombre")\
+            .execute()
+            
+        return res.data
+    except Exception as e:
+        print(f"Error al listar productos ligeros: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
 @app.get("/api/productos/margenes")
 @app.get("/productos/margenes")
 def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_token),authorization: str = Header(None)):
