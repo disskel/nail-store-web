@@ -194,7 +194,12 @@ export default function DevolucionesPage() {
   };
 
   // FILTRO DEL CATÁLOGO EN VIVO
-  const productosFiltrados = catalogo.filter(p => p.nombre.toLowerCase().includes(filtroCat.toLowerCase()) || p.sku.toLowerCase().includes(filtroCat.toLowerCase())).slice(0, 10); // Limitar a 10 para no saturar UI
+  const productosFiltrados = filtroCat.trim() === '' 
+    ? [] // Si el buscador está vacío, el array queda vacío (no muestra nada)
+    : catalogo.filter(p => 
+        p.nombre.toLowerCase().includes(filtroCat.toLowerCase()) || 
+        p.sku.toLowerCase().includes(filtroCat.toLowerCase())
+      ).slice(0, 10); // Limitar a 10 para no saturar UI
 
   return (
     <div className="p-2 lg:p-4 w-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
