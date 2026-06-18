@@ -1950,13 +1950,11 @@ def analitica_inteligencia_negocio(
         if not ids_ventas:
             return {"resumen": {"ticket_promedio": 0, "ingresos": 0, "margen_global": 0}, "matriz": [], "ranking_volumen": [], "ranking_rentabilidad": []}
 
-        # 3. Extraer solo las salidas que NO fueron devoluciones
-        # Usamos .not_.ilike para excluir cualquier referencia que contenga 'DEVOLUCION'
+        # 3. Extraer los productos exactos que se vendieron en esas facturas
         res = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, productos(id, nombre, costo_unidad)")\
             .eq("tipo_movimiento", "SALIDA")\
             .in_("id_venta", ids_ventas)\
-            .not_.ilike("referencia", "%DEVOLUCION%")\
             .execute()
 
         # 4. Agrupamiento y Matemáticas Financieras
