@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { apiService } from '@/services/apiService';
+import NotaCreditoPrint from './components/NotaCreditoPrint'; // <--- NUEVO IMPORT (Comprobante Físico)
 
 export default function DevolucionesPage() {
+  const [printData, setPrintData] = useState<any>(null); // <--- NUEVO ESTADO PARA IMPRESIÓN
   const [correlativo, setCorrelativo] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -47,6 +49,18 @@ export default function DevolucionesPage() {
   useEffect(() => {
     if (tipoOperacion === 'CAMBIO') cargarCatalogo();
   }, [tipoOperacion]);
+
+  // =======================================================================
+  // EFECTO DE AUTO-IMPRESIÓN (DISPARADOR)
+  // =======================================================================
+  useEffect(() => {
+    if (printData) {
+      // Le damos 500ms a React para que dibuje el componente oculto en el DOM antes de invocar la impresora del SO
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    }
+  }, [printData]);
 
   // 2. BUSCADOR DE DOCUMENTO
   const buscarDocumento = async (e: React.FormEvent) => {
@@ -136,7 +150,7 @@ export default function DevolucionesPage() {
     }).filter(Boolean));
   };
 
-  // 5. PROCESAR TRANSACCIÓN FINANCIERA (CONEXIÓN PYTHON)
+  // 5. PROCESAR TRANSACCIÓN FINANCIERA E IMPRESIÓN (CONEXIÓN PYTHON)
   const procesarDevolucion = async () => {
     if (deja <= 0) {
       setError('Debes seleccionar al menos un producto a devolver/cambiar.');
@@ -181,11 +195,38 @@ export default function DevolucionesPage() {
         items_nuevos: items_nuevos_payload
       };
 
+      // Enviamos la petición al Backend en Python
       await apiService.procesarDevolucion(payload);
       
-      setMensaje({ texto: 'OPERACIÓN REGISTRADA: CAJA Y KARDEX ACTUALIZADOS', tipo: 'success' });
-      setVentaData(null); setItemsDisponibles([]); setCorrelativo(''); setMotivo(''); setItemsNuevos([]);
+      // =================================================================
+      // NUEVO: PREPARAMOS LA DATA PARA EL COMPROBANTE DE IMPRESIÓN
+      // Extraemos nombres y consolidamos la info antes de limpiar los estados
+      // =================================================================
+      const printPayload = {
+        cliente: ventaData.clientes || { nombre_razon_social: 'PÚBLICO GENERAL', numero_documento: 'S/N' },
+        correlativo_nota_credito: `DEV-${ventaData.correlativo_nota}`,
+        correlativo_original: ventaData.correlativo_nota,
+        fecha: new Date().toLocaleDateString(),
+        vendedor: "CAJERO / ADMINISTRADOR", // Trazabilidad
+        motivo: motivo,
+        tipo_operacion: tipoOperacion,
+        // Cruzamos la data enviada con el catálogo para obtener los nombres de los productos devueltos
+        items_devueltos: items_devueltos.map(idv => {
+          const itemOriginal = itemsDisponibles.find(i => i.id_producto === idv.id_producto);
+          return { ...idv, nombre: itemOriginal?.nombre || 'PRODUCTO' };
+        }),
+        items_nuevos: itemsNuevos,
+        valor_devuelto: deja, // Valor prorrateado calculado arriba
+        valor_nuevos: lleva,
+        diferencia: diferencia
+      };
+
+      // Al setear esta data, React activará la "Pantalla de Bloqueo de Impresión"
+      setPrintData(printPayload);
+      setMensaje({ texto: 'OPERACIÓN REGISTRADA: ENVIANDO TICKET A IMPRESORA...', tipo: 'success' });
       setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
+      
+      // NOTA: Ya no limpiamos los estados aquí. Se limpiarán cuando el usuario haga clic en "NUEVA OPERACIÓN"
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -193,7 +234,7 @@ export default function DevolucionesPage() {
     }
   };
 
-  // FILTRO DEL CATÁLOGO EN VIVO
+  // FILTRO DEL CATÁLOGO EN VIVO (Mantenemos la optimización de UX)
   const productosFiltrados = filtroCat.trim() === '' 
     ? [] // Si el buscador está vacío, el array queda vacío (no muestra nada)
     : catalogo.filter(p => 
@@ -201,6 +242,40 @@ export default function DevolucionesPage() {
         p.sku.toLowerCase().includes(filtroCat.toLowerCase())
       ).slice(0, 10); // Limitar a 10 para no saturar UI
 
+  // =======================================================================
+  // PANTALLA DE IMPRESIÓN (Bloquea la UI para evitar errores post-venta)
+  // =======================================================================
+  if (printData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] animate-in fade-in">
+        <div className="bg-emerald-900/20 border border-emerald-500 p-8 rounded-2xl text-center">
+          <h2 className="text-3xl font-black text-emerald-400 mb-2">¡OPERACIÓN EXITOSA!</h2>
+          <p className="text-zinc-300 font-bold mb-8">El comprobante se está enviando a la impresora...</p>
+          
+          <button 
+            onClick={() => {
+              // Ahora sí, limpiamos TODO para recibir al siguiente cliente en caja
+              setPrintData(null);
+              setVentaData(null); 
+              setItemsDisponibles([]); 
+              setCorrelativo(''); 
+              setMotivo(''); 
+              setItemsNuevos([]);
+            }} 
+            className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-white font-black tracking-widest uppercase transition-all shadow-lg shadow-emerald-900/50"
+          >
+            NUEVA OPERACIÓN
+          </button>
+        </div>
+        {/* COMPONENTE OCULTO PARA LA IMPRESORA FÍSICA */}
+        <NotaCreditoPrint data={printData} />
+      </div>
+    );
+  }
+
+  // =======================================================================
+  // RENDERIZADO PRINCIPAL (UI NORMAL)
+  // =======================================================================
   return (
     <div className="p-2 lg:p-4 w-full max-w-[1600px] mx-auto animate-in fade-in duration-500">
       
