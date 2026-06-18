@@ -306,6 +306,9 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
             cat_nombre = p.get("categorias", {}).get("nombre", "Sin Categoría") if p.get("categorias") else "Sin Categoría"
             prov_nombre = p.get("proveedores", {}).get("nombre", "Sin Proveedor") if p.get("proveedores") else "Sin Proveedor"
             
+            # 1. CALCULAMOS EL MARGEN MAYOR AQUÍ PARA QUE EXISTA EN AMBOS CASOS (IF / ELSE)
+            margen_mayor = ((p_mayor - costo_rep) / p_mayor) * 100 if p_mayor > 0 else 0.0
+            
             if precio > 0:
                 margen_porcentaje = ((precio - costo_rep) / precio) * 100
                 resultado.append({
@@ -319,7 +322,7 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
                     "precio_mayor": p_mayor, 
                     "stock": stock,
                     "activo": activo_status,
-                    "margen_porcentaje": round(float(margen_porcentaje), 2)
+                    "margen_porcentaje": round(float(margen_porcentaje), 2), # <--- AQUÍ FALTABA LA COMA (,)
                     "margen_mayor": round(float(margen_mayor), 2) # <-- NUEVO DATO ENVIADO AL FRONTEND
                 })
             else:
@@ -334,7 +337,8 @@ def obtener_margenes(mostrar_inactivos: bool = False, user = Depends(validar_tok
                     "precio_mayor": p_mayor, 
                     "stock": stock,
                     "activo": activo_status,
-                    "margen_porcentaje": 0.0
+                    "margen_porcentaje": 0.0, # <--- AGREGAMOS LA COMA (,)
+                    "margen_mayor": round(float(margen_mayor), 2) # <--- TAMBIÉN DEBE IR EN EL ELSE
                 })
         return resultado
     except Exception as e:
