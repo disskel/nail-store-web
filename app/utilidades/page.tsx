@@ -98,6 +98,8 @@ export default function UtilidadesPage() {
   }, [reporte]);
 
   const utilidadNetaReal = (totales.ingresos - totales.costos) - totales.gastos;
+  const margenBruto = totales.ingresos > 0 ? ((totales.ingresos - totales.costos) / totales.ingresos) * 100 : 0;
+  const margenNeto = totales.ingresos > 0 ? (utilidadNetaReal / totales.ingresos) * 100 : 0;
 
   const guardarGasto = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,11 +180,44 @@ export default function UtilidadesPage() {
           </div>
         </div>
 
-        <div className={`p-4 rounded-xl border-2 shadow-sm flex flex-col justify-center ${utilidadNetaReal >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-500/50' : 'bg-red-50 dark:bg-red-900/10 border-red-500/50'}`}>
-          <p className={`text-[10px] font-black uppercase mb-1 ${utilidadNetaReal >= 0 ? 'text-emerald-700 dark:text-emerald-500' : 'text-red-700 dark:text-red-500'}`}>Utilidad Neta Real</p>
+        {/* BLOQUE UTILIDAD NETA CON TOOLTIP DE MÁRGENES */}
+        <div className={`relative group p-4 rounded-xl border-2 shadow-sm flex flex-col justify-center cursor-help transition-all ${utilidadNetaReal >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-500/50 hover:border-emerald-500' : 'bg-red-50 dark:bg-red-900/10 border-red-500/50 hover:border-red-500'}`}>
+          <p className={`text-[10px] font-black uppercase mb-1 flex justify-between items-center ${utilidadNetaReal >= 0 ? 'text-emerald-700 dark:text-emerald-500' : 'text-red-700 dark:text-red-500'}`}>
+            Utilidad Neta Real
+            <span className={`${utilidadNetaReal >= 0 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-500/20 text-red-700 dark:text-red-400'} px-1.5 py-0.5 rounded text-[8px] animate-pulse`}>VER MÁRGENES 🔍</span>
+          </p>
           <p className={`text-3xl font-black italic tracking-tighter ${utilidadNetaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
             S/ {utilidadNetaReal.toFixed(2)}
           </p>
+
+          {/* ETIQUETA EMERGENTE (TOOLTIP DE ANÁLISIS) */}
+          <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 p-4">
+            <h4 className="text-[9px] text-zinc-500 dark:text-zinc-400 font-black uppercase border-b border-zinc-200 dark:border-zinc-700 pb-2 mb-3">Análisis de Rentabilidad</h4>
+            
+            <div className="space-y-3">
+              {/* MARGEN BRUTO */}
+              <div className="flex justify-between items-center bg-zinc-50 dark:bg-black/30 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <p className="text-[10px] font-black text-zinc-900 dark:text-white">% MARGEN BRUTO</p>
+                  <p className="text-[8px] text-zinc-500 font-bold leading-tight mt-0.5">Sin incluir gastos operativos</p>
+                </div>
+                <p className={`text-lg tracking-tighter font-black ${margenBruto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {margenBruto.toFixed(2)}%
+                </p>
+              </div>
+
+              {/* MARGEN NETO */}
+              <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/10 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+                <div>
+                  <p className="text-[10px] font-black text-indigo-900 dark:text-indigo-400">% MARGEN NETO</p>
+                  <p className="text-[8px] text-indigo-500/70 font-bold leading-tight mt-0.5">Ganancia final al bolsillo</p>
+                </div>
+                <p className={`text-lg tracking-tighter font-black ${margenNeto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {margenNeto.toFixed(2)}%
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
