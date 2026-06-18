@@ -1913,3 +1913,135 @@ def procesar_devolucion_y_cambio(
             
         # Fallback para errores de conectividad o de sistema inesperados
         raise HTTPException(status_code=500, detail="ERROR CRÍTICO EN TRANSACCIÓN DE BASE DE DATOS.")
+
+# -----------------------------------------------------------------------------
+# 21. MÓDULO DE BUSINESS INTELLIGENCE (ANALÍTICA Y MATRIZ BCG)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/analitica/inteligencia")
+@app.get("/analitica/inteligencia")
+def analitica_inteligencia_negocio(
+    desde: str, 
+    hasta: str, 
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """
+    Motor de BI: Procesa todas las ventas en un rango de fechas y clasifica 
+    los productos usando la Matriz de Rentabilidad BCG.
+    """
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Aseguramos que cubra hasta las 23:59 del día final
+        fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
+
+        # 2. DOBLE FILTRO SEGURO: Traer solo IDs de ventas completadas en el rango
+        ventas_res = supabase.postgrest.auth(token).table("ventas")\
+            .select("id")\
+            .eq("estado", "COMPLETADA")\
+            .gte("fecha", desde)\
+            .lte("fecha", fecha_fin)\
+            .execute()
+            
+        ids_ventas = [v["id"] for v in ventas_res.data]
+        
+        # Si no hubo ventas en ese rango, devolvemos esquema vacío para no romper la UI
+        if not ids_ventas:
+            return {"resumen": {"ticket_promedio": 0, "ingresos": 0, "margen_global": 0}, "matriz": [], "ranking_volumen": [], "ranking_rentabilidad": []}
+
+        # 3. Extraer los productos exactos que se vendieron en esas facturas
+        res = supabase.postgrest.auth(token).table("movimientos_inventario")\
+            .select("cantidad, precio_momento, productos(id, nombre, costo_unidad)")\
+            .eq("tipo_movimiento", "SALIDA")\
+            .in_("id_venta", ids_ventas)\
+            .execute()
+
+        # 4. Agrupamiento y Matemáticas Financieras
+        productos_agrupados = {}
+        
+        for m in res.data:
+            prod = m.get("productos")
+            if not prod: continue
+            
+            p_id = prod.get("id")
+            p_nombre = prod.get("nombre")
+            p_costo = float(prod.get("costo_unidad") or 0.0)
+            
+            cant = int(m.get("cantidad") or 0)
+            precio = float(m.get("precio_momento") or 0.0)
+            
+            venta_total = cant * precio
+            costo_total = cant * p_costo
+            
+            if p_id not in productos_agrupados:
+                productos_agrupados[p_id] = {
+                    "id": p_id,
+                    "nombre": p_nombre,
+                    "cantidad": 0,
+                    "ingresos": 0.0,
+                    "costos": 0.0
+                }
+                
+            productos_agrupados[p_id]["cantidad"] += cant
+            productos_agrupados[p_id]["ingresos"] += venta_total
+            productos_agrupados[p_id]["costos"] += costo_total
+
+        # 5. Cálculos Globales para trazar los Ejes de la Matriz BCG
+        lista_productos = []
+        total_ingresos_global = 0.0
+        total_costos_global = 0.0
+        total_cantidad_vendida = 0
+        
+        for p in productos_agrupados.values():
+            ing = p["ingresos"]
+            cst = p["costos"]
+            margen = ((ing - cst) / ing) * 100 if ing > 0 else 0.0
+            
+            p["margen_porcentaje"] = round(margen, 2)
+            p["utilidad_neta"] = round(ing - cst, 2)
+            
+            total_ingresos_global += ing
+            total_costos_global += cst
+            total_cantidad_vendida += p["cantidad"]
+            
+            lista_productos.append(p)
+
+        # Promedios del mercado para saber dónde "cortar" los cuadrantes
+        cantidad_promedio = total_cantidad_vendida / len(lista_productos) if lista_productos else 0
+        margen_promedio = ((total_ingresos_global - total_costos_global) / total_ingresos_global) * 100 if total_ingresos_global > 0 else 0
+
+        # 6. Algoritmo de Clasificación Automática (Inteligencia de Negocio)
+        for p in lista_productos:
+            es_alta_rotacion = p["cantidad"] >= cantidad_promedio
+            es_alto_margen = p["margen_porcentaje"] >= margen_promedio
+            
+            if es_alta_rotacion and es_alto_margen:
+                p["cuadrante"] = "ESTRELLA"
+            elif es_alta_rotacion and not es_alto_margen:
+                p["cuadrante"] = "VACA"
+            elif not es_alta_rotacion and es_alto_margen:
+                p["cuadrante"] = "INTERROGANTE"
+            else:
+                p["cuadrante"] = "PERRO"
+
+        # 7. Generar los Rankings Duales
+        ranking_volumen = sorted(lista_productos, key=lambda x: x["cantidad"], reverse=True)[:10]
+        ranking_rentabilidad = sorted(lista_productos, key=lambda x: x["utilidad_neta"], reverse=True)[:10]
+        
+        ticket_promedio = total_ingresos_global / len(ids_ventas)
+
+        return {
+            "resumen": {
+                "ticket_promedio": round(ticket_promedio, 2),
+                "ingresos": round(total_ingresos_global, 2),
+                "margen_global": round(margen_promedio, 2),
+                "eje_x_cantidad": round(cantidad_promedio, 2) # Punto de corte
+            },
+            "matriz": lista_productos,
+            "ranking_volumen": ranking_volumen,
+            "ranking_rentabilidad": ranking_rentabilidad
+        }
+    except Exception as e:
+        print(f"Error Crítico en Analítica BI: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Fallo en motor BI: {str(e)}")

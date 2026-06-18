@@ -119,6 +119,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-lg">📈</span> Utilidades
             </Link>
 
+            {/* NUEVO: ACCESO AL MÓDULO DE BUSINESS INTELLIGENCE (MATRIZ BCG) */}
+            <Link href="/analitica" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
+              <span className="text-lg">🎯</span> Analítica BI
+            </Link>
+
             <Link href="/inventario" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-all text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-white">
               <span className="text-lg">📊</span> Inventario
             </Link>
@@ -169,9 +174,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <button onClick={toggleTheme} className="text-xl px-2">{isDark ? '☀️' : '🌙'}</button>
           <Link href="/cajas" className="text-xl px-2">🔐</Link>
           <Link href="/utilidades" className="text-xl px-2">📈</Link>
+          
+          {/* NUEVO ACCESO MÓVIL A ANALÍTICA BI */}
+          <Link href="/analitica" className="text-xl px-2">🎯</Link>
+          
           <Link href="/inventario" className="text-xl px-2">📊</Link>
-          <Link href="/compras">📦</Link>
-          <Link href="/inventario/nuevo">✨</Link>
+          <Link href="/compras" className="text-xl px-2">📦</Link>
+          <Link href="/inventario/nuevo" className="text-xl px-2">✨</Link>
           <button onClick={handleLogout} className="text-xl px-2">🚪</button>
         </nav>
 

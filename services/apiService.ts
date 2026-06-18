@@ -664,4 +664,22 @@ export const apiService = {
     return data.filter((p: any) => p.stock_actual > 0 && p.activo);
   },
 
+  // -------------------------------------------------------------------------
+  // 15. MÓDULO DE BUSINESS INTELLIGENCE (NUEVO)
+  // -------------------------------------------------------------------------
+  
+  /**
+   * Ejecuta el análisis de la Matriz BCG y los Rankings Financieros.
+   */
+  async getAnaliticaBI(desde: string, hasta: string) {
+    const res = await fetch(`${API_URL}/analitica/inteligencia?desde=${desde}&hasta=${hasta}`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Error al procesar la inteligencia de negocio');
+    }
+    return res.json();
+  }
+
 };
