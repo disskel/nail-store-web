@@ -1936,28 +1936,38 @@ def analitica_inteligencia_negocio(
         # 1. Aseguramos que cubra hasta las 23:59 del día final
         fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
 
-        # 2. SELECCIÓN DE VENTAS BASE
+        # 2. SELECCIÓN DE VENTAS BASE Y EXTRACCIÓN DE CAJA REAL
         ventas_res = supabase.postgrest.auth(token).table("ventas")\
-            .select("id, monto_neto")\
+            .select("id, monto_neto, monto_descuento")\
             .eq("estado", "COMPLETADA")\
             .gte("fecha", desde)\
             .lte("fecha", fecha_fin)\
             .execute()
             
-        ids_ventas = [v["id"] for v in ventas_res.data]
+        ids_ventas = []
+        ingresos_netos_caja = 0.0
+        descuentos_globales = 0.0
+        ventas_reales_count = 0
         
-        # Para el ticket promedio, solo contamos facturas con ingresos positivos (ignorando las Notas de Crédito)
-        ventas_reales_count = len([v for v in ventas_res.data if float(v.get("monto_neto", 0)) > 0])
+        for v in ventas_res.data:
+            ids_ventas.append(v["id"])
+            m_neto = float(v.get("monto_neto") or 0.0)
+            m_desc = float(v.get("monto_descuento") or 0.0)
+            
+            ingresos_netos_caja += m_neto
+            descuentos_globales += m_desc
+            if m_neto > 0:
+                ventas_reales_count += 1
         
         if not ids_ventas:
             return {
-                "resumen": {"ticket_promedio": 0, "ingresos": 0, "margen_global": 0, "eje_x_cantidad": 0}, 
+                "resumen": {"ticket_promedio": 0, "ingresos_netos": 0, "descuentos_cedidos": 0, "margen_global": 0, "eje_x_cantidad": 0}, 
                 "matriz": [], 
                 "ranking_volumen": [], 
                 "ranking_rentabilidad": []
             }
 
-        # 3. TRAER TODO EL HISTORIAL VINCULADO (Ignoramos el filtro ilike para evitar la trampa del NULL)
+        # 3. TRAER TODO EL HISTORIAL VINCULADO DEL KÁRDEX
         res = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, tipo_movimiento, referencia, productos(id, nombre, costo_unidad)")\
             .in_("id_venta", ids_ventas)\
@@ -2000,12 +2010,11 @@ def analitica_inteligencia_negocio(
 
         # 5. CÁLCULOS GLOBALES Y LIMPIEZA
         lista_productos = []
-        total_ingresos_global = 0.0
+        total_ingresos_kardex = 0.0
         total_costos_global = 0.0
         total_cantidad_vendida = 0
         
         for p in productos_agrupados.values():
-            # Si la cantidad matemática quedó en cero (se devolvió todo), lo ignoramos del panel
             if p["cantidad"] <= 0:
                 continue
                 
@@ -2016,17 +2025,17 @@ def analitica_inteligencia_negocio(
             p["margen_porcentaje"] = round(margen, 2)
             p["utilidad_neta"] = round(ing - cst, 2)
             
-            total_ingresos_global += ing
+            total_ingresos_kardex += ing
             total_costos_global += cst
             total_cantidad_vendida += p["cantidad"]
             
             lista_productos.append(p)
 
-        # Promedios del mercado para los ejes de la matriz BCG
+        # Promedios del mercado para los ejes de la matriz BCG (Se mantiene sobre el kárdex puro)
         cantidad_promedio = total_cantidad_vendida / len(lista_productos) if lista_productos else 0
-        margen_promedio = ((total_ingresos_global - total_costos_global) / total_ingresos_global) * 100 if total_ingresos_global > 0 else 0
+        margen_promedio = ((total_ingresos_kardex - total_costos_global) / total_ingresos_kardex) * 100 if total_ingresos_kardex > 0 else 0
 
-        # 6. ALGORITMO BCG (Inteligencia de Negocio)
+        # 6. ALGORITMO BCG
         for p in lista_productos:
             es_alta_rotacion = p["cantidad"] >= cantidad_promedio
             es_alto_margen = p["margen_porcentaje"] >= margen_promedio
@@ -2044,14 +2053,15 @@ def analitica_inteligencia_negocio(
         ranking_volumen = sorted(lista_productos, key=lambda x: x["cantidad"], reverse=True)[:10]
         ranking_rentabilidad = sorted(lista_productos, key=lambda x: x["utilidad_neta"], reverse=True)[:10]
         
-        ticket_promedio = total_ingresos_global / ventas_reales_count if ventas_reales_count > 0 else 0
+        ticket_promedio = ingresos_netos_caja / ventas_reales_count if ventas_reales_count > 0 else 0
 
         return {
             "resumen": {
                 "ticket_promedio": round(ticket_promedio, 2),
-                "ingresos": round(total_ingresos_global, 2),
+                "ingresos_netos": round(ingresos_netos_caja, 2), # <-- Dato unificado con Utilidades
+                "descuentos_cedidos": round(descuentos_globales, 2), # <-- Fuga de capital detectada
                 "margen_global": round(margen_promedio, 2),
-                "eje_x_cantidad": round(cantidad_promedio, 2) # Punto de corte
+                "eje_x_cantidad": round(cantidad_promedio, 2) 
             },
             "matriz": lista_productos,
             "ranking_volumen": ranking_volumen,

@@ -63,26 +63,31 @@ export default function AnaliticaBIPage() {
         </div>
       </header>
 
-      {/* 2. KPIs GLOBALES (PUNTO DE CORTE) */}
+      {/* 2. KPIs GLOBALES Y AUDITORÍA DE FUGAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Ingresos del Periodo</p>
-            <p className="text-2xl font-black text-zinc-900 dark:text-white">S/ {dataBI?.resumen.ingresos.toFixed(2)}</p>
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm flex items-center justify-between relative overflow-hidden">
+          <div className="z-10">
+            <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Ingresos Netos (Caja)</p>
+            <p className="text-2xl font-black text-zinc-900 dark:text-white mt-1">S/ {dataBI?.resumen.ingresos_netos?.toFixed(2)}</p>
+            {dataBI?.resumen.descuentos_cedidos > 0 && (
+               <p className="text-[8px] font-bold text-red-500 mt-2 uppercase bg-red-50 dark:bg-red-500/10 px-1.5 py-0.5 rounded inline-block border border-red-100 dark:border-red-900/30">
+                 Fuga: S/ {dataBI?.resumen.descuentos_cedidos.toFixed(2)} en Descuentos
+               </p>
+            )}
           </div>
-          <div className="text-3xl opacity-50">💰</div>
+          <div className="text-4xl opacity-10 absolute right-4 bottom-2 z-0">💰</div>
         </div>
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Ticket Promedio</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">S/ {dataBI?.resumen.ticket_promedio.toFixed(2)}</p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">S/ {dataBI?.resumen.ticket_promedio?.toFixed(2)}</p>
           </div>
           <div className="text-3xl opacity-50">🛒</div>
         </div>
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 rounded-2xl shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Margen Promedio Global</p>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{dataBI?.resumen.margen_global.toFixed(2)}%</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{dataBI?.resumen.margen_global?.toFixed(2)}%</p>
           </div>
           <div className="text-3xl opacity-50">📈</div>
         </div>
