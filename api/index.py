@@ -1928,7 +1928,7 @@ def analitica_inteligencia_negocio(
 ):
     """
     Motor de BI: Procesa todas las ventas en un rango de fechas y clasifica 
-    los productos usando la Matriz de Rentabilidad BCG.
+    los productos usando la Matriz de Rentabilidad BCG, descontando devoluciones con precisión.
     """
     try:
         token = authorization.split(" ")[1] if authorization else None
@@ -1936,9 +1936,9 @@ def analitica_inteligencia_negocio(
         # 1. Aseguramos que cubra hasta las 23:59 del día final
         fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
 
-        # 2. DOBLE FILTRO SEGURO: Traer solo IDs de ventas completadas en el rango
+        # 2. SELECCIÓN DE VENTAS BASE
         ventas_res = supabase.postgrest.auth(token).table("ventas")\
-            .select("id")\
+            .select("id, monto_neto")\
             .eq("estado", "COMPLETADA")\
             .gte("fecha", desde)\
             .lte("fecha", fecha_fin)\
@@ -1946,18 +1946,24 @@ def analitica_inteligencia_negocio(
             
         ids_ventas = [v["id"] for v in ventas_res.data]
         
-        # Si no hubo ventas en ese rango, devolvemos esquema vacío para no romper la UI
+        # Para el ticket promedio, solo contamos facturas con ingresos positivos (ignorando las Notas de Crédito)
+        ventas_reales_count = len([v for v in ventas_res.data if float(v.get("monto_neto", 0)) > 0])
+        
         if not ids_ventas:
-            return {"resumen": {"ticket_promedio": 0, "ingresos": 0, "margen_global": 0}, "matriz": [], "ranking_volumen": [], "ranking_rentabilidad": []}
+            return {
+                "resumen": {"ticket_promedio": 0, "ingresos": 0, "margen_global": 0, "eje_x_cantidad": 0}, 
+                "matriz": [], 
+                "ranking_volumen": [], 
+                "ranking_rentabilidad": []
+            }
 
-        # 3. Extraer los productos exactos que se vendieron en esas facturas
+        # 3. TRAER TODO EL HISTORIAL VINCULADO (Ignoramos el filtro ilike para evitar la trampa del NULL)
         res = supabase.postgrest.auth(token).table("movimientos_inventario")\
-            .select("cantidad, precio_momento, productos(id, nombre, costo_unidad)")\
-            .eq("tipo_movimiento", "SALIDA")\
+            .select("cantidad, precio_momento, tipo_movimiento, referencia, productos(id, nombre, costo_unidad)")\
             .in_("id_venta", ids_ventas)\
             .execute()
 
-        # 4. Agrupamiento y Matemáticas Financieras
+        # 4. AGRUPAMIENTO Y MATEMÁTICAS FINANCIERAS CON COMPENSACIÓN
         productos_agrupados = {}
         
         for m in res.data:
@@ -1970,9 +1976,8 @@ def analitica_inteligencia_negocio(
             
             cant = int(m.get("cantidad") or 0)
             precio = float(m.get("precio_momento") or 0.0)
-            
-            venta_total = cant * precio
-            costo_total = cant * p_costo
+            tipo_mov = m.get("tipo_movimiento")
+            ref = str(m.get("referencia") or "").upper()
             
             if p_id not in productos_agrupados:
                 productos_agrupados[p_id] = {
@@ -1982,18 +1987,28 @@ def analitica_inteligencia_negocio(
                     "ingresos": 0.0,
                     "costos": 0.0
                 }
-                
-            productos_agrupados[p_id]["cantidad"] += cant
-            productos_agrupados[p_id]["ingresos"] += venta_total
-            productos_agrupados[p_id]["costos"] += costo_total
+            
+            # MATEMÁTICA PURA: Sumamos lo que sale (Ventas) y restamos lo que entra (Devoluciones)
+            if tipo_mov == "SALIDA":
+                productos_agrupados[p_id]["cantidad"] += cant
+                productos_agrupados[p_id]["ingresos"] += (cant * precio)
+                productos_agrupados[p_id]["costos"] += (cant * p_costo)
+            elif tipo_mov == "ENTRADA" and "DEVOLUCION" in ref:
+                productos_agrupados[p_id]["cantidad"] -= cant
+                productos_agrupados[p_id]["ingresos"] -= (cant * precio)
+                productos_agrupados[p_id]["costos"] -= (cant * p_costo)
 
-        # 5. Cálculos Globales para trazar los Ejes de la Matriz BCG
+        # 5. CÁLCULOS GLOBALES Y LIMPIEZA
         lista_productos = []
         total_ingresos_global = 0.0
         total_costos_global = 0.0
         total_cantidad_vendida = 0
         
         for p in productos_agrupados.values():
+            # Si la cantidad matemática quedó en cero (se devolvió todo), lo ignoramos del panel
+            if p["cantidad"] <= 0:
+                continue
+                
             ing = p["ingresos"]
             cst = p["costos"]
             margen = ((ing - cst) / ing) * 100 if ing > 0 else 0.0
@@ -2007,11 +2022,11 @@ def analitica_inteligencia_negocio(
             
             lista_productos.append(p)
 
-        # Promedios del mercado para saber dónde "cortar" los cuadrantes
+        # Promedios del mercado para los ejes de la matriz BCG
         cantidad_promedio = total_cantidad_vendida / len(lista_productos) if lista_productos else 0
         margen_promedio = ((total_ingresos_global - total_costos_global) / total_ingresos_global) * 100 if total_ingresos_global > 0 else 0
 
-        # 6. Algoritmo de Clasificación Automática (Inteligencia de Negocio)
+        # 6. ALGORITMO BCG (Inteligencia de Negocio)
         for p in lista_productos:
             es_alta_rotacion = p["cantidad"] >= cantidad_promedio
             es_alto_margen = p["margen_porcentaje"] >= margen_promedio
@@ -2025,11 +2040,11 @@ def analitica_inteligencia_negocio(
             else:
                 p["cuadrante"] = "PERRO"
 
-        # 7. Generar los Rankings Duales
+        # 7. GENERACIÓN DE RANKINGS DUALES
         ranking_volumen = sorted(lista_productos, key=lambda x: x["cantidad"], reverse=True)[:10]
         ranking_rentabilidad = sorted(lista_productos, key=lambda x: x["utilidad_neta"], reverse=True)[:10]
         
-        ticket_promedio = total_ingresos_global / len(ids_ventas)
+        ticket_promedio = total_ingresos_global / ventas_reales_count if ventas_reales_count > 0 else 0
 
         return {
             "resumen": {
