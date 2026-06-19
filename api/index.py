@@ -1323,8 +1323,9 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
         # =========================================================
         # 2. OBTENER DEVOLUCIONES Y CAMBIOS (EGRESOS/IMPACTOS)
         # =========================================================
+        # CORRECCIÓN: Agregamos "costo_unidad" a la consulta de productos
         res_dev = supabase.postgrest.auth(token).table("devoluciones")\
-            .select("id, tipo_operacion, monto_devuelto, motivo, fecha, id_venta_original, ventas(correlativo_nota, clientes(nombre_razon_social)), devoluciones_detalle(cantidad_devuelta, precio_unitario, productos(nombre, sku))")\
+            .select("id, tipo_operacion, monto_devuelto, motivo, fecha, id_venta_original, ventas(correlativo_nota, clientes(nombre_razon_social)), devoluciones_detalle(cantidad_devuelta, precio_unitario, productos(nombre, sku, costo_unidad))")\
             .eq("id_sesion_caja", sesion_id)\
             .order("fecha", desc=True)\
             .execute()
@@ -1335,14 +1336,24 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
             cliente_nombre = venta_original.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL") if venta_original.get("clientes") else "PÚBLICO GENERAL"
             
             items_dev = []
+            costo_total_devolucion = 0.0 # <-- NUEVO: Acumulador de costo recuperado
+            
             for item in d.get("devoluciones_detalle", []):
                 prod = item.get("productos") or {}
+                cant_dev = item.get("cantidad_devuelta", 0)
+                
+                # Matemáticas de recuperación de costo
+                costo_u = float(prod.get("costo_unidad") or 0.0)
+                costo_linea = cant_dev * costo_u
+                costo_total_devolucion += costo_linea
+                
                 items_dev.append({
                     "sku": prod.get("sku"),
                     "nombre": prod.get("nombre"),
-                    "cantidad": item.get("cantidad_devuelta"),
+                    "cantidad": cant_dev,
                     "precio_venta": float(item.get("precio_unitario") or 0.0),
-                    "total_item": float(item.get("cantidad_devuelta") * (item.get("precio_unitario") or 0.0))
+                    "costo_item": costo_linea,
+                    "total_item": float(cant_dev * (item.get("precio_unitario") or 0.0))
                 })
 
             correlativo_original = venta_original.get("correlativo_nota", "DESCONOCIDO")
@@ -1356,6 +1367,7 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
                 "tipo_operacion": d["tipo_operacion"],
                 "motivo": d["motivo"],
                 "monto_devuelto": float(d["monto_devuelto"] or 0.0),
+                "costo_devuelto": costo_total_devolucion, # <-- NUEVO: Enviamos el costo al frontend
                 "fecha": d["fecha"],
                 "productos": items_dev
             })

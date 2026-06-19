@@ -3,11 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 import NotaPedidoPrint from '../ventas/components/NotaPedidoPrint';
-import NotaCreditoPrint from '../devoluciones/components/NotaCreditoPrint'; // <-- IMPORTACIÓN NECESARIA
+import NotaCreditoPrint from '../devoluciones/components/NotaCreditoPrint'; 
 
 /**
  * MÓDULO DE GESTIÓN DE CAJAS PRO (ALTA DENSIDAD)
- * Actualización: Auditoría Transaccional Dual (Ventas vs Notas de Crédito)
+ * Actualización: Auditoría Transaccional Dual (Ventas vs Notas de Crédito) con Matemáticas Compensatorias.
  */
 export default function HistorialCajas() {
   const [historial, setHistorial] = useState<any[]>([]);
@@ -23,7 +23,6 @@ export default function HistorialCajas() {
   const [showReporteProd, setShowReporteProd] = useState(false);
   const [showReporteGen, setShowReporteGen] = useState(false);
   
-  // CORRECCIÓN ARQUITECTÓNICA: Cambiamos el estado inicial a null porque ahora recibimos un Objeto {ventas, devoluciones}
   const [reporteAgrupado, setReporteAgrupado] = useState<any>(null); 
   const [resumenFinanciero, setResumenFinanciero] = useState<any>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
@@ -39,7 +38,7 @@ export default function HistorialCajas() {
     }
   }, [datosImpresionCredito]);
 
-  // Función Ejecutora de Reimpresión de Devoluciones (Corregida)
+  // Función Ejecutora de Reimpresión de Devoluciones
   const ejecutarReimpresionDevolucion = async (idDevolucion: string) => {
     setCargandoDetalle(true);
     try {
@@ -54,9 +53,6 @@ export default function HistorialCajas() {
         vendedor: "AUDITORÍA (REIMPRESIÓN)",
         motivo: dev.motivo,
         tipo_operacion: dev.tipo_operacion,
-        // =================================================================
-        // CORRECCIÓN CRÍTICA: Los nombres deben coincidir con NotaCreditoPrint
-        // =================================================================
         items_devueltos: data.items_devueltos.map((idv: any) => ({
           cantidad_devuelta: idv.cantidad_devuelta,
           nombre: idv.productos?.nombre || 'Producto Desconocido',
@@ -292,29 +288,37 @@ export default function HistorialCajas() {
             
             {/* CABECERA ANALÍTICA CON FUNCIÓN AUTO-EJECUTABLE */}
             {(() => {
-              // 1. Extraemos las dos listas desde el nuevo formato del Backend
+              // 1. Extraemos las dos listas
               const listaVentas = reporteAgrupado?.ventas || [];
               const listaDev = reporteAgrupado?.devoluciones || [];
               
-              // 2. Matemáticas al vuelo (Suma de las ventas limpias)
-              const granTotalVenta = listaVentas.reduce((acc: number, nota: any) => acc + (nota.total_venta || 0), 0);
-              const granTotalCosto = listaVentas.reduce((acc: number, nota: any) => acc + (nota.costo_total || 0), 0);
-              const granMargen = granTotalVenta > 0 ? ((granTotalVenta - granTotalCosto) / granTotalVenta) * 100 : 0;
+              // 2. Matemáticas Brutas (Solo Ventas)
+              const totalVentaBruta = listaVentas.reduce((acc: number, nota: any) => acc + (nota.total_venta || 0), 0);
+              const totalCostoBruto = listaVentas.reduce((acc: number, nota: any) => acc + (nota.costo_total || 0), 0);
+
+              // 3. Matemáticas de Compensación (Egresos y Devoluciones de Costo)
+              const totalDevoluciones = listaDev.reduce((acc: number, dev: any) => acc + (dev.monto_devuelto || 0), 0);
+              const totalCostoDevuelto = listaDev.reduce((acc: number, dev: any) => acc + (dev.costo_devuelto || 0), 0);
+
+              // 4. Matemáticas Netas (La Realidad del Turno)
+              const granTotalVentaNeta = totalVentaBruta - totalDevoluciones;
+              const granTotalCostoNeto = totalCostoBruto - totalCostoDevuelto;
+              const granMargen = granTotalVentaNeta > 0 ? ((granTotalVentaNeta - granTotalCostoNeto) / granTotalVentaNeta) * 100 : 0;
 
               return (
                 <>
                   <div className="flex flex-wrap lg:flex-nowrap justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-4 gap-4">
                     <h2 className="font-black text-lg text-zinc-900 dark:text-white uppercase italic">Auditoría de Transacciones</h2>
                     
-                    {/* GRAN RESUMEN DEL TURNO */}
+                    {/* GRAN RESUMEN DEL TURNO (Ahora es NETO) */}
                     <div className="flex bg-zinc-50 dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
                       <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
-                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Venta Bruta</span>
-                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">S/ {granTotalVenta.toFixed(2)}</span>
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Venta Neta (Caja)</span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">S/ {granTotalVentaNeta.toFixed(2)}</span>
                       </div>
                       <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
-                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Costo Stock</span>
-                        <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">S/ {granTotalCosto.toFixed(2)}</span>
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Costo Neto</span>
+                        <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">S/ {granTotalCostoNeto.toFixed(2)}</span>
                       </div>
                       <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/10">
                         <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block">Margen Global</span>
@@ -337,7 +341,7 @@ export default function HistorialCajas() {
                         listaVentas.map((nota: any, i: number) => (
                           <div key={i} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                             
-                            {/* Cabecera de la Nota de Venta (Píldora Segmentada) */}
+                            {/* Cabecera de la Nota de Venta */}
                             <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center">
                                <div className="flex flex-1 items-center gap-4">
                                  <div>
