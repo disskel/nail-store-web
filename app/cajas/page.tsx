@@ -39,7 +39,7 @@ export default function HistorialCajas() {
     }
   }, [datosImpresionCredito]);
 
-  // Función Ejecutora de Reimpresión de Devoluciones (UX: Formato exacto para NotaCreditoPrint)
+  // Función Ejecutora de Reimpresión de Devoluciones (Corregida)
   const ejecutarReimpresionDevolucion = async (idDevolucion: string) => {
     setCargandoDetalle(true);
     try {
@@ -54,12 +54,14 @@ export default function HistorialCajas() {
         vendedor: "AUDITORÍA (REIMPRESIÓN)",
         motivo: dev.motivo,
         tipo_operacion: dev.tipo_operacion,
+        // =================================================================
+        // CORRECCIÓN CRÍTICA: Los nombres deben coincidir con NotaCreditoPrint
+        // =================================================================
         items_devueltos: data.items_devueltos.map((idv: any) => ({
-          codigo: idv.productos?.sku || 'S/C',
-          cantidad: idv.cantidad_devuelta,
-          descripcion: idv.productos?.nombre || 'Producto Desconocido',
-          precio_unitario: idv.precio_unitario,
-          total: idv.cantidad_devuelta * idv.precio_unitario
+          cantidad_devuelta: idv.cantidad_devuelta,
+          nombre: idv.productos?.nombre || 'Producto Desconocido',
+          estado_inventario: idv.estado_inventario || 'REINGRESADO_BUENO',
+          precio_unitario: idv.precio_unitario
         })),
         items_nuevos: [], 
         valor_devuelto: dev.monto_devuelto,

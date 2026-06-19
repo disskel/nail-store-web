@@ -1270,17 +1270,23 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
         # =========================================================
         # 1. OBTENER VENTAS NORMALES (INGRESOS)
         # =========================================================
+        # CORRECCIÓN: Quitamos el .not_.ilike de Supabase por la trampa del NULL
+        # y traemos el campo "referencia" para filtrarlo manualmente.
         res_ventas = supabase.postgrest.auth(token).table("movimientos_inventario")\
-            .select("cantidad, precio_momento, id_venta, "
+            .select("cantidad, precio_momento, id_venta, referencia, "
                     "productos(nombre, sku, costo_unidad), "
                     "ventas(id, correlativo_nota, monto_neto, id_cliente, clientes(nombre_razon_social))")\
             .eq("id_sesion_caja", sesion_id)\
             .eq("tipo_movimiento", "SALIDA")\
-            .not_.ilike("referencia", "%DEVOLUCION%")\
             .execute()
             
         ventas_agrupadas = {}
         for m in res_ventas.data:
+            # FILTRO SEGURO EN PYTHON: Ignoramos las salidas que son por devoluciones
+            ref = m.get("referencia")
+            if ref and "DEVOLUCION" in str(ref).upper():
+                continue
+
             id_v = m.get("id_venta")
             if not id_v: continue 
             
