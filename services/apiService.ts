@@ -664,6 +664,20 @@ export const apiService = {
     return data.filter((p: any) => p.stock_actual > 0 && p.activo);
   },
 
+  /**
+   * Recupera el detalle completo de una Nota de Crédito para su reimpresión.
+   */
+  async getDetalleDevolucionReimpresion(idDevolucion: string) {
+    const res = await fetch(`${API_URL}/devoluciones/${idDevolucion}/detalle-completo`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Error al cargar la nota de crédito para impresión');
+    }
+    return res.json();
+  },
+
   // -------------------------------------------------------------------------
   // 15. MÓDULO DE BUSINESS INTELLIGENCE (NUEVO)
   // -------------------------------------------------------------------------

@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/apiService';
 import NotaPedidoPrint from '../ventas/components/NotaPedidoPrint';
+import NotaCreditoPrint from '../devoluciones/components/NotaCreditoPrint'; // <-- IMPORTACIÓN NECESARIA
 
 /**
  * MÓDULO DE GESTIÓN DE CAJAS PRO (ALTA DENSIDAD)
- * Actualización: Diseño Full-Width corporativo y sistema de Paginación.
+ * Actualización: Auditoría Transaccional Dual (Ventas vs Notas de Crédito)
  */
 export default function HistorialCajas() {
   const [historial, setHistorial] = useState<any[]>([]);
@@ -14,17 +15,65 @@ export default function HistorialCajas() {
   const [filtro, setFiltro] = useState('');
   const [mostrarSoloDescuadres, setMostrarSoloDescuadres] = useState(false); 
   
-  // --- NUEVO: ESTADOS DE PAGINACIÓN ---
+  // --- ESTADOS DE PAGINACIÓN ---
   const [paginaActual, setPaginaActual] = useState(1);
   const turnosPorPagina = 12; // Cantidad de filas por vista
 
   // --- ESTADOS PARA REPORTES ---
   const [showReporteProd, setShowReporteProd] = useState(false);
   const [showReporteGen, setShowReporteGen] = useState(false);
-  const [reporteAgrupado, setReporteAgrupado] = useState<any[]>([]);
+  
+  // CORRECCIÓN ARQUITECTÓNICA: Cambiamos el estado inicial a null porque ahora recibimos un Objeto {ventas, devoluciones}
+  const [reporteAgrupado, setReporteAgrupado] = useState<any>(null); 
   const [resumenFinanciero, setResumenFinanciero] = useState<any>(null);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  
+  // --- ESTADOS DE IMPRESIÓN ---
   const [datosImpresion, setDatosImpresion] = useState<any>(null);
+  const [datosImpresionCredito, setDatosImpresionCredito] = useState<any>(null);
+
+  // Efecto de Auto-Impresión para Devoluciones
+  useEffect(() => {
+    if (datosImpresionCredito) {
+      setTimeout(() => { window.print(); }, 500);
+    }
+  }, [datosImpresionCredito]);
+
+  // Función Ejecutora de Reimpresión de Devoluciones (UX: Formato exacto para NotaCreditoPrint)
+  const ejecutarReimpresionDevolucion = async (idDevolucion: string) => {
+    setCargandoDetalle(true);
+    try {
+      const data = await apiService.getDetalleDevolucionReimpresion(idDevolucion);
+      const dev = data.devolucion;
+      
+      const printPayload = {
+        cliente: dev.ventas?.clientes || { nombre_razon_social: 'PÚBLICO GENERAL', numero_documento: 'S/N' },
+        correlativo_nota_credito: `DEV-${dev.ventas?.correlativo_nota}`,
+        correlativo_original: dev.ventas?.correlativo_nota,
+        fecha: new Date(dev.fecha).toLocaleDateString('es-PE'),
+        vendedor: "AUDITORÍA (REIMPRESIÓN)",
+        motivo: dev.motivo,
+        tipo_operacion: dev.tipo_operacion,
+        items_devueltos: data.items_devueltos.map((idv: any) => ({
+          codigo: idv.productos?.sku || 'S/C',
+          cantidad: idv.cantidad_devuelta,
+          descripcion: idv.productos?.nombre || 'Producto Desconocido',
+          precio_unitario: idv.precio_unitario,
+          total: idv.cantidad_devuelta * idv.precio_unitario
+        })),
+        items_nuevos: [], 
+        valor_devuelto: dev.monto_devuelto,
+        valor_nuevos: 0,
+        diferencia: dev.monto_devuelto * -1
+      };
+      setDatosImpresionCredito(printPayload);
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
 
   const cargarHistorial = async () => {
     try {
@@ -51,7 +100,6 @@ export default function HistorialCajas() {
   }, [filtro, historial, mostrarSoloDescuadres]);
 
   // --- LÓGICA DE PAGINACIÓN ---
-  // Si el usuario filtra o busca algo, lo regresamos a la página 1 automáticamente
   useEffect(() => {
     setPaginaActual(1);
   }, [filtro, mostrarSoloDescuadres]);
@@ -62,7 +110,7 @@ export default function HistorialCajas() {
     paginaActual * turnosPorPagina
   );
 
-  // --- REPORTES Y REIMPRESIÓN ---
+  // --- REPORTES Y REIMPRESIÓN NORMAL ---
   const verReporteProductos = async (sesionId: string) => {
     setCargandoDetalle(true); setShowReporteProd(true);
     try {
@@ -112,10 +160,27 @@ export default function HistorialCajas() {
   return (
     <div className="p-4 lg:p-6 max-w-[1600px] w-full mx-auto animate-in fade-in duration-500 relative transition-colors duration-300 print:p-0 print:m-0">
       
-      {/* CAPA DE IMPRESIÓN */}
-      {datosImpresion && (
-        <div className="hidden print:block print:w-full print:bg-white">
-           <NotaPedidoPrint data={datosImpresion} />
+      {/* PANTALLA DE IMPRESIÓN UNIFICADA (Bloquea la UI) */}
+      {(datosImpresion || datosImpresionCredito) && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-zinc-900 animate-in fade-in print:static print:bg-white print:block">
+          <div className="bg-zinc-800 p-8 rounded-2xl text-center shadow-2xl border border-zinc-700 print:hidden">
+            <div className="text-4xl mb-4 animate-bounce">🖨️</div>
+            <h2 className="text-2xl font-black text-white mb-2 uppercase italic tracking-tight">Impresión en Curso</h2>
+            <p className="text-zinc-400 font-bold mb-6 text-[10px] uppercase tracking-widest">El comprobante se está generando para la impresora...</p>
+            
+            <button 
+              onClick={() => { setDatosImpresion(null); setDatosImpresionCredito(null); }} 
+              className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-900/50"
+            >
+              VOLVER A AUDITORÍA
+            </button>
+          </div>
+          
+          {/* COMPONENTES OCULTOS PARA LA PANTALLA PERO VISIBLES AL IMPRIMIR */}
+          <div className="hidden print:block print:w-full print:bg-white">
+             {datosImpresion && <NotaPedidoPrint data={datosImpresion} />}
+             {datosImpresionCredito && <NotaCreditoPrint data={datosImpresionCredito} />}
+          </div>
         </div>
       )}
 
@@ -190,7 +255,7 @@ export default function HistorialCajas() {
                       </span>
                     </td>
                     <td className="p-3 text-right space-x-2">
-                      <button onClick={() => verReporteProductos(caja.id)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-black rounded text-[9px] uppercase transition-colors">📦 Productos</button>
+                      <button onClick={() => verReporteProductos(caja.id)} className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-black rounded text-[9px] uppercase transition-colors">📦 Transacciones</button>
                       <button onClick={() => verReporteGeneral(caja.id)} className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-black rounded text-[9px] uppercase transition-colors">📊 General</button>
                     </td>
                   </tr>
@@ -225,92 +290,178 @@ export default function HistorialCajas() {
             
             {/* CABECERA ANALÍTICA CON FUNCIÓN AUTO-EJECUTABLE */}
             {(() => {
-              // 1. Matemáticas al vuelo (Suma de todo el turno)
-              const granTotalVenta = reporteAgrupado.reduce((acc, nota) => acc + (nota.total_venta || 0), 0);
-              const granTotalCosto = reporteAgrupado.reduce((acc, nota) => acc + (nota.costo_total || 0), 0);
+              // 1. Extraemos las dos listas desde el nuevo formato del Backend
+              const listaVentas = reporteAgrupado?.ventas || [];
+              const listaDev = reporteAgrupado?.devoluciones || [];
+              
+              // 2. Matemáticas al vuelo (Suma de las ventas limpias)
+              const granTotalVenta = listaVentas.reduce((acc: number, nota: any) => acc + (nota.total_venta || 0), 0);
+              const granTotalCosto = listaVentas.reduce((acc: number, nota: any) => acc + (nota.costo_total || 0), 0);
               const granMargen = granTotalVenta > 0 ? ((granTotalVenta - granTotalCosto) / granTotalVenta) * 100 : 0;
 
               return (
-                <div className="flex flex-wrap lg:flex-nowrap justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-4 gap-4">
-                  <h2 className="font-black text-lg text-zinc-900 dark:text-white uppercase italic">Detalle de Ventas</h2>
-                  
-                  {/* GRAN RESUMEN DEL TURNO (Píldora Global) */}
-                  <div className="flex bg-zinc-50 dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
-                    <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Total Venta</span>
-                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">S/ {granTotalVenta.toFixed(2)}</span>
+                <>
+                  <div className="flex flex-wrap lg:flex-nowrap justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-4 mb-4 gap-4">
+                    <h2 className="font-black text-lg text-zinc-900 dark:text-white uppercase italic">Auditoría de Transacciones</h2>
+                    
+                    {/* GRAN RESUMEN DEL TURNO */}
+                    <div className="flex bg-zinc-50 dark:bg-black rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
+                      <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Venta Bruta</span>
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">S/ {granTotalVenta.toFixed(2)}</span>
+                      </div>
+                      <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
+                        <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Costo Stock</span>
+                        <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">S/ {granTotalCosto.toFixed(2)}</span>
+                      </div>
+                      <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/10">
+                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block">Margen Global</span>
+                        <span className="text-sm font-black text-indigo-700 dark:text-indigo-400">{granMargen.toFixed(2)}%</span>
+                      </div>
                     </div>
-                    <div className="px-4 py-2 border-r border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block">Costo Stock</span>
-                      <span className="text-sm font-black text-zinc-700 dark:text-zinc-300">S/ {granTotalCosto.toFixed(2)}</span>
-                    </div>
-                    <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/10">
-                      <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block">Margen Global</span>
-                      <span className="text-sm font-black text-indigo-700 dark:text-indigo-400">{granMargen.toFixed(2)}%</span>
-                    </div>
+
+                    <button onClick={() => setShowReporteProd(false)} className="text-zinc-400 hover:text-red-500 font-black flex-shrink-0 transition-colors">
+                      ✕ CERRAR
+                    </button>
                   </div>
 
-                  <button onClick={() => setShowReporteProd(false)} className="text-zinc-400 hover:text-red-500 font-black flex-shrink-0 transition-colors">
-                    ✕ CERRAR
-                  </button>
-                </div>
+                  <div className="space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar pr-2 pb-10">
+                    
+                    {/* ================= BLOQUE 1: VENTAS (INGRESOS) ================= */}
+                    <div className="space-y-4">
+                      {listaVentas.length === 0 ? (
+                        <p className="text-center text-[10px] font-bold text-zinc-400 uppercase italic py-4">No hay ventas registradas</p>
+                      ) : (
+                        listaVentas.map((nota: any, i: number) => (
+                          <div key={i} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                            
+                            {/* Cabecera de la Nota de Venta (Píldora Segmentada) */}
+                            <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center">
+                               <div className="flex flex-1 items-center gap-4">
+                                 <div>
+                                   <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block mb-0.5">Nota de Venta</span>
+                                   <h3 className="text-zinc-900 dark:text-white font-black text-sm">{nota.correlativo}</h3>
+                                 </div>
+                                 <div className="w-px h-8 bg-zinc-300 dark:bg-zinc-700"></div>
+                                 <div>
+                                   <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Cliente Atendido</span>
+                                   <p className="text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px] max-w-[140px] truncate">{nota.cliente}</p>
+                                 </div>
+                               </div>
+
+                               <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
+                                  <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800 bg-emerald-50 dark:bg-emerald-900/10">
+                                    <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest block">Total Venta</span>
+                                    <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400">S/ {nota.total_venta?.toFixed(2)}</span>
+                                  </div>
+                                  <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800">
+                                    <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block">Costo Stock</span>
+                                    <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">S/ {nota.costo_total?.toFixed(2)}</span>
+                                  </div>
+                                  <div className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/10">
+                                    <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block">% Margen</span>
+                                    <span className="text-[11px] font-black text-indigo-700 dark:text-indigo-400">{nota.porcentaje_ganancia?.toFixed(2)}%</span>
+                                  </div>
+                               </div>
+
+                               <button onClick={() => ejecutarReimpresion(nota.id_venta)} disabled={cargandoDetalle} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-black text-[9px] uppercase transition-all shadow-md shrink-0">
+                                 🖨️ Reimprimir
+                               </button>
+                            </div>
+
+                            {/* Detalle de Productos de la Venta */}
+                            <div className="p-4">
+                              <table className="w-full text-left">
+                                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 text-[10px]">
+                                  {nota.productos?.map((prod: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
+                                      <td className="py-2 font-bold text-zinc-800 dark:text-zinc-200 uppercase w-1/2">{prod.nombre}</td>
+                                      <td className="py-2 text-center font-black text-zinc-500">x{prod.cantidad}</td>
+                                      <td className="py-2 text-right font-bold text-zinc-400">S/ {prod.precio_venta?.toFixed(2)}</td>
+                                      <td className="py-2 text-right font-black text-emerald-600 dark:text-emerald-400">S/ {prod.total_item?.toFixed(2)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* ================= BLOQUE 2: DEVOLUCIONES (EGRESOS) ================= */}
+                    {listaDev.length > 0 && (
+                      <div className="mt-8 border-t-2 border-red-500/30 pt-8 animate-in slide-in-from-bottom-4">
+                        <div className="flex items-center gap-3 mb-6">
+                           <span className="bg-red-500 text-white text-[10px] font-black uppercase px-4 py-1.5 rounded-lg shadow-lg shadow-red-500/20 animate-pulse">⚠️ Notas de Crédito Registradas</span>
+                           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Auditoría de Salidas de Caja / Cambios</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                           {listaDev.map((dev: any, i: number) => (
+                              <div key={i} className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl overflow-hidden shadow-sm hover:border-red-400 transition-colors">
+                                 
+                                 {/* Cabecera Roja de la Devolución */}
+                                 <div className="p-3 bg-red-100/50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-900/50 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center">
+                                    <div className="flex flex-1 items-center gap-4">
+                                      <div>
+                                        <span className="text-[8px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest block mb-0.5">{dev.tipo_operacion}</span>
+                                        <h3 className="text-red-900 dark:text-red-100 font-black text-sm">{dev.correlativo_nota_credito}</h3>
+                                      </div>
+                                      <div className="w-px h-8 bg-red-200 dark:bg-red-800/50"></div>
+                                      <div>
+                                        <span className="text-[8px] font-black text-red-500 dark:text-red-400/70 uppercase tracking-widest block mb-0.5">Motivo de Extorno</span>
+                                        <p className="text-red-800 dark:text-red-200 font-bold uppercase text-[10px] max-w-[180px] truncate">{dev.motivo} ({dev.cliente})</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex bg-white dark:bg-black rounded-lg border border-red-200 dark:border-red-800 shadow-sm overflow-hidden flex-shrink-0">
+                                       <div className="px-4 py-1.5 bg-red-50 dark:bg-red-900/10">
+                                         <span className="text-[8px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest block">Caja Impactada (Salida)</span>
+                                         <span className="text-[11px] font-black text-red-700 dark:text-red-400">- S/ {dev.monto_devuelto?.toFixed(2)}</span>
+                                       </div>
+                                    </div>
+
+                                    <button onClick={() => ejecutarReimpresionDevolucion(dev.id_devolucion)} disabled={cargandoDetalle} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-black text-[9px] uppercase transition-all shadow-md shrink-0">
+                                      🖨️ Reimprimir Doc.
+                                    </button>
+                                 </div>
+
+                                 {/* Lista de Items Retornados */}
+                                 <div className="p-4">
+                                   <table className="w-full text-left">
+                                     <thead className="text-[8px] uppercase text-red-800/50 dark:text-red-300/50 font-black border-b border-red-100 dark:border-red-900/30">
+                                       <tr>
+                                         <th className="pb-2">Mercadería Retornada a Stock</th>
+                                         <th className="pb-2 text-center">Cant</th>
+                                         <th className="pb-2 text-right">P. Unit</th>
+                                         <th className="pb-2 text-right">Impacto</th>
+                                       </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-red-100 dark:divide-red-900/20 text-[10px]">
+                                       {dev.productos?.map((prod: any, idx: number) => (
+                                         <tr key={idx} className="hover:bg-red-100/40 dark:hover:bg-red-900/20 transition-colors">
+                                           <td className="py-2">
+                                             <p className="font-bold text-red-900 dark:text-red-100 uppercase">{prod.nombre}</p>
+                                             <p className="text-[8px] text-red-500/70">SKU: {prod.sku || 'S/N'}</p>
+                                           </td>
+                                           <td className="py-2 text-center font-black text-red-700 dark:text-red-400">x{prod.cantidad}</td>
+                                           <td className="py-2 text-right font-bold text-red-600/70 dark:text-red-400/70">S/ {prod.precio_venta?.toFixed(2)}</td>
+                                           <td className="py-2 text-right font-black text-red-600 dark:text-red-500">- S/ {prod.total_item?.toFixed(2)}</td>
+                                         </tr>
+                                       ))}
+                                     </tbody>
+                                   </table>
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               );
             })()}
-            
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-                {reporteAgrupado.map((nota, idx) => (
-                  <div key={idx} className="bg-zinc-50 dark:bg-black border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
-                    <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap lg:flex-nowrap gap-3 justify-between items-center">
-                       
-                       {/* SECCIÓN IDENTIDAD */}
-                       <div className="flex flex-1 items-center gap-4">
-                         <div>
-                           <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block mb-0.5">Nota de Venta</span>
-                           <h3 className="text-zinc-900 dark:text-white font-black text-sm">{nota.correlativo}</h3>
-                         </div>
-                         <div className="w-px h-8 bg-zinc-300 dark:bg-zinc-700"></div>
-                         <div>
-                           <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block mb-0.5">Cliente Atendido</span>
-                           <p className="text-zinc-700 dark:text-zinc-300 font-bold uppercase text-[10px] max-w-[140px] truncate">{nota.cliente}</p>
-                         </div>
-                       </div>
-
-                       {/* SECCIÓN AUDITORÍA FINANCIERA (Píldora Segmentada) */}
-                       <div className="flex bg-white dark:bg-black rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex-shrink-0">
-                          <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800 bg-emerald-50 dark:bg-emerald-900/10">
-                            <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest block">Total Venta</span>
-                            <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400">S/ {nota.total_venta?.toFixed(2)}</span>
-                          </div>
-                          <div className="px-3 py-1.5 border-r border-zinc-200 dark:border-zinc-800">
-                            <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest block">Costo Stock</span>
-                            <span className="text-[11px] font-black text-zinc-600 dark:text-zinc-300">S/ {nota.costo_total?.toFixed(2)}</span>
-                          </div>
-                          <div className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/10">
-                            <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest block">% Margen</span>
-                            <span className="text-[11px] font-black text-indigo-700 dark:text-indigo-400">{nota.porcentaje_ganancia?.toFixed(2)}%</span>
-                          </div>
-                       </div>
-
-                       {/* SECCIÓN ACCIÓN */}
-                       <button onClick={() => ejecutarReimpresion(nota.id_venta)} disabled={cargandoDetalle} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-black text-[9px] uppercase transition-all shadow-md shrink-0">
-                         🖨️ Reimprimir
-                       </button>
-                    </div>
-                    <table className="w-full text-left text-[10px]">
-                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/50">
-                        {nota.productos.map((prod: any, pIdx: number) => (
-                          <tr key={pIdx} className="hover:bg-zinc-100 dark:hover:bg-zinc-800/30">
-                            <td className="p-2 font-bold text-zinc-700 dark:text-zinc-300 uppercase pl-4">{prod.nombre}</td>
-                            <td className="p-2 text-center text-zinc-500 font-black">x{prod.cantidad}</td>
-                            <td className="p-2 text-right text-zinc-500">S/ {prod.precio_venta.toFixed(2)}</td>
-                            <td className="p-2 text-right text-emerald-600 dark:text-emerald-400 font-black pr-4">S/ {prod.total_item.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-            </div>
           </div>
         </div>
       )}
