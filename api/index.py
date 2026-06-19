@@ -1261,45 +1261,44 @@ def listar_historial_cajas(
 @app.get("/caja/reporte-productos/{sesion_id}")
 def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),authorization: str = Header(None)):
     """
-    Genera un reporte agrupado por Nota de Venta, incluyendo auditoría de 
-    costos y márgenes de ganancia exactos para la interfaz gerencial.
+    Genera un reporte doble: Agrupa las Notas de Venta y las Notas de Crédito (Devoluciones)
+    del turno para la auditoría visual completa.
     """
     try:
         token = authorization.split(" ")[1] if authorization else None
         
-        # 1. Ampliamos la consulta: Traemos el 'costo_unidad' del producto y el 'monto_neto' real de la venta
-        res = supabase.postgrest.auth(token).table("movimientos_inventario")\
+        # =========================================================
+        # 1. OBTENER VENTAS NORMALES (INGRESOS)
+        # =========================================================
+        res_ventas = supabase.postgrest.auth(token).table("movimientos_inventario")\
             .select("cantidad, precio_momento, id_venta, "
                     "productos(nombre, sku, costo_unidad), "
                     "ventas(id, correlativo_nota, monto_neto, id_cliente, clientes(nombre_razon_social))")\
             .eq("id_sesion_caja", sesion_id)\
             .eq("tipo_movimiento", "SALIDA")\
+            .not_.ilike("referencia", "%DEVOLUCION%")\
             .execute()
             
         ventas_agrupadas = {}
-        
-        for m in res.data:
+        for m in res_ventas.data:
             id_v = m.get("id_venta")
-            if not id_v: continue # Ignoramos salidas manuales sin venta ligada
+            if not id_v: continue 
             
             venta_info = m.get("ventas") or {}
             prod_info = m.get("productos") or {}
             
-            # Inicializamos la cabecera de la venta si es la primera vez que la vemos
             if id_v not in ventas_agrupadas:
                 ventas_agrupadas[id_v] = {
                     "id_venta": id_v,
                     "correlativo": venta_info.get("correlativo_nota", "SIN CORRELATIVO"),
                     "cliente": venta_info.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL") if venta_info.get("clientes") else "PÚBLICO GENERAL",
                     "productos": [],
-                    "total_venta": float(venta_info.get("monto_neto") or 0.0), # Lo que pagó realmente el cliente (incluye descuentos)
-                    "costo_total": 0.0 # Acumulador del costo de fábrica
+                    "total_venta": float(venta_info.get("monto_neto") or 0.0),
+                    "costo_total": 0.0
                 }
             
-            # Matemáticas del ítem
             subtotal_item = float(m["cantidad"] * (m["precio_momento"] or 0.0))
             costo_unitario = float(prod_info.get("costo_unidad") or 0.0)
-            costo_fila = float(m["cantidad"] * costo_unitario)
             
             ventas_agrupadas[id_v]["productos"].append({
                 "sku": prod_info.get("sku"),
@@ -1308,24 +1307,61 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
                 "precio_venta": float(m["precio_momento"] or 0.0),
                 "total_item": subtotal_item
             })
-            
-            # Sumamos el costo de fábrica al total de esta nota
-            ventas_agrupadas[id_v]["costo_total"] += costo_fila
+            ventas_agrupadas[id_v]["costo_total"] += float(m["cantidad"] * costo_unitario)
 
-        # 2. Calculamos el margen de ganancia final por cada nota
         for id_v, data in ventas_agrupadas.items():
             t_venta = data["total_venta"]
             t_costo = data["costo_total"]
-            
-            if t_venta > 0:
-                data["porcentaje_ganancia"] = ((t_venta - t_costo) / t_venta) * 100
-            else:
-                data["porcentaje_ganancia"] = 0.0
+            data["porcentaje_ganancia"] = ((t_venta - t_costo) / t_venta) * 100 if t_venta > 0 else 0.0
 
-        return list(ventas_agrupadas.values())
+        # =========================================================
+        # 2. OBTENER DEVOLUCIONES Y CAMBIOS (EGRESOS/IMPACTOS)
+        # =========================================================
+        res_dev = supabase.postgrest.auth(token).table("devoluciones")\
+            .select("id, tipo_operacion, monto_devuelto, motivo, fecha, id_venta_original, ventas(correlativo_nota, clientes(nombre_razon_social)), devoluciones_detalle(cantidad_devuelta, precio_unitario, productos(nombre, sku))")\
+            .eq("id_sesion_caja", sesion_id)\
+            .order("fecha", desc=True)\
+            .execute()
+
+        devoluciones_formateadas = []
+        for d in res_dev.data:
+            venta_original = d.get("ventas") or {}
+            cliente_nombre = venta_original.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL") if venta_original.get("clientes") else "PÚBLICO GENERAL"
+            
+            items_dev = []
+            for item in d.get("devoluciones_detalle", []):
+                prod = item.get("productos") or {}
+                items_dev.append({
+                    "sku": prod.get("sku"),
+                    "nombre": prod.get("nombre"),
+                    "cantidad": item.get("cantidad_devuelta"),
+                    "precio_venta": float(item.get("precio_unitario") or 0.0),
+                    "total_item": float(item.get("cantidad_devuelta") * (item.get("precio_unitario") or 0.0))
+                })
+
+            correlativo_original = venta_original.get("correlativo_nota", "DESCONOCIDO")
+            
+            devoluciones_formateadas.append({
+                "id_devolucion": d["id"],
+                "id_venta_original": d.get("id_venta_original"),
+                "correlativo_original": correlativo_original,
+                "correlativo_nota_credito": f"DEV-{correlativo_original}",
+                "cliente": cliente_nombre,
+                "tipo_operacion": d["tipo_operacion"],
+                "motivo": d["motivo"],
+                "monto_devuelto": float(d["monto_devuelto"] or 0.0),
+                "fecha": d["fecha"],
+                "productos": items_dev
+            })
+
+        # Retornamos el paquete estructurado para el nuevo diseño UI
+        return {
+            "ventas": list(ventas_agrupadas.values()),
+            "devoluciones": devoluciones_formateadas
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en agrupamiento: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agrupamiento de auditoría: {str(e)}")
 
 # -----------------------------------------------------------------------------
 # 16. REIMPRESIÓN: RECUPERAR DATOS COMPLETOS DE UNA VENTA
@@ -1356,6 +1392,31 @@ def obtener_detalle_venta_reimpresion(id_venta: str, user = Depends(validar_toke
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/devoluciones/{id_devolucion}/detalle-completo")
+@app.get("/devoluciones/{id_devolucion}/detalle-completo")
+def obtener_detalle_devolucion_reimpresion(id_devolucion: str, user = Depends(validar_token),authorization: str = Header(None)):
+    """
+    Recupera cabecera e items devueltos para volver a imprimir una Nota de Crédito.
+    """
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        
+        # 1. Traemos la cabecera y datos del cliente a través de la venta original
+        dev = supabase.postgrest.auth(token).table("devoluciones")\
+            .select("*, ventas(correlativo_nota, clientes(*))")\
+            .eq("id", id_devolucion).single().execute()
+            
+        # 2. Traemos los productos devueltos
+        items = supabase.postgrest.auth(token).table("devoluciones_detalle")\
+            .select("cantidad_devuelta, precio_unitario, estado_inventario, productos(nombre, sku)")\
+            .eq("id_devolucion", id_devolucion).execute()
+            
+        return {
+            "devolucion": dev.data,
+            "items_devueltos": items.data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # -----------------------------------------------------------------------------
 # 17. MÓDULO DE GASTOS Y UTILIDADES (ACTUALIZADO - v1.0.35)
