@@ -216,6 +216,80 @@ export default function AnaliticaBIPage() {
         </div>
 
       </div>
+      
+      {/* 5. ASISTENTE DE COMPRAS PREDICTIVO (DSI) */}
+      <h2 className="text-lg font-black text-zinc-900 dark:text-white uppercase italic mt-8 mb-3">🛒 Asistente de Reabastecimiento Predictivo</h2>
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
+        
+        {/* Cabecera y Semáforo de Leyenda */}
+        <div className="bg-zinc-100 dark:bg-black/60 p-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row justify-between items-center gap-3">
+          <h3 className="font-black uppercase text-[11px] text-zinc-600 dark:text-zinc-400">Cobertura de Stock (Basado en Rotación Diaria)</h3>
+          <div className="flex flex-wrap gap-4 text-[9px] font-bold uppercase">
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800/50">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> Crítico (≤ 15 días)
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+              <div className="w-2 h-2 rounded-full bg-amber-500"></div> Previsión (16 - 30 días)
+            </span>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div> Sobrestock (&gt; 30 días)
+            </span>
+          </div>
+        </div>
+
+        {/* Tabla de Decisiones */}
+        <div className="overflow-x-auto custom-scrollbar max-h-[500px]">
+          <table className="w-full text-left">
+            <thead className="bg-zinc-50 dark:bg-zinc-900/50 sticky top-0 z-10 text-[9px] uppercase text-zinc-500 shadow-sm">
+              <tr>
+                <th className="p-3 font-black w-[5%]">#</th>
+                <th className="p-3 font-black w-[35%]">Catálogo de Producto</th>
+                <th className="p-3 font-black text-center w-[15%]">Clasificación</th>
+                <th className="p-3 font-black text-center w-[10%]">Rotación</th>
+                <th className="p-3 font-black text-center w-[10%]">Stock Actual</th>
+                <th className="p-3 font-black text-center w-[10%]">DSI (Días Restantes)</th>
+                <th className="p-3 font-black text-right w-[15%]">Acción Comercial</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+              {dataBI?.asistente_compras.map((p: any, i: number) => (
+                <tr key={p.id} className="text-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                  <td className="p-3 font-black text-zinc-400">{i + 1}</td>
+                  <td className="p-3 font-bold text-zinc-900 dark:text-white truncate max-w-[250px]">{p.nombre}</td>
+                  <td className="p-3 text-center">
+                    <span className="font-black text-[9px] text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{p.cuadrante}</span>
+                  </td>
+                  <td className="p-3 text-center font-bold text-zinc-600 dark:text-zinc-400">{p.velocidad_diaria} un/día</td>
+                  <td className="p-3 text-center font-black text-zinc-800 dark:text-zinc-200 text-[11px]">{p.stock_actual}</td>
+                  
+                  <td className="p-3 text-center">
+                    <span className={`px-2 py-1 rounded font-black text-[11px] ${
+                      p.estado_stock === 'CRITICO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                      p.estado_stock === 'PREVISION' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    }`}>
+                      {p.dias_cobertura > 999 ? '+999' : p.dias_cobertura} DÍAS
+                    </span>
+                  </td>
+                  
+                  <td className="p-3 text-right">
+                    <span className={`font-black uppercase tracking-widest ${
+                      p.estado_stock === 'CRITICO' ? 'text-red-600 dark:text-red-500' :
+                      p.estado_stock === 'PREVISION' ? 'text-amber-600 dark:text-amber-500' :
+                      'text-blue-600 dark:text-blue-500 opacity-60'
+                    }`}>
+                      {p.estado_stock === 'CRITICO' ? '🚨 COMPRAR YA' :
+                       p.estado_stock === 'PREVISION' ? '🛒 PROGRAMAR' :
+                       '🛑 ESPERAR'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }

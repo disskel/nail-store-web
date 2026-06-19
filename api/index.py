@@ -1927,14 +1927,18 @@ def analitica_inteligencia_negocio(
     authorization: str = Header(None)
 ):
     """
-    Motor de BI: Procesa todas las ventas en un rango de fechas y clasifica 
-    los productos usando la Matriz de Rentabilidad BCG, descontando devoluciones con precisión.
+    Motor de BI: Procesa las ventas, clasifica con la Matriz BCG y calcula 
+    la Cobertura Predictiva de Stock (DSI) para el Asistente de Compras.
     """
     try:
         token = authorization.split(" ")[1] if authorization else None
         
-        # 1. Aseguramos que cubra hasta las 23:59 del día final
+        # 1. Ajuste de Fechas y Cálculo del Horizonte de Tiempo (DSI)
         fecha_fin = f"{hasta}T23:59:59.999Z" if len(hasta) == 10 else hasta
+        
+        d1 = datetime.strptime(desde[:10], "%Y-%m-%d")
+        d2 = datetime.strptime(hasta[:10], "%Y-%m-%d")
+        dias_periodo = max(1, (d2 - d1).days + 1) # Mínimo 1 día para evitar error matemático
 
         # 2. SELECCIÓN DE VENTAS BASE Y EXTRACCIÓN DE CAJA REAL
         ventas_res = supabase.postgrest.auth(token).table("ventas")\
@@ -1964,12 +1968,13 @@ def analitica_inteligencia_negocio(
                 "resumen": {"ticket_promedio": 0, "ingresos_netos": 0, "descuentos_cedidos": 0, "margen_global": 0, "eje_x_cantidad": 0}, 
                 "matriz": [], 
                 "ranking_volumen": [], 
-                "ranking_rentabilidad": []
+                "ranking_rentabilidad": [],
+                "asistente_compras": []
             }
 
-        # 3. TRAER TODO EL HISTORIAL VINCULADO DEL KÁRDEX
+        # 3. TRAER KÁRDEX Y STOCK ACTUAL (Se agrega stock_actual al select)
         res = supabase.postgrest.auth(token).table("movimientos_inventario")\
-            .select("cantidad, precio_momento, tipo_movimiento, referencia, productos(id, nombre, costo_unidad)")\
+            .select("cantidad, precio_momento, tipo_movimiento, referencia, productos(id, nombre, costo_unidad, stock_actual)")\
             .in_("id_venta", ids_ventas)\
             .execute()
 
@@ -1983,6 +1988,7 @@ def analitica_inteligencia_negocio(
             p_id = prod.get("id")
             p_nombre = prod.get("nombre")
             p_costo = float(prod.get("costo_unidad") or 0.0)
+            p_stock = int(prod.get("stock_actual") or 0) # Extracción del stock en estante
             
             cant = int(m.get("cantidad") or 0)
             precio = float(m.get("precio_momento") or 0.0)
@@ -1993,12 +1999,13 @@ def analitica_inteligencia_negocio(
                 productos_agrupados[p_id] = {
                     "id": p_id,
                     "nombre": p_nombre,
+                    "stock_actual": p_stock,
                     "cantidad": 0,
                     "ingresos": 0.0,
                     "costos": 0.0
                 }
             
-            # MATEMÁTICA PURA: Sumamos lo que sale (Ventas) y restamos lo que entra (Devoluciones)
+            # MATEMÁTICA PURA: Compensación Ventas vs Devoluciones
             if tipo_mov == "SALIDA":
                 productos_agrupados[p_id]["cantidad"] += cant
                 productos_agrupados[p_id]["ingresos"] += (cant * precio)
@@ -2008,7 +2015,7 @@ def analitica_inteligencia_negocio(
                 productos_agrupados[p_id]["ingresos"] -= (cant * precio)
                 productos_agrupados[p_id]["costos"] -= (cant * p_costo)
 
-        # 5. CÁLCULOS GLOBALES Y LIMPIEZA
+        # 5. CÁLCULOS GLOBALES Y ALGORITMOS PREDICTIVOS
         lista_productos = []
         total_ingresos_kardex = 0.0
         total_costos_global = 0.0
@@ -2025,13 +2032,27 @@ def analitica_inteligencia_negocio(
             p["margen_porcentaje"] = round(margen, 2)
             p["utilidad_neta"] = round(ing - cst, 2)
             
+            # --- ASISTENTE DE COMPRAS: CÁLCULO DSI ---
+            velocidad_diaria = p["cantidad"] / dias_periodo
+            dias_cobertura = p["stock_actual"] / velocidad_diaria if velocidad_diaria > 0 else 9999
+            
+            p["velocidad_diaria"] = round(velocidad_diaria, 2)
+            p["dias_cobertura"] = int(dias_cobertura)
+            
+            if p["dias_cobertura"] <= 15:
+                p["estado_stock"] = "CRITICO"
+            elif p["dias_cobertura"] <= 30:
+                p["estado_stock"] = "PREVISION"
+            else:
+                p["estado_stock"] = "SOBRESTOCK"
+            
             total_ingresos_kardex += ing
             total_costos_global += cst
             total_cantidad_vendida += p["cantidad"]
             
             lista_productos.append(p)
 
-        # Promedios del mercado para los ejes de la matriz BCG (Se mantiene sobre el kárdex puro)
+        # Promedios del mercado para los ejes BCG
         cantidad_promedio = total_cantidad_vendida / len(lista_productos) if lista_productos else 0
         margen_promedio = ((total_ingresos_kardex - total_costos_global) / total_ingresos_kardex) * 100 if total_ingresos_kardex > 0 else 0
 
@@ -2049,23 +2070,27 @@ def analitica_inteligencia_negocio(
             else:
                 p["cuadrante"] = "PERRO"
 
-        # 7. GENERACIÓN DE RANKINGS DUALES
+        # 7. GENERACIÓN DE RANKINGS Y LISTA DEL ASISTENTE
         ranking_volumen = sorted(lista_productos, key=lambda x: x["cantidad"], reverse=True)[:10]
         ranking_rentabilidad = sorted(lista_productos, key=lambda x: x["utilidad_neta"], reverse=True)[:10]
+        
+        # El asistente ordena los productos mostrando primero las urgencias (Rojo/Amarillo)
+        asistente_compras = sorted(lista_productos, key=lambda x: x["dias_cobertura"])
         
         ticket_promedio = ingresos_netos_caja / ventas_reales_count if ventas_reales_count > 0 else 0
 
         return {
             "resumen": {
                 "ticket_promedio": round(ticket_promedio, 2),
-                "ingresos_netos": round(ingresos_netos_caja, 2), # <-- Dato unificado con Utilidades
-                "descuentos_cedidos": round(descuentos_globales, 2), # <-- Fuga de capital detectada
+                "ingresos_netos": round(ingresos_netos_caja, 2),
+                "descuentos_cedidos": round(descuentos_globales, 2),
                 "margen_global": round(margen_promedio, 2),
                 "eje_x_cantidad": round(cantidad_promedio, 2) 
             },
             "matriz": lista_productos,
             "ranking_volumen": ranking_volumen,
-            "ranking_rentabilidad": ranking_rentabilidad
+            "ranking_rentabilidad": ranking_rentabilidad,
+            "asistente_compras": asistente_compras
         }
     except Exception as e:
         print(f"Error Crítico en Analítica BI: {str(e)}")
