@@ -1850,6 +1850,7 @@ class DevolucionRequest(BaseModel):
     motivo: str
     items_devueltos: List[ItemDevolucion]
     items_nuevos: Optional[List[ItemCambio]] = []
+    id_sesion_caja: Optional[str] = None # <--- NUEVO: Soporte para auditoría de caja
 
 @app.get("/api/devoluciones/consultar/{correlativo}")
 @app.get("/devoluciones/consultar/{correlativo}")
