@@ -1941,6 +1941,21 @@ def procesar_devolucion_y_cambio(
         # quién está ejecutando la acción (para auditoría y RLS).
         # =========================================================
         token = authorization.split(" ")[1] if authorization else None
+
+        # =========================================================
+        # TRAMO 1.5: INTELIGENCIA DE CAJA (RESOLUCIÓN AUTOMÁTICA)
+        # Identificamos el turno abierto para impactar el dinero allí.
+        # =========================================================
+        id_sesion = req.id_sesion_caja
+        if not id_sesion:
+            sesion_activa = supabase.postgrest.auth(token).table("sesiones_caja")\
+                .select("id").eq("estado", "ABIERTA")\
+                .order("fecha_apertura", desc=True).limit(1).execute()
+            
+            if not sesion_activa.data:
+                raise HTTPException(status_code=400, detail="OPERACIÓN CANCELADA: NO HAY TURNO DE CAJA ABIERTO.")
+                
+            id_sesion = sesion_activa.data[0]["id"]
         
         # =========================================================
         # TRAMO 2: PREPARACIÓN DE DATOS (PAYLOAD)
@@ -1960,7 +1975,8 @@ def procesar_devolucion_y_cambio(
             "p_metodo_reembolso": req.metodo_reembolso,
             "p_motivo": req.motivo.upper(),
             "p_items_devueltos": items_devueltos_json,
-            "p_items_nuevos": items_nuevos_json
+            "p_items_nuevos": items_nuevos_json,
+            "p_id_sesion_caja": id_sesion # <--- EL ESLABÓN PERDIDO PARA QUE FUNCIONE EL RPC
         }
 
         # =========================================================
