@@ -1850,7 +1850,7 @@ class DevolucionRequest(BaseModel):
     motivo: str
     items_devueltos: List[ItemDevolucion]
     items_nuevos: Optional[List[ItemCambio]] = []
-    id_sesion_caja: Optional[str] = None # <--- NUEVO: Soporte para auditoría de caja
+    
 
 @app.get("/api/devoluciones/consultar/{correlativo}")
 @app.get("/devoluciones/consultar/{correlativo}")
@@ -1943,21 +1943,6 @@ def procesar_devolucion_y_cambio(
         token = authorization.split(" ")[1] if authorization else None
 
         # =========================================================
-        # TRAMO 1.5: INTELIGENCIA DE CAJA (RESOLUCIÓN AUTOMÁTICA)
-        # Identificamos el turno abierto para impactar el dinero allí.
-        # =========================================================
-        id_sesion = req.id_sesion_caja
-        if not id_sesion:
-            sesion_activa = supabase.postgrest.auth(token).table("sesiones_caja")\
-                .select("id").eq("estado", "ABIERTA")\
-                .order("fecha_apertura", desc=True).limit(1).execute()
-            
-            if not sesion_activa.data:
-                raise HTTPException(status_code=400, detail="OPERACIÓN CANCELADA: NO HAY TURNO DE CAJA ABIERTO.")
-                
-            id_sesion = sesion_activa.data[0]["id"]
-        
-        # =========================================================
         # TRAMO 2: PREPARACIÓN DE DATOS (PAYLOAD)
         # Convertimos los objetos de Python (req.items_devueltos) 
         # en diccionarios JSON puros que PostgreSQL pueda entender nativamente.
@@ -1976,7 +1961,7 @@ def procesar_devolucion_y_cambio(
             "p_motivo": req.motivo.upper(),
             "p_items_devueltos": items_devueltos_json,
             "p_items_nuevos": items_nuevos_json,
-            "p_id_sesion_caja": id_sesion # <--- EL ESLABÓN PERDIDO PARA QUE FUNCIONE EL RPC
+
         }
 
         # =========================================================
