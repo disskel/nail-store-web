@@ -301,7 +301,7 @@ export default function HistorialCajas() {
               const totalCostoDevuelto = listaDev.reduce((acc: number, dev: any) => acc + (dev.costo_devuelto || 0), 0);
 
               // 4. Matemáticas Netas (La Realidad del Turno)
-              const granTotalVentaNeta = totalVentaBruta - totalDevoluciones;
+              const granTotalVentaNeta = totalVentaBruta + totalDevoluciones;
               const granTotalCostoNeto = totalCostoBruto - totalCostoDevuelto;
               const granMargen = granTotalVentaNeta > 0 ? ((granTotalVentaNeta - granTotalCostoNeto) / granTotalVentaNeta) * 100 : 0;
 
