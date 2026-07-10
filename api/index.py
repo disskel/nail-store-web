@@ -1292,14 +1292,19 @@ def reporte_productos_por_turno(sesion_id: str, user = Depends(validar_token),au
             
             venta_info = m.get("ventas") or {}
             prod_info = m.get("productos") or {}
+
+            correlativo_actual = venta_info.get("correlativo_nota", "SIN CORRELATIVO")
+            es_compensatoria = str(correlativo_actual).startswith("DEV-")
             
             if id_v not in ventas_agrupadas:
                 ventas_agrupadas[id_v] = {
                     "id_venta": id_v,
-                    "correlativo": venta_info.get("correlativo_nota", "SIN CORRELATIVO"),
+                    "correlativo": correlativo_actual,
                     "cliente": venta_info.get("clientes", {}).get("nombre_razon_social", "PÚBLICO GENERAL") if venta_info.get("clientes") else "PÚBLICO GENERAL",
                     "productos": [],
-                    "total_venta": float(venta_info.get("monto_neto") or 0.0),
+                    # SOLUCIÓN ARQUITECTÓNICA: Evitamos el doble conteo de dinero en los CAMBIOS.
+                    # El dinero ya se sumó en el bloque de Devoluciones, aquí solo mostramos los productos que salieron.
+                    "total_venta": 0.0 if es_compensatoria else float(venta_info.get("monto_neto") or 0.0),
                     "costo_total": 0.0
                 }
             
