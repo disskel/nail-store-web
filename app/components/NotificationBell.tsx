@@ -10,6 +10,8 @@ export default function NotificationBell() {
   const [monto, setMonto] = useState("");
   // NUEVO: Estado para el método de pago seleccionado (por defecto EFECTIVO)
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
+  // NUEVO: Candado de seguridad para evitar doble clic
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const revisar = async () => {
     // =========================================================================
@@ -66,6 +68,9 @@ export default function NotificationBell() {
   };
 
 const ejecutarPago = async () => {
+  // CANDADO 1: Si ya está procesando, bloqueamos clics adicionales
+  if (isSubmitting) return; 
+  setIsSubmitting(true); // Bloqueamos el botón
   // Capturamos la fecha y hora completa ISO, pero asegurando el horario de Lima
   // Esto enviará algo como "2026-05-13T18:15:00-05:00"
   const ahora = new Date();
@@ -88,9 +93,13 @@ const ejecutarPago = async () => {
     setMonto(""); 
     revisar(); 
     
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fallo en Trujillo:", error);
-    alert("Error de red. Intenta de nuevo.");
+    // Atrapamos el mensaje formal del backend (ej. "PAGO DUPLICADO")
+    alert(error?.response?.data?.detail || "Error de red. Intenta de nuevo.");
+  } finally {
+    // CANDADO 2: Liberamos el botón sin importar si hubo éxito o error
+    setIsSubmitting(false); 
   }
 };
 
@@ -168,10 +177,15 @@ const ejecutarPago = async () => {
                   Cancelar
                 </button>
                 <button 
-                  onClick={ejecutarPago} 
-                  className="flex-1 bg-indigo-600 text-white p-3 rounded-xl font-bold text-xs"
+                  onClick={ejecutarPago}
+                  disabled={isSubmitting}
+                  className={`flex-1 p-3 rounded-xl font-bold text-xs transition-all ${
+                    isSubmitting 
+                      ? 'bg-zinc-600 text-zinc-400 opacity-70 cursor-not-allowed' 
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  }`}
                 >
-                  Registrar Pago
+                  {isSubmitting ? 'Procesando...' : 'Registrar Pago'}
                 </button>
             </div>
           </div>

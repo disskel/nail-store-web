@@ -1686,8 +1686,16 @@ def liquidar_pago_completo(
         
         return res.data
     except Exception as e:
-        print(f"Error en transacción Trujillo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Fallo crítico: {str(e)}")
+        error_dict = str(e)
+        print(f"Error en transacción Trujillo: {error_dict}")
+        
+        # Atrapamos el escudo Anti-Doble Clic de la base de datos
+        if "DBL01" in error_dict:
+            raise HTTPException(status_code=409, detail="PAGO DUPLICADO: Esta obligación ya fue registrada hoy.")
+        elif "CJA01" in error_dict:
+            raise HTTPException(status_code=400, detail="OPERACIÓN CANCELADA: NO HAY TURNO DE CAJA ABIERTO.")
+            
+        raise HTTPException(status_code=500, detail=f"Fallo crítico: {error_dict}")
 
 # -----------------------------------------------------------------------------
 # 19. MÓDULO DE ANALÍTICA CRM (ALIANZAS Y FIDELIZACIÓN)

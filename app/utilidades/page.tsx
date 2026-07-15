@@ -33,6 +33,8 @@ export default function UtilidadesPage() {
     descripcion: '', categoria: 'SERVICIOS', es_recurrente: true, dia_vencimiento: 15, recordatorio_dias: 3, monto_sugerido: 0
   });
 
+  const [isSubmittingGasto, setIsSubmittingGasto] = useState(false); // NUEVO
+
   // --- 4. MOTOR DE CARGA SINCRONIZADO ---
   const cargarTodo = async () => {
     setCargando(true);
@@ -103,6 +105,8 @@ export default function UtilidadesPage() {
 
   const guardarGasto = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingGasto) return; // Candado de seguridad
+    setIsSubmittingGasto(true);
     try {
       await apiService.registrarGasto(nuevoGasto);
       setShowModalGasto(false);
@@ -110,6 +114,9 @@ export default function UtilidadesPage() {
       cargarTodo();
       alert("✅ GASTO REGISTRADO");
     } catch (error) { alert("Error al registrar"); }
+      finally {
+      setIsSubmittingGasto(false); // Liberar candado
+      }
   };
 
   if (cargando) return <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950 text-indigo-500 font-black tracking-widest uppercase italic animate-pulse">Auditoría en proceso...</div>;
@@ -327,7 +334,17 @@ export default function UtilidadesPage() {
 
               <div className="flex gap-2 pt-4">
                 <button type="button" onClick={() => setShowModalGasto(false)} className="flex-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 p-3 rounded-lg font-black uppercase text-[10px]">Cancelar</button>
-                <button type="submit" className="flex-1 bg-red-600 hover:bg-red-500 text-white p-3 rounded-lg font-black uppercase text-[10px] shadow-lg">Confirmar Gasto</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingGasto}
+                  className={`flex-1 p-3 rounded-lg font-black uppercase text-[10px] shadow-lg transition-all ${
+                    isSubmittingGasto 
+                      ? 'bg-zinc-500 text-white opacity-50 cursor-not-allowed' 
+                      : 'bg-red-600 hover:bg-red-500 text-white'
+                  }`}
+                >
+                  {isSubmittingGasto ? 'Procesando...' : 'Confirmar Gasto'}
+                </button>
               </div>
             </div>
           </form>
