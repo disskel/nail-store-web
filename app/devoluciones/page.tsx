@@ -65,10 +65,23 @@ export default function DevolucionesPage() {
   // 2. BUSCADOR DE DOCUMENTO
   const buscarDocumento = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!correlativo.trim()) return;
-    setCargando(true); setError(''); setMensaje({ texto: '', tipo: '' });
+    const textoBuscado = correlativo.trim().toUpperCase();
+    
+    if (!textoBuscado) return;
+
+    // CANDADO UX: Evitar que el usuario busque nombres de productos en lugar de boletas
+    // Exigimos que al menos contenga un guion (-) como en "P001-XXXX" o "DEV-XXXX"
+    if (!textoBuscado.includes('-')) {
+      setError('Formato inválido. El correlativo debe contener un guion (Ej: P001-000123).');
+      return;
+    }
+
+    setCargando(true); 
+    setError(''); 
+    setMensaje({ texto: '', tipo: '' });
+    
     try {
-      const data = await apiService.consultarVentaParaDevolucion(correlativo.trim().toUpperCase());
+      const data = await apiService.consultarVentaParaDevolucion(textoBuscado);
       setVentaData(data.venta);
       setItemsDisponibles(data.items_disponibles);
       
@@ -83,8 +96,16 @@ export default function DevolucionesPage() {
       setItemsNuevos([]); // Limpiar carrito de cambios
       setTipoOperacion('TOTAL');
     } catch (err: any) {
-      setError(err.message);
-      setVentaData(null); setItemsDisponibles([]);
+      // TRADUCTOR DE UX: Convertimos el error JSON feo de Supabase en un mensaje amigable
+      const msjError = err.message || "";
+      if (msjError.includes("PGRST116") || msjError.includes("0 ROWS") || msjError.includes("JSON OBJECT") || msjError.includes("404")) {
+        setError('El documento ingresado no existe o fue anulado previamente.');
+      } else {
+        setError(`Error al buscar: ${msjError}`);
+      }
+      
+      setVentaData(null); 
+      setItemsDisponibles([]);
     } finally {
       setCargando(false);
     }
@@ -247,29 +268,33 @@ export default function DevolucionesPage() {
   // =======================================================================
   if (printData) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] animate-in fade-in">
-        <div className="bg-emerald-900/20 border border-emerald-500 p-8 rounded-2xl text-center">
-          <h2 className="text-3xl font-black text-emerald-400 mb-2">¡OPERACIÓN EXITOSA!</h2>
-          <p className="text-zinc-300 font-bold mb-8">El comprobante se está enviando a la impresora...</p>
-          
-          <button 
-            onClick={() => {
-              // Ahora sí, limpiamos TODO para recibir al siguiente cliente en caja
-              setPrintData(null);
-              setVentaData(null); 
-              setItemsDisponibles([]); 
-              setCorrelativo(''); 
-              setMotivo(''); 
-              setItemsNuevos([]);
-            }} 
-            className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-white font-black tracking-widest uppercase transition-all shadow-lg shadow-emerald-900/50"
-          >
-            NUEVA OPERACIÓN
-          </button>
+      <>
+        {/* INTERFAZ VISUAL: El "print:hidden" hace que desaparezca en el PDF */}
+        <div className="print:hidden flex flex-col items-center justify-center h-[calc(100vh-100px)] animate-in fade-in">
+          <div className="bg-emerald-900/20 border border-emerald-500 p-8 rounded-2xl text-center">
+            <h2 className="text-3xl font-black text-emerald-400 mb-2">¡OPERACIÓN EXITOSA!</h2>
+            <p className="text-zinc-300 font-bold mb-8">El comprobante se está enviando a la impresora...</p>
+            
+            <button 
+              onClick={() => {
+                // Ahora sí, limpiamos TODO para recibir al siguiente cliente en caja
+                setPrintData(null);
+                setVentaData(null); 
+                setItemsDisponibles([]); 
+                setCorrelativo(''); 
+                setMotivo(''); 
+                setItemsNuevos([]);
+              }} 
+              className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-white font-black tracking-widest uppercase transition-all shadow-lg shadow-emerald-900/50"
+            >
+              NUEVA OPERACIÓN
+            </button>
+          </div>
         </div>
+        
         {/* COMPONENTE OCULTO PARA LA IMPRESORA FÍSICA */}
         <NotaCreditoPrint data={printData} />
-      </div>
+      </>
     );
   }
 
