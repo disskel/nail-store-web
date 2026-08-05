@@ -582,25 +582,38 @@ def actualizar_cliente(
     try:
         token = authorization.split(" ")[1] if authorization else None
         
-        # SOLUCIÓN: exclude_unset=True captura exactamente lo que el frontend envió,
-        # permitiendo diferenciar entre "no me enviaron el id_academia" y "enviaron id_academia = null"
+        # exclude_unset=True captura lo que el frontend envió
         campos_recibidos = req.dict(exclude_unset=True)
 
         # =================================================================
-        # BLOQUEO INTELIGENTE DE AUDITORÍA (OPCIÓN B)
+        # BLOQUEO INTELIGENTE DE AUDITORÍA (CORREGIDO - V2)
         # =================================================================
-        intentando_editar_documento = ("numero_documento" in campos_recibidos) or ("tipo_documento" in campos_recibidos)
+        # 1. Traemos los datos actuales del cliente de la base de datos
+        cliente_db = supabase.postgrest.auth(token).table("clientes")\
+            .select("numero_documento, tipo_documento")\
+            .eq("id", id_cliente).single().execute()
         
-        if intentando_editar_documento:
-            # Buscamos si este cliente ya tiene alguna venta registrada
+        doc_actual = cliente_db.data.get("numero_documento") if cliente_db.data else None
+        tipo_actual = cliente_db.data.get("tipo_documento") if cliente_db.data else None
+
+        # 2. Verificamos si REALMENTE se está intentando cambiar el DNI o RUC
+        hubo_cambio_identidad = False
+        
+        if "numero_documento" in campos_recibidos and campos_recibidos["numero_documento"] != doc_actual:
+            hubo_cambio_identidad = True
+            
+        if "tipo_documento" in campos_recibidos and campos_recibidos["tipo_documento"] != tipo_actual:
+            hubo_cambio_identidad = True
+
+        # 3. Solo si hubo un cambio real en el número/tipo, verificamos el historial de ventas
+        if hubo_cambio_identidad:
             ventas_historial = supabase.postgrest.auth(token).table("ventas")\
                 .select("id").eq("id_cliente", id_cliente).limit(1).execute()
                 
             if ventas_historial.data and len(ventas_historial.data) > 0:
-                # Si tiene ventas, bloqueamos la API con un error 403 (Prohibido)
                 raise HTTPException(
                     status_code=403, 
-                    detail="BLOQUEO DE AUDITORÍA: No se puede editar el DNI/RUC de un cliente que ya tiene historial de compras. Por favor, registre un cliente nuevo."
+                    detail="403: BLOQUEO DE AUDITORÍA: NO SE PUEDE EDITAR EL DNI/RUC DE UN CLIENTE QUE YA TIENE HISTORIAL DE COMPRAS. POR FAVOR, REGISTRE UN CLIENTE NUEVO."
                 )
         # =================================================================
 
@@ -620,14 +633,10 @@ def actualizar_cliente(
             
         if "celular" in campos_recibidos:
             update_data["celular"] = req.celular
-
-        if "numero_documento" in campos_recibidos:
-            update_data["numero_documento"] = req.numero_documento
             
         if "activo" in campos_recibidos:
             update_data["activo"] = req.activo
 
-        # MAGIA: Si el frontend envió el campo, lo asignamos (incluso si es None/null)
         if "id_academia" in campos_recibidos:
             update_data["id_academia"] = req.id_academia
 
