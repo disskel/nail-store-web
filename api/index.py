@@ -2206,8 +2206,6 @@ def analitica_inteligencia_negocio(
 # 22. MÓDULO CONSULTOR IA FINANCIERO (TEXT-TO-SQL SOLO LECTURA + PROYECCIONES)
 # -----------------------------------------------------------------------------
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
 # Cascada de modelos gratuitos y rápidos en Google AI Studio
 MODELOS_GEMINI_GRATIS = [
     "gemini-2.5-flash",
@@ -2257,6 +2255,9 @@ class ConsultaIARequest(BaseModel):
 def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
     """Valida que la consulta generada sea estrictamente SELECT/WITH y sin escritura."""
     limpio = re.sub(r"```(?:sql)?", "", sql_raw, flags=re.IGNORECASE).replace("```", "").strip()
+    # Eliminamos comentarios SQL que puedan romper la subconsulta envolvente
+    limpio = re.sub(r"/\*[\s\S]*?\*/", " ", limpio)
+    limpio = re.sub(r"--.*$", "", limpio, flags=re.MULTILINE).strip()
     limpio = re.sub(r";+\s*$", "", limpio).strip()
 
     if not re.match(r"^(SELECT|WITH)\b", limpio, re.IGNORECASE):
@@ -2276,14 +2277,23 @@ def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
     return limpio
 
 async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
-    """Ejecuta la llamada a Google Gemini con respaldo automático entre modelos gratuitos."""
-    if not GEMINI_API_KEY:
+    """Ejecuta la llamada a Google Gemini limpiando saltos de línea de la API Key."""
+    raw_key = os.environ.get("GEMINI_API_KEY") or ""
+    # Limpieza crítica: elimina \n, \r, espacios o comillas pegadas al copiar la llave
+    api_key = re.sub(r"[\s\"']+", "", raw_key)
+
+    if not api_key:
         raise HTTPException(status_code=500, detail="Falta configurar GEMINI_API_KEY en el servidor.")
 
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key
+    }
+
     ultimo_error = ""
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with httpx.AsyncClient(timeout=25.0) as client:
         for modelo in MODELOS_GEMINI_GRATIS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={GEMINI_API_KEY}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
             payload = {
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                 "generationConfig": {
@@ -2292,7 +2302,7 @@ async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[s
                 }
             }
             try:
-                resp = await client.post(url, json=payload)
+                resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
                     texto = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -2301,7 +2311,7 @@ async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[s
             except Exception as ex:
                 ultimo_error = f"{modelo} Excepción: {str(ex)}"
 
-    raise HTTPException(status_code=503, detail=f"Modelos gratuitos ocupados temporalmente. Detalle: {ultimo_error}")
+    raise HTTPException(status_code=503, detail=f"No se pudo conectar con Gemini. Detalle: {ultimo_error}")
 
 @app.post("/api/ia/consultar")
 @app.post("/ia/consultar")
@@ -2311,9 +2321,9 @@ async def consultar_asistente_ia(
     authorization: str = Header(None)
 ):
     """
-    Motor Analítico Conversacional (Solo Lectura):
+    Motor Analítico Conversacional (Solo Lectura con Autocorrección SQL):
     1. Traduce la pregunta del administrador a SQL seguro (SELECT/WITH).
-    2. Ejecuta el SQL en Supabase mediante RPC READ ONLY respetando RLS.
+    2. Ejecuta el SQL en Supabase mediante RPC READ ONLY (con 1 reintento automático si hay error de sintaxis).
     3. Redacta el informe financiero, económico o proyección con base en datos reales.
     """
     try:
@@ -2321,7 +2331,6 @@ async def consultar_asistente_ia(
         if not req.pregunta or not req.pregunta.strip():
             raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía.")
 
-        # Contexto breve de mensajes previos para repreguntas
         contexto_chat = ""
         if req.historial:
             ultimos = req.historial[-4:]
@@ -2345,19 +2354,42 @@ INSTRUCCIONES ESTRICTAS:
 3. Si piden proyecciones (ej. cierre de mes), extrae los datos históricos diarios del mes actual y del mes anterior para calcular promedios diarios reales.
 4. Usa ROUND(..., 2) en cálculos monetarios y porcentajes, y COALESCE(..., 0) para evitar valores NULL.
 """
-        sql_generado_raw, modelo_usado = await llamar_gemini_gratis(prompt_sql, temperatura=0.0)
+        sql_generado_raw, _ = await llamar_gemini_gratis(prompt_sql, temperatura=0.0)
         sql_seguro = sanitizar_sql_solo_lectura(sql_generado_raw)
 
-        # FASE 2: EJECUCIÓN BLINDADA EN SUPABASE (RPC READ ONLY + RLS)
-        res_db = supabase.postgrest.auth(token).rpc(
-            "ejecutar_consulta_ia",
-            {"p_sql": sql_seguro}
-        ).execute()
+        # FASE 2: EJECUCIÓN BLINDADA EN SUPABASE CON AUTOCORRECCIÓN (1 REINTENTO)
+        try:
+            res_db = supabase.postgrest.auth(token).rpc(
+                "ejecutar_consulta_ia",
+                {"p_sql": sql_seguro}
+            ).execute()
+        except Exception as db_err:
+            error_pg = str(db_err)
+            if "IA403" in error_pg:
+                raise ValueError("Operación bloqueada por seguridad: solo se permiten consultas SELECT.")
+
+            # Si hubo un error de sintaxis o columna en PostgreSQL, pedimos a Gemini corregirlo una vez
+            prompt_fix = f"""La siguiente consulta PostgreSQL falló al ejecutarse en Supabase:
+SQL FALLIDO:
+{sql_seguro}
+
+ERROR DE POSTGRESQL:
+{error_pg}
+
+{ESQUEMA_BD_NAIL_STORE}
+
+Corrige la consulta respetando exactamente los nombres de tablas y columnas del esquema. Devuelve ÚNICAMENTE el SQL corregido, sin markdown ni explicaciones.
+"""
+            sql_corregido_raw, _ = await llamar_gemini_gratis(prompt_fix, temperatura=0.0)
+            sql_seguro = sanitizar_sql_solo_lectura(sql_corregido_raw)
+            res_db = supabase.postgrest.auth(token).rpc(
+                "ejecutar_consulta_ia",
+                {"p_sql": sql_seguro}
+            ).execute()
 
         datos_reales = res_db.data if res_db.data is not None else []
         datos_json_str = json.dumps(datos_reales, ensure_ascii=False, default=str)
 
-        # Recorte de seguridad si el JSON supera 18,000 caracteres
         if len(datos_json_str) > 18000:
             datos_json_str = datos_json_str[:18000] + "... [TRUNCADO POR TAMAÑO]"
 
