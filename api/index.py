@@ -2205,16 +2205,10 @@ def analitica_inteligencia_negocio(
 # -----------------------------------------------------------------------------
 # 22. MÓDULO CONSULTOR IA FINANCIERO (MOTOR HÍBRIDO GEMINI + GROQ SOLO LECTURA)
 # -----------------------------------------------------------------------------
-import asyncio
 
 MODELOS_GEMINI_GRATIS = [
     "gemini-3.8-flash",
     "gemini-3.6-flash"
-]
-
-MODELOS_GROQ_GRATIS = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant"
 ]
 
 ESQUEMA_BD_NAIL_STORE = """
@@ -2279,11 +2273,20 @@ def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
 
     return limpio
 
+def _prioridad_modelo_groq(model_id: str) -> int:
+    """Ordena los modelos activos de Groq priorizando los de mayor capacidad analítica."""
+    mid = model_id.lower()
+    if any(k in mid for k in ("llama-4", "maverick", "scout", "qwen", "gpt-oss", "deepseek", "70b", "120b")):
+        return 0
+    if any(k in mid for k in ("32b", "24b", "27b", "mistral", "gemma", "versatile")):
+        return 1
+    return 2
+
 async def llamar_ia_hibrida(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
     """
-    Motor Híbrido Multi-Proveedor (Alta Disponibilidad Gratuita):
+    Motor Híbrido Multi-Proveedor con Autodescubrimiento:
     1. Intenta con Google Gemini (3.8 Flash / 3.6 Flash).
-    2. Si Google tiene picos 503 o límite 429, salta instantáneamente a Groq (Llama 3.3 70B).
+    2. Si Google devuelve 503 o timeout, consulta los modelos activos en Groq y usa el mejor disponible.
     """
     gemini_key = re.sub(r"[\s\"']+", "", os.environ.get("GEMINI_API_KEY") or "")
     groq_key = re.sub(r"[\s\"']+", "", os.environ.get("GROQ_API_KEY") or "")
@@ -2309,7 +2312,7 @@ async def llamar_ia_hibrida(prompt: str, temperatura: float = 0.1) -> tuple[str,
                 "maxOutputTokens": 4096
             }
         }
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             for modelo in MODELOS_GEMINI_GRATIS:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
                 try:
@@ -2320,17 +2323,36 @@ async def llamar_ia_hibrida(prompt: str, temperatura: float = 0.1) -> tuple[str,
                         texto = re.sub(r"<think>[\s\S]*?</think>", "", texto, flags=re.IGNORECASE).strip()
                         return texto, modelo
                     errores.append(f"{modelo} ({resp.status_code})")
-                except Exception as ex:
+                except Exception:
                     errores.append(f"{modelo} (Timeout/Red)")
 
-    # --- PROVEEDOR 2: GROQ CLOUD (RESPALDO ULTRARRÁPIDO GRATUITO) ---
+    # --- PROVEEDOR 2: GROQ CLOUD (AUTODESCUBRIMIENTO DE MODELOS ACTIVOS) ---
     if groq_key:
         headers_groq = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {groq_key}"
         }
-        async with httpx.AsyncClient(timeout=12.0) as client:
-            for modelo_groq in MODELOS_GROQ_GRATIS:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            modelos_groq_activos = []
+            try:
+                resp_lista = await client.get(
+                    "https://api.groq.com/openai/v1/models",
+                    headers=headers_groq
+                )
+                if resp_lista.status_code == 200:
+                    excluidos = ("whisper", "tts", "guard", "safeguard", "embed", "moderation", "audio", "speech", "orpheus", "playai")
+                    modelos_groq_activos = [
+                        m["id"]
+                        for m in resp_lista.json().get("data", [])
+                        if m.get("active", True) and not any(x in m["id"].lower() for x in excluidos)
+                    ]
+                    modelos_groq_activos.sort(key=lambda m: (_prioridad_modelo_groq(m), m))
+                else:
+                    errores.append(f"groq/models ({resp_lista.status_code}): {resp_lista.text[:120]}")
+            except Exception as ex_list:
+                errores.append(f"groq/models (Error): {str(ex_list)}")
+
+            for modelo_groq in modelos_groq_activos[:3]:
                 payload_groq = {
                     "model": modelo_groq,
                     "messages": [{"role": "user", "content": prompt}],
