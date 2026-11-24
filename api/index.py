@@ -2203,14 +2203,18 @@ def analitica_inteligencia_negocio(
         raise HTTPException(status_code=500, detail=f"Fallo en motor BI: {str(e)}")
 
 # -----------------------------------------------------------------------------
-# 22. MÓDULO CONSULTOR IA FINANCIERO (TEXT-TO-SQL SOLO LECTURA + PROYECCIONES)
+# 22. MÓDULO CONSULTOR IA FINANCIERO (MOTOR HÍBRIDO GEMINI + GROQ SOLO LECTURA)
 # -----------------------------------------------------------------------------
+import asyncio
 
-# Cascada de modelos gratuitos vigentes en Google AI Studio
 MODELOS_GEMINI_GRATIS = [
     "gemini-3.8-flash",
-    "gemini-3.8-flash-lite",
     "gemini-3.6-flash"
+]
+
+MODELOS_GROQ_GRATIS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant"
 ]
 
 ESQUEMA_BD_NAIL_STORE = """
@@ -2254,8 +2258,8 @@ class ConsultaIARequest(BaseModel):
 
 def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
     """Valida que la consulta generada sea estrictamente SELECT/WITH y sin escritura."""
-    limpio = re.sub(r"```(?:sql)?", "", sql_raw, flags=re.IGNORECASE).replace("```", "").strip()
-    # Eliminamos comentarios SQL que puedan romper la subconsulta envolvente
+    limpio = re.sub(r"<think>[\s\S]*?</think>", "", sql_raw, flags=re.IGNORECASE).strip()
+    limpio = re.sub(r"```(?:sql)?", "", limpio, flags=re.IGNORECASE).replace("```", "").strip()
     limpio = re.sub(r"/\*[\s\S]*?\*/", " ", limpio)
     limpio = re.sub(r"--.*$", "", limpio, flags=re.MULTILINE).strip()
     limpio = re.sub(r";+\s*$", "", limpio).strip()
@@ -2270,77 +2274,88 @@ def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
     if re.search(palabras_prohibidas, limpio, re.IGNORECASE):
         raise ValueError("Operación de modificación bloqueada: el asistente es estrictamente de solo lectura.")
 
-    # Protección de memoria y tokens: limitamos resultados masivos si la IA no puso LIMIT
     if not re.search(r"\bLIMIT\b", limpio, re.IGNORECASE):
         limpio = f"{limpio} LIMIT 150"
 
     return limpio
 
-async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
-    """Ejecuta la llamada a Google Gemini con modelos vigentes y autodescubrimiento."""
-    raw_key = os.environ.get("GEMINI_API_KEY") or ""
-    api_key = re.sub(r"[\s\"']+", "", raw_key)
+async def llamar_ia_hibrida(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
+    """
+    Motor Híbrido Multi-Proveedor (Alta Disponibilidad Gratuita):
+    1. Intenta con Google Gemini (3.8 Flash / 3.6 Flash).
+    2. Si Google tiene picos 503 o límite 429, salta instantáneamente a Groq (Llama 3.3 70B).
+    """
+    gemini_key = re.sub(r"[\s\"']+", "", os.environ.get("GEMINI_API_KEY") or "")
+    groq_key = re.sub(r"[\s\"']+", "", os.environ.get("GROQ_API_KEY") or "")
 
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Falta configurar GEMINI_API_KEY en el servidor.")
-
-    headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": api_key
-    }
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": temperatura,
-            "maxOutputTokens": 4096
-        }
-    }
+    if not gemini_key and not groq_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Configura GEMINI_API_KEY o GROQ_API_KEY en las variables de entorno de Vercel."
+        )
 
     errores = []
-    async with httpx.AsyncClient(timeout=25.0) as client:
-        # 1. Intentar con los modelos Flash vigentes prioritarios
-        for modelo in MODELOS_GEMINI_GRATIS:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-            try:
-                resp = await client.post(url, headers=headers, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    texto = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return texto, modelo
-                errores.append(f"{modelo} ({resp.status_code}): {resp.text[:140]}")
-            except Exception as ex:
-                errores.append(f"{modelo} (Error): {str(ex)}")
 
-        # 2. Autodescubrimiento sostenible si Google actualiza nombres en el futuro
-        try:
-            resp_modelos = await client.get(
-                "https://generativelanguage.googleapis.com/v1beta/models",
-                headers=headers
-            )
-            if resp_modelos.status_code == 200:
-                lista = resp_modelos.json().get("models", [])
-                candidatos = [
-                    m["name"].replace("models/", "")
-                    for m in lista
-                    if "generateContent" in m.get("supportedGenerationMethods", [])
-                    and "flash" in m.get("name", "").lower()
-                    and not any(x in m.get("name", "").lower() for x in ["image", "audio", "tts", "live", "lite"])
-                ]
-                candidatos.sort(reverse=True)
-                for modelo_auto in candidatos[:2]:
-                    if modelo_auto in MODELOS_GEMINI_GRATIS:
-                        continue
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo_auto}:generateContent"
-                    resp = await client.post(url, headers=headers, json=payload)
+    # --- PROVEEDOR 1: GOOGLE GEMINI ---
+    if gemini_key:
+        headers_gemini = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": gemini_key
+        }
+        payload_gemini = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperatura,
+                "maxOutputTokens": 4096
+            }
+        }
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            for modelo in MODELOS_GEMINI_GRATIS:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+                try:
+                    resp = await client.post(url, headers=headers_gemini, json=payload_gemini)
                     if resp.status_code == 200:
                         data = resp.json()
                         texto = data["candidates"][0]["content"]["parts"][0]["text"]
-                        return texto, modelo_auto
-                    errores.append(f"{modelo_auto} ({resp.status_code}): {resp.text[:140]}")
-        except Exception as ex_auto:
-            errores.append(f"Autodescubrimiento: {str(ex_auto)}")
+                        texto = re.sub(r"<think>[\s\S]*?</think>", "", texto, flags=re.IGNORECASE).strip()
+                        return texto, modelo
+                    errores.append(f"{modelo} ({resp.status_code})")
+                except Exception as ex:
+                    errores.append(f"{modelo} (Timeout/Red)")
 
-    raise HTTPException(status_code=503, detail=f"No se pudo conectar con Gemini. Detalle: {' | '.join(errores)}")
+    # --- PROVEEDOR 2: GROQ CLOUD (RESPALDO ULTRARRÁPIDO GRATUITO) ---
+    if groq_key:
+        headers_groq = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {groq_key}"
+        }
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            for modelo_groq in MODELOS_GROQ_GRATIS:
+                payload_groq = {
+                    "model": modelo_groq,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperatura,
+                    "max_tokens": 4096
+                }
+                try:
+                    resp = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers=headers_groq,
+                        json=payload_groq
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        texto = data["choices"][0]["message"]["content"]
+                        texto = re.sub(r"<think>[\s\S]*?</think>", "", texto, flags=re.IGNORECASE).strip()
+                        return texto, f"groq/{modelo_groq}"
+                    errores.append(f"groq/{modelo_groq} ({resp.status_code}): {resp.text[:120]}")
+                except Exception as ex:
+                    errores.append(f"groq/{modelo_groq} (Error): {str(ex)}")
+
+    raise HTTPException(
+        status_code=503,
+        detail=f"Motores IA ocupados temporalmente. Detalle: {' | '.join(errores)}"
+    )
 
 @app.post("/api/ia/consultar")
 @app.post("/ia/consultar")
@@ -2383,7 +2398,7 @@ INSTRUCCIONES ESTRICTAS:
 3. Si piden proyecciones (ej. cierre de mes), extrae los datos históricos diarios del mes actual y del mes anterior para calcular promedios diarios reales.
 4. Usa ROUND(..., 2) en cálculos monetarios y porcentajes, y COALESCE(..., 0) para evitar valores NULL.
 """
-        sql_generado_raw, _ = await llamar_gemini_gratis(prompt_sql, temperatura=0.0)
+        sql_generado_raw, _ = await llamar_ia_hibrida(prompt_sql, temperatura=0.0)
         sql_seguro = sanitizar_sql_solo_lectura(sql_generado_raw)
 
         # FASE 2: EJECUCIÓN BLINDADA EN SUPABASE CON AUTOCORRECCIÓN (1 REINTENTO)
@@ -2397,7 +2412,6 @@ INSTRUCCIONES ESTRICTAS:
             if "IA403" in error_pg:
                 raise ValueError("Operación bloqueada por seguridad: solo se permiten consultas SELECT.")
 
-            # Si hubo un error de sintaxis o columna en PostgreSQL, pedimos a Gemini corregirlo una vez
             prompt_fix = f"""La siguiente consulta PostgreSQL falló al ejecutarse en Supabase:
 SQL FALLIDO:
 {sql_seguro}
@@ -2409,7 +2423,7 @@ ERROR DE POSTGRESQL:
 
 Corrige la consulta respetando exactamente los nombres de tablas y columnas del esquema. Devuelve ÚNICAMENTE el SQL corregido, sin markdown ni explicaciones.
 """
-            sql_corregido_raw, _ = await llamar_gemini_gratis(prompt_fix, temperatura=0.0)
+            sql_corregido_raw, _ = await llamar_ia_hibrida(prompt_fix, temperatura=0.0)
             sql_seguro = sanitizar_sql_solo_lectura(sql_corregido_raw)
             res_db = supabase.postgrest.auth(token).rpc(
                 "ejecutar_consulta_ia",
@@ -2439,7 +2453,7 @@ REGLAS DE RESPUESTA:
 4. Si la consulta solicita una PROYECCIÓN, muestra explícitamente la fórmula aplicada (ej. Promedio diario actual × días restantes del mes) y presenta un escenario conservador y uno esperado.
 5. Cierra con 1 recomendación accionable breve basada en los números hallados.
 """
-        respuesta_final, modelo_final = await llamar_gemini_gratis(prompt_analisis, temperatura=0.25)
+        respuesta_final, modelo_final = await llamar_ia_hibrida(prompt_analisis, temperatura=0.25)
 
         return {
             "status": "success",
