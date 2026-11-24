@@ -31,9 +31,16 @@ export default function AsistenteIAPage() {
       rol: 'assistant',
       contenido:
         "Hola. Soy el **Consultor Financiero IA de Jean Nails Store**.\n\nEstoy conectado en modo **Solo Lectura** directamente a tu base de datos en tiempo real. Puedes pedirme balances económicos, comparativas entre meses, auditoría de gastos/cajas, rentabilidad por producto o proyecciones de cierre de mes.",
-      hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+      hora: ''
     }
   ]);
+
+  useEffect(() => {
+    const horaLocal = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    setMensajes((prev) =>
+      prev.map((m) => (m.id === 'bienvenida' && !m.hora ? { ...m, hora: horaLocal } : m))
+    );
+  }, []);
   const [input, setInput] = useState('');
   const [cargando, setCargando] = useState(false);
   const [sqlAbierto, setSqlAbierto] = useState<Record<string, boolean>>({});

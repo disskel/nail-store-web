@@ -2206,11 +2206,11 @@ def analitica_inteligencia_negocio(
 # 22. MÓDULO CONSULTOR IA FINANCIERO (TEXT-TO-SQL SOLO LECTURA + PROYECCIONES)
 # -----------------------------------------------------------------------------
 
-# Cascada de modelos gratuitos y rápidos en Google AI Studio
+# Cascada de modelos gratuitos vigentes en Google AI Studio
 MODELOS_GEMINI_GRATIS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash"
+    "gemini-3.8-flash",
+    "gemini-3.8-flash-lite",
+    "gemini-3.6-flash"
 ]
 
 ESQUEMA_BD_NAIL_STORE = """
@@ -2277,9 +2277,8 @@ def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
     return limpio
 
 async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
-    """Ejecuta la llamada a Google Gemini limpiando saltos de línea de la API Key."""
+    """Ejecuta la llamada a Google Gemini con modelos vigentes y autodescubrimiento."""
     raw_key = os.environ.get("GEMINI_API_KEY") or ""
-    # Limpieza crítica: elimina \n, \r, espacios o comillas pegadas al copiar la llave
     api_key = re.sub(r"[\s\"']+", "", raw_key)
 
     if not api_key:
@@ -2289,29 +2288,59 @@ async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[s
         "Content-Type": "application/json",
         "x-goog-api-key": api_key
     }
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": temperatura,
+            "maxOutputTokens": 4096
+        }
+    }
 
-    ultimo_error = ""
+    errores = []
     async with httpx.AsyncClient(timeout=25.0) as client:
+        # 1. Intentar con los modelos Flash vigentes prioritarios
         for modelo in MODELOS_GEMINI_GRATIS:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
-            payload = {
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": temperatura,
-                    "maxOutputTokens": 4096
-                }
-            }
             try:
                 resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
                     texto = data["candidates"][0]["content"]["parts"][0]["text"]
                     return texto, modelo
-                ultimo_error = f"{modelo} HTTP {resp.status_code}: {resp.text[:200]}"
+                errores.append(f"{modelo} ({resp.status_code}): {resp.text[:140]}")
             except Exception as ex:
-                ultimo_error = f"{modelo} Excepción: {str(ex)}"
+                errores.append(f"{modelo} (Error): {str(ex)}")
 
-    raise HTTPException(status_code=503, detail=f"No se pudo conectar con Gemini. Detalle: {ultimo_error}")
+        # 2. Autodescubrimiento sostenible si Google actualiza nombres en el futuro
+        try:
+            resp_modelos = await client.get(
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                headers=headers
+            )
+            if resp_modelos.status_code == 200:
+                lista = resp_modelos.json().get("models", [])
+                candidatos = [
+                    m["name"].replace("models/", "")
+                    for m in lista
+                    if "generateContent" in m.get("supportedGenerationMethods", [])
+                    and "flash" in m.get("name", "").lower()
+                    and not any(x in m.get("name", "").lower() for x in ["image", "audio", "tts", "live", "lite"])
+                ]
+                candidatos.sort(reverse=True)
+                for modelo_auto in candidatos[:2]:
+                    if modelo_auto in MODELOS_GEMINI_GRATIS:
+                        continue
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo_auto}:generateContent"
+                    resp = await client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        texto = data["candidates"][0]["content"]["parts"][0]["text"]
+                        return texto, modelo_auto
+                    errores.append(f"{modelo_auto} ({resp.status_code}): {resp.text[:140]}")
+        except Exception as ex_auto:
+            errores.append(f"Autodescubrimiento: {str(ex_auto)}")
+
+    raise HTTPException(status_code=503, detail=f"No se pudo conectar con Gemini. Detalle: {' | '.join(errores)}")
 
 @app.post("/api/ia/consultar")
 @app.post("/ia/consultar")
