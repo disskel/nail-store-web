@@ -694,6 +694,30 @@ export const apiService = {
       throw new Error(errorData.detail || 'Error al procesar la inteligencia de negocio');
     }
     return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // 16. MÓDULO CONSULTOR IA FINANCIERO (SOLO LECTURA)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Envía preguntas financieras, económicas o de proyección al motor IA
+   * con historial conversacional y validación estricta de solo lectura.
+   */
+  async consultarAsistenteIA(
+    pregunta: string,
+    historial: { rol: 'user' | 'assistant'; contenido: string }[] = []
+  ) {
+    const res = await fetch(`${API_URL}/ia/consultar`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ pregunta, historial }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Error al consultar el Asistente IA');
+    }
+    return res.json();
   }
 
 };

@@ -5,6 +5,9 @@ from typing import List, Optional, Any, Literal
 from supabase import create_client, Client
 import os
 import time
+import re
+import json
+import httpx
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
@@ -2198,3 +2201,197 @@ def analitica_inteligencia_negocio(
     except Exception as e:
         print(f"Error Crítico en Analítica BI: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Fallo en motor BI: {str(e)}")
+
+# -----------------------------------------------------------------------------
+# 22. MÓDULO CONSULTOR IA FINANCIERO (TEXT-TO-SQL SOLO LECTURA + PROYECCIONES)
+# -----------------------------------------------------------------------------
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Cascada de modelos gratuitos y rápidos en Google AI Studio
+MODELOS_GEMINI_GRATIS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash"
+]
+
+ESQUEMA_BD_NAIL_STORE = """
+ESQUEMA POSTGRESQL (SUPABASE - SCHEMA public) DE JEAN NAILS STORE (TRUJILLO, PERÚ):
+1. productos (id uuid, sku text, nombre text, id_proveedor uuid, costo_unidad numeric, precio_menor numeric, precio_mayor numeric, stock_actual int4, id_categoria uuid, costo_maximo numeric, activo bool)
+2. categorias (id uuid, nombre text, descripcion text, created_at timestamptz, activo bool)
+3. proveedores (id uuid, nombre text, contacto text, created_at timestamptz, activo bool)
+4. ventas (id uuid, fecha timestamptz, id_sesion_caja uuid, monto_bruto numeric, monto_descuento numeric, monto_neto numeric, medio_pago text, motivo_descuento text, estado text, creado_en timestamptz, id_cliente uuid, correlativo_nota text)
+5. movimientos_inventario (id uuid, id_producto uuid, tipo_movimiento text, cantidad int4, referencia text, id_sesion_caja uuid, fecha timestamptz, medio_pago text, precio_momento numeric, id_venta uuid)
+6. clientes (id uuid, tipo_documento text, numero_documento text, nombre_razon_social text, direccion text, celular text, contacto_nombre text, fecha_registro timestamptz, activo bool, id_academia uuid)
+7. academias (id uuid, nombre text, descuento_sugerido numeric, activo bool, fecha_registro timestamptz)
+8. gastos_operativos (id uuid, fecha_gasto timestamptz, descripcion text, monto numeric, categoria text, metodo_pago text, id_sesion_caja uuid, creado_en timestamptz)
+9. obligaciones_pago (id uuid, descripcion text, categoria text, es_recurrente bool, dia_vencimiento int4, fecha_especifica date, monto_sugerido numeric, recordatorio_dias int4, activo bool, ultima_notificacion date, creado_en timestamptz)
+10. sesiones_caja (id uuid, fecha_apertura timestamptz, monto_inicial numeric, monto_final_contado numeric, monto_final_sistema numeric, estado text, observaciones text)
+11. cierres_caja_detalle (id uuid, id_sesion uuid, total_efectivo_sistema numeric, total_digital_sistema numeric, monto_fisico_contado numeric, diferencia numeric, fecha_cierre timestamptz, observaciones_arqueo text)
+12. devoluciones (id uuid, id_venta_original uuid, id_sesion_caja uuid, tipo_operacion text, monto_devuelto numeric, metodo_reembolso text, motivo text, fecha timestamp, creado_por text)
+13. devoluciones_detalle (id uuid, id_devolucion uuid, id_producto uuid, cantidad_devuelta int4, precio_unitario numeric, estado_inventario text)
+14. historial_precios (id uuid, id_producto uuid, costo_anterior numeric, costo_nuevo numeric, precio_nuevo_menor numeric, fecha_cambio timestamptz, precio_nuevo_mayor numeric)
+15. historial_movimientos (id uuid, id_producto uuid, tipo_movimiento text, cantidad int4, precio_momento numeric, fecha timestamptz)
+16. correlativos (id uuid, tipo_documento text, serie text, ultimo_numero int4, longitud_numero int4)
+17. perfiles (id uuid, nombre_completo text, rol user-defined, updated_at timestamptz)
+18. vista_reporte_utilidad (fecha date, ingresos_totales numeric, costo_mercaderia numeric, egresos_operativos numeric, ganancia_neta numeric)
+19. vista_historial_cajas (id uuid, fecha_apertura text, fecha_cierre text, monto_inicial numeric, saldo_esperado_efectivo numeric, saldo_contado_efectivo numeric, estado text, descuadre_total numeric, detalle_apps text, monto_total_sistema numeric, total_ventas_digitales numeric)
+
+REGLAS DE NEGOCIO OBLIGATORIAS PARA CONSULTAS SQL:
+- Zona horaria del negocio: (columna AT TIME ZONE 'America/Lima')::date para filtrar fechas en ventas, gastos_operativos y movimientos_inventario.
+- Fecha actual de referencia en Perú: (NOW() AT TIME ZONE 'America/Lima')::date.
+- Para ingresos, costos y utilidad diaria/mensual, prioriza consultar 'vista_reporte_utilidad' (ya descuenta devoluciones y agrupa ventas completadas).
+- Si consultas 'ventas' directamente, filtra siempre WHERE estado = 'COMPLETADA'.
+- Si consultas 'productos', filtra WHERE activo = TRUE salvo que pregunten por productos desactivados/eliminados.
+- Moneda oficial: Soles peruanos (S/).
+"""
+
+class MensajeChatIA(BaseModel):
+    rol: Literal["user", "assistant"]
+    contenido: str
+
+class ConsultaIARequest(BaseModel):
+    pregunta: str
+    historial: Optional[List[MensajeChatIA]] = []
+
+def sanitizar_sql_solo_lectura(sql_raw: str) -> str:
+    """Valida que la consulta generada sea estrictamente SELECT/WITH y sin escritura."""
+    limpio = re.sub(r"```(?:sql)?", "", sql_raw, flags=re.IGNORECASE).replace("```", "").strip()
+    limpio = re.sub(r";+\s*$", "", limpio).strip()
+
+    if not re.match(r"^(SELECT|WITH)\b", limpio, re.IGNORECASE):
+        raise ValueError("La consulta generada no inicia con SELECT o WITH.")
+
+    if ";" in limpio:
+        raise ValueError("Se detectaron múltiples sentencias SQL bloqueadas por seguridad.")
+
+    palabras_prohibidas = r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE|EXECUTE|CALL|COPY|VACUUM|LOCK|MERGE|UPSERT)\b"
+    if re.search(palabras_prohibidas, limpio, re.IGNORECASE):
+        raise ValueError("Operación de modificación bloqueada: el asistente es estrictamente de solo lectura.")
+
+    # Protección de memoria y tokens: limitamos resultados masivos si la IA no puso LIMIT
+    if not re.search(r"\bLIMIT\b", limpio, re.IGNORECASE):
+        limpio = f"{limpio} LIMIT 150"
+
+    return limpio
+
+async def llamar_gemini_gratis(prompt: str, temperatura: float = 0.1) -> tuple[str, str]:
+    """Ejecuta la llamada a Google Gemini con respaldo automático entre modelos gratuitos."""
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="Falta configurar GEMINI_API_KEY en el servidor.")
+
+    ultimo_error = ""
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        for modelo in MODELOS_GEMINI_GRATIS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": temperatura,
+                    "maxOutputTokens": 4096
+                }
+            }
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    texto = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return texto, modelo
+                ultimo_error = f"{modelo} HTTP {resp.status_code}: {resp.text[:200]}"
+            except Exception as ex:
+                ultimo_error = f"{modelo} Excepción: {str(ex)}"
+
+    raise HTTPException(status_code=503, detail=f"Modelos gratuitos ocupados temporalmente. Detalle: {ultimo_error}")
+
+@app.post("/api/ia/consultar")
+@app.post("/ia/consultar")
+async def consultar_asistente_ia(
+    req: ConsultaIARequest,
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """
+    Motor Analítico Conversacional (Solo Lectura):
+    1. Traduce la pregunta del administrador a SQL seguro (SELECT/WITH).
+    2. Ejecuta el SQL en Supabase mediante RPC READ ONLY respetando RLS.
+    3. Redacta el informe financiero, económico o proyección con base en datos reales.
+    """
+    try:
+        token = authorization.split(" ")[1] if authorization else None
+        if not req.pregunta or not req.pregunta.strip():
+            raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía.")
+
+        # Contexto breve de mensajes previos para repreguntas
+        contexto_chat = ""
+        if req.historial:
+            ultimos = req.historial[-4:]
+            contexto_chat = "\n".join([f"{m.rol.upper()}: {m.contenido[:400]}" for m in ultimos])
+
+        # FASE 1: GENERACIÓN DE CONSULTA SQL DE SOLO LECTURA
+        prompt_sql = f"""Eres un arquitecto de datos PostgreSQL experto en ERP retail.
+Tu única tarea es generar UNA consulta SQL válida en PostgreSQL para responder la pregunta del administrador de Jean Nails Store.
+
+{ESQUEMA_BD_NAIL_STORE}
+
+HISTORIAL RECIENTE DE CONVERSACIÓN:
+{contexto_chat if contexto_chat else "Sin historial previo."}
+
+PREGUNTA DEL ADMINISTRADOR:
+"{req.pregunta.strip()}"
+
+INSTRUCCIONES ESTRICTAS:
+1. Devuelve ÚNICAMENTE el código SQL puro (sin explicaciones, sin comentarios, sin bloques markdown).
+2. Usa exclusivamente SELECT o WITH (CTE). Prohibido modificar datos.
+3. Si piden proyecciones (ej. cierre de mes), extrae los datos históricos diarios del mes actual y del mes anterior para calcular promedios diarios reales.
+4. Usa ROUND(..., 2) en cálculos monetarios y porcentajes, y COALESCE(..., 0) para evitar valores NULL.
+"""
+        sql_generado_raw, modelo_usado = await llamar_gemini_gratis(prompt_sql, temperatura=0.0)
+        sql_seguro = sanitizar_sql_solo_lectura(sql_generado_raw)
+
+        # FASE 2: EJECUCIÓN BLINDADA EN SUPABASE (RPC READ ONLY + RLS)
+        res_db = supabase.postgrest.auth(token).rpc(
+            "ejecutar_consulta_ia",
+            {"p_sql": sql_seguro}
+        ).execute()
+
+        datos_reales = res_db.data if res_db.data is not None else []
+        datos_json_str = json.dumps(datos_reales, ensure_ascii=False, default=str)
+
+        # Recorte de seguridad si el JSON supera 18,000 caracteres
+        if len(datos_json_str) > 18000:
+            datos_json_str = datos_json_str[:18000] + "... [TRUNCADO POR TAMAÑO]"
+
+        # FASE 3: SUSTENTO FINANCIERO, ECONÓMICO Y PROYECCIONES
+        prompt_analisis = f"""Eres el Director Financiero (CFO) y Analista de Datos Senior de 'Jean Nails Store' (Trujillo, Perú).
+Responde la consulta del administrador basándote ESTRICTAMENTE en los datos reales extraídos de la base de datos.
+
+PREGUNTA DEL ADMINISTRADOR:
+"{req.pregunta.strip()}"
+
+DATOS REALES EXTRAÍDOS DE SUPABASE (JSON):
+{datos_json_str}
+
+REGLAS DE RESPUESTA:
+1. Responde en español profesional, directo y claro, usando formato Markdown limpio (negritas, listas con viñetas o tablas compactas si hay varios ítems).
+2. Expresa todos los montos en Soles (S/ X,XXX.XX).
+3. Si los datos vienen vacíos ([]), indica con claridad que no hay movimientos registrados para ese filtro o periodo, sin inventar cifras.
+4. Si la consulta solicita una PROYECCIÓN, muestra explícitamente la fórmula aplicada (ej. Promedio diario actual × días restantes del mes) y presenta un escenario conservador y uno esperado.
+5. Cierra con 1 recomendación accionable breve basada en los números hallados.
+"""
+        respuesta_final, modelo_final = await llamar_gemini_gratis(prompt_analisis, temperatura=0.25)
+
+        return {
+            "status": "success",
+            "respuesta": respuesta_final,
+            "sql_ejecutado": sql_seguro,
+            "filas_analizadas": len(datos_reales) if isinstance(datos_reales, list) else 0,
+            "modelo": modelo_final
+        }
+
+    except HTTPException as he:
+        raise he
+    except ValueError as ve:
+        raise HTTPException(status_code=403, detail=str(ve))
+    except Exception as e:
+        print(f"Error en Consultor IA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar consulta IA: {str(e)}")
