@@ -89,7 +89,12 @@ export default function HistorialCajas() {
   // --- FILTRADO INTELIGENTE ---
   const historialFiltrado = useMemo(() => {
     return historial.filter(item => {
-      const coincideBusqueda = item.fecha_apertura.includes(filtro) || item.estado.toLowerCase().includes(filtro.toLowerCase());
+      const textoBusqueda = filtro.toLowerCase();
+      const coincideBusqueda =
+        item.fecha_apertura.toLowerCase().includes(textoBusqueda) ||
+        item.estado.toLowerCase().includes(textoBusqueda) ||
+        (item.usuario_apertura || '').toLowerCase().includes(textoBusqueda) ||
+        (item.usuario_cierre || '').toLowerCase().includes(textoBusqueda);
       if (mostrarSoloDescuadres) {
         return coincideBusqueda && Math.abs(item.descuadre_total || 0) > 0.01;
       }
@@ -194,7 +199,7 @@ export default function HistorialCajas() {
           <div className="flex bg-black p-1.5 rounded-lg border border-zinc-800">
             <input type="date" onChange={(e) => setFiltro(e.target.value)} className="bg-transparent text-white text-[10px] font-black outline-none px-2 cursor-pointer" />
             <div className="w-px bg-zinc-800 mx-2"></div>
-            <input placeholder="BUSCAR ESTADO O FECHA..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="bg-transparent w-48 text-white text-[10px] font-black outline-none uppercase placeholder:text-zinc-600" />
+            <input placeholder="BUSCAR FECHA, ESTADO O USUARIO..." value={filtro} onChange={(e) => setFiltro(e.target.value.toUpperCase())} className="bg-transparent w-56 text-white text-[10px] font-black outline-none uppercase placeholder:text-zinc-600" />
           </div>
           
           <button onClick={() => setMostrarSoloDescuadres(!mostrarSoloDescuadres)} className={`px-4 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${mostrarSoloDescuadres ? 'bg-red-600 text-white shadow-md' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>
@@ -231,10 +236,24 @@ export default function HistorialCajas() {
                 return (
                   <tr key={caja.id} className="hover:bg-indigo-50 dark:hover:bg-zinc-800/40 transition-colors">
                     <td className="p-3">
-                      <p className="font-black text-zinc-900 dark:text-white">{formatearFechaLocal(caja.fecha_apertura)}</p>
-                      <p className="text-[9px] font-bold text-zinc-500 uppercase mt-0.5">
-                        {caja.fecha_cierre ? `Cierre: ${formatearFechaLocal(caja.fecha_cierre)}` : '🔓 TURNO ABIERTO'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-black text-zinc-900 dark:text-white">{formatearFechaLocal(caja.fecha_apertura)}</p>
+                        {caja.usuario_apertura && (
+                          <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase">
+                            👤 Abrió: {caja.usuario_apertura}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[9px] font-bold text-zinc-500 uppercase">
+                          {caja.fecha_cierre ? `Cierre: ${formatearFechaLocal(caja.fecha_cierre)}` : '🔓 TURNO ABIERTO'}
+                        </p>
+                        {caja.fecha_cierre && caja.usuario_cierre && (
+                          <span className="px-2 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[9px] font-black uppercase">
+                            🔒 Cerró: {caja.usuario_cierre}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-right font-bold text-zinc-500 dark:text-zinc-400">
                       S/ {Number(caja.monto_inicial || 0).toFixed(2)}

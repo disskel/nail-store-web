@@ -92,6 +92,47 @@ async def validar_token(authorization: str = Header(None)):
         print(f"Error de seguridad en Trujillo: {str(e)}")
         raise HTTPException(status_code=401, detail="SESIÓN EXPIRADA")
 
+def obtener_perfil_usuario(user_obj, token: str) -> dict:
+    """Obtiene nombre_completo y rol desde public.perfiles usando el token del usuario."""
+    try:
+        user_id = getattr(user_obj, "id", None) or (user_obj.get("id") if isinstance(user_obj, dict) else None)
+        email = getattr(user_obj, "email", "") or ""
+        fallback_nombre = email.split("@")[0].upper() if email else "USUARIO"
+
+        if not user_id:
+            return {"nombre_completo": fallback_nombre, "rol": "VENDEDOR"}
+
+        res = supabase.postgrest.auth(token).table("perfiles")\
+            .select("nombre_completo, rol")\
+            .eq("id", str(user_id))\
+            .execute()
+
+        if res.data and len(res.data) > 0:
+            row = res.data[0]
+            return {
+                "nombre_completo": (row.get("nombre_completo") or fallback_nombre).strip(),
+                "rol": str(row.get("rol") or "VENDEDOR").upper()
+            }
+        return {"nombre_completo": fallback_nombre, "rol": "VENDEDOR"}
+    except Exception as e:
+        print(f"Aviso al consultar perfil: {str(e)}")
+        return {"nombre_completo": "USUARIO", "rol": "VENDEDOR"}
+
+@app.get("/api/auth/perfil")
+@app.get("/auth/perfil")
+def consultar_perfil_actual(
+    user = Depends(validar_token),
+    authorization: str = Header(None)
+):
+    """Retorna el nombre_completo y rol del usuario autenticado."""
+    token = authorization.split(" ")[1] if authorization else None
+    perfil = obtener_perfil_usuario(user["user"], token)
+    return {
+        "status": "success",
+        "nombre_completo": perfil["nombre_completo"],
+        "rol": perfil["rol"]
+    }
+
 # -----------------------------------------------------------------------------
 # 2. UTILIDADES FINANCIERAS (TRUJILLO FORMATO)
 # -----------------------------------------------------------------------------
@@ -752,25 +793,30 @@ def crear_categoria(
 @app.get("/dashboard/resumen")
 def obtener_resumen_dashboard(
     user = Depends(validar_token),
-    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+    authorization: str = Header(None)
 ):
-    """Calcula el valor del inventario identificándose ante la DB para saltar el RLS."""
+    """Calcula el valor del inventario solo para usuarios con rol ADMIN."""
     try:
-        # Extraemos el token del encabezado de seguridad
         token = authorization.split(" ")[1] if authorization else None
-        
-        # ACCIÓN CRÍTICA: Usamos .auth(token) para que Supabase reconozca 
-        # al administrador y nos entregue los costos y el stock real.
+        perfil = obtener_perfil_usuario(user["user"], token)
+
+        if perfil["rol"] != "ADMIN":
+            return {
+                "valor_total_inventario": 0,
+                "total_items": 0,
+                "restringido": True
+            }
+
         res = supabase.postgrest.auth(token).table("productos")\
             .select("costo_unidad, stock_actual")\
             .eq("activo", True).execute()
             
-        # Realizamos el cálculo financiero del capital inmovilizado en Trujillo
         v_total = sum(float(p.get("costo_unidad") or 0.0) * int(p.get("stock_actual") or 0) for p in res.data)
         
         return {
             "valor_total_inventario": round(v_total, 2), 
-            "total_items": len(res.data)
+            "total_items": len(res.data),
+            "restringido": False
         }
     except Exception as e:
         print(f"Error en dashboard: {str(e)}")
@@ -818,18 +864,18 @@ def crear_proveedor(
 def abrir_caja(
     req: AperturaCajaRequest, 
     user = Depends(validar_token),
-    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN
+    authorization: str = Header(None)
 ):
-    """Inicia un nuevo turno registrando el autor del mismo."""
+    """Inicia un nuevo turno registrando el nombre_completo del usuario."""
     try:
         token = authorization.split(" ")[1] if authorization else None
+        perfil = obtener_perfil_usuario(user["user"], token)
         
-        # Usamos el token para que el registro quede asociado al usuario logueado
         res = supabase.postgrest.auth(token).table("sesiones_caja").insert({
             "monto_inicial": req.monto_inicial, 
             "estado": "ABIERTA", 
             "observaciones": req.observaciones,
-            
+            "usuario_apertura": perfil["nombre_completo"]
         }).execute()
         
         if not res.data:
@@ -1198,18 +1244,16 @@ def obtener_resumen_caja(
 def cerrar_caja(
     req: CierreCajaRequest, 
     user = Depends(validar_token),
-    authorization: str = Header(None) # <--- CAPTURAMOS EL TOKEN PARA EL RLS
+    authorization: str = Header(None)
 ):
-    """Finaliza el turno y guarda auditoría detallada usando identificación segura."""
+    """Finaliza el turno y guarda auditoría detallada con usuario de cierre."""
     try:
-        # Extraemos el token del encabezado de autorización
         token = authorization.split(" ")[1] if authorization else None
+        perfil = obtener_perfil_usuario(user["user"], token)
 
-        # 1. Obtener el resumen actualizado (Pasamos el authorization para saltar el RLS)
         resumen = obtener_resumen_caja(req.id_sesion, user, authorization)
         esp_efectivo = resumen["saldo_esperado_efectivo"]
         
-        # 2. Calcular descuadres por cada método
         dif_efectivo = req.monto_fisico_efectivo - esp_efectivo
         dif_yape = req.monto_yape_contado - resumen["ventas_por_metodo"]["YAPE"]
         dif_plin = req.monto_plin_contado - resumen["ventas_por_metodo"]["PLIN"]
@@ -1217,15 +1261,13 @@ def cerrar_caja(
 
         total_diferencia = dif_efectivo + dif_yape + dif_plin + dif_transf
 
-        # 3. Actualizar Sesión Maestra con permiso RLS
-        # Usamos .auth(token) para que Supabase reconozca al cajero autor de la acción
         supabase.postgrest.auth(token).table("sesiones_caja").update({
             "monto_final_contado": req.monto_fisico_efectivo,
             "monto_final_sistema": esp_efectivo,
-            "estado": "CERRADA"
+            "estado": "CERRADA",
+            "usuario_cierre": perfil["nombre_completo"]
         }).eq("id", req.id_sesion).execute()
 
-        # 4. Registrar Auditoría Final Detallada con permiso RLS
         obs_arqueo = f"Dif Yape: {dif_yape:.2f}, Plin: {dif_plin:.2f}, Transf: {dif_transf:.2f}"
         supabase.postgrest.auth(token).table("cierres_caja_detalle").insert({
             "id_sesion": req.id_sesion,
@@ -1240,7 +1282,6 @@ def cerrar_caja(
             "efectivo": dif_efectivo, "digital": dif_yape + dif_plin + dif_transf, "total": total_diferencia
         }}
     except Exception as e:
-        # Imprimimos el error en el servidor para facilitar el soporte técnico
         print(f"Error crítico en cierre de caja: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en cierre: {str(e)}")
 

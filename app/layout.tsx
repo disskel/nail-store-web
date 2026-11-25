@@ -24,6 +24,22 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isDark, setIsDark] = useState(true); // El sistema inicia en modo oscuro por defecto
+
+const [perfil, setPerfil] = useState<{ nombre_completo: string; rol: string } | null>(null);
+
+useEffect(() => {
+  const sessionStr = localStorage.getItem('supabase-session');
+  if (!sessionStr) return;
+
+  const cached = localStorage.getItem('nail-store-perfil');
+  if (cached) {
+    try { setPerfil(JSON.parse(cached)); } catch {}
+  }
+
+  apiService.getPerfilUsuario()
+    .then((data) => setPerfil(data))
+    .catch(() => {});
+}, []);
   
   // Inicialización del cliente de Supabase para validación de identidad en tiempo real
   const supabase = createBrowserClient(
@@ -81,7 +97,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
               <div>
                 <h2 className="text-xl font-bold tracking-tight">Nail-Store</h2>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-500 uppercase font-bold tracking-widest transition-colors">Admin Pro</p>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-widest transition-colors truncate max-w-[135px]">
+                  {perfil ? `${perfil.nombre_completo} • ${perfil.rol}` : 'Admin Pro'}
+                </p>
               </div>
             </div>
 

@@ -5,41 +5,37 @@ import { apiService } from '@/services/apiService';
 
 /**
  * COMPONENTE: Dashboard Principal - JEAN NAILS STORE
- * Propósito: Centralizar los indicadores clave de rendimiento (KPIs).
- * Versión: 1.0.36 - Soporte para Modo Claro y Oscuro (Responsive Theme).
+ * Propósito: Centralizar los indicadores clave según el rol del usuario.
  */
-
 export default function Dashboard() {
-  // --- 1. ESTADO DE LAS MÉTRICAS ---
   const [stats, setStats] = useState({
     valorInventario: 0,
     totalProductos: 0,
     totalClientes: 0
   });
+  const [rol, setRol] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
-  // --- 2. MOTOR DE SINCRONIZACIÓN CON EL BACKEND ---
   async function cargarEstadisticas() {
     try {
       setCargando(true);
-      
-      /**
-       * SINCRONIZACIÓN CENTRALIZADA:
-       * Utilizamos Promise.all para ejecutar ambas peticiones en paralelo.
-       * Ahora usamos 'getResumenDashboard' que ya gestiona los tokens de seguridad.
-       */
-      const [resumenInv, listaClientes] = await Promise.all([
-        apiService.getResumenDashboard(),
-        apiService.getClientes()
-      ]);
+      const perfil = await apiService.getPerfilUsuario();
+      const rolActual = (perfil?.rol || 'VENDEDOR').toUpperCase();
+      setRol(rolActual);
 
-      // --- 3. ACTUALIZACIÓN DEL ESTADO ---
-      // Los datos se mapean directamente desde las respuestas del Backend.
-      setStats({
-        valorInventario: resumenInv.valor_total_inventario || 0,
-        totalProductos: resumenInv.total_items || 0,
-        totalClientes: listaClientes.length || 0
-      });
+      // Solo el rol ADMIN consulta y visualiza las métricas financieras y de cartera
+      if (rolActual === 'ADMIN') {
+        const [resumenInv, listaClientes] = await Promise.all([
+          apiService.getResumenDashboard(),
+          apiService.getClientes()
+        ]);
+
+        setStats({
+          valorInventario: resumenInv.valor_total_inventario || 0,
+          totalProductos: resumenInv.total_items || 0,
+          totalClientes: listaClientes.length || 0
+        });
+      }
     } catch (error) {
       console.error("Fallo en la sincronización del Dashboard:", error);
     } finally {
@@ -47,10 +43,8 @@ export default function Dashboard() {
     }
   }
 
-  // Hook para disparar la carga de datos al montar el componente
   useEffect(() => { cargarEstadisticas(); }, []);
 
-  // Pantalla de carga profesional mientras se validan los tokens en Trujillo
   if (cargando) return (
     <div className="flex h-screen items-center justify-center bg-white dark:bg-zinc-950 text-pink-600 dark:text-pink-500 font-black uppercase italic animate-pulse transition-colors duration-300">
       Sincronizando Dashboard con Trujillo...
@@ -67,29 +61,32 @@ export default function Dashboard() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <MetricCard 
-          titulo="Capital en Stock" 
-          valor={`S/ ${stats.valorInventario.toFixed(2)}`} 
-          sub="Valorización total del inventario"
-          color="text-emerald-600 dark:text-emerald-400"
-          icon="💰"
-        />
-        <MetricCard 
-          titulo="Variedad de Productos" 
-          valor={stats.totalProductos.toString()} 
-          sub="SKUs activos en catálogo"
-          color="text-indigo-600 dark:text-indigo-400"
-          icon="📦"
-        />
-        <MetricCard 
-          titulo="Fidelización Clientes" 
-          valor={stats.totalClientes.toString()} 
-          sub="Base de datos CRM Trujillo"
-          color="text-amber-600 dark:text-amber-400"
-          icon="👥"
-        />
-      </div>
+      {/* BLOQUE VISIBLE ÚNICAMENTE PARA ROL ADMIN */}
+      {rol === 'ADMIN' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <MetricCard 
+            titulo="Capital en Stock" 
+            valor={`S/ ${stats.valorInventario.toFixed(2)}`} 
+            sub="Valorización total del inventario"
+            color="text-emerald-600 dark:text-emerald-400"
+            icon="💰"
+          />
+          <MetricCard 
+            titulo="Variedad de Productos" 
+            valor={stats.totalProductos.toString()} 
+            sub="SKUs activos en catálogo"
+            color="text-indigo-600 dark:text-indigo-400"
+            icon="📦"
+          />
+          <MetricCard 
+            titulo="Fidelización Clientes" 
+            valor={stats.totalClientes.toString()} 
+            sub="Base de datos CRM Trujillo"
+            color="text-amber-600 dark:text-amber-400"
+            icon="👥"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section className="bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[3rem] backdrop-blur-xl transition-colors duration-300">
@@ -117,7 +114,6 @@ export default function Dashboard() {
   );
 }
 
-// SUB-COMPONENTES ACTUALIZADOS PARA v4
 function MetricCard({ titulo, valor, sub, color, icon }: any) {
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[2.5rem] shadow-xl dark:shadow-2xl hover:border-indigo-500/50 transition-all group duration-300">

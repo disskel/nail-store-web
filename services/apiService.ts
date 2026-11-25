@@ -41,6 +41,7 @@ export const apiService = {
   async logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('supabase-session');
+      localStorage.removeItem('nail-store-perfil');
     }
   },
 
@@ -718,6 +719,21 @@ export const apiService = {
       throw new Error(errorData.detail || 'Error al consultar el Asistente IA');
     }
     return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // 17. PERFIL Y CONTROL DE ROLES (RBAC)
+  // -------------------------------------------------------------------------
+  async getPerfilUsuario() {
+    const res = await fetch(`${API_URL}/auth/perfil`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error('Error al obtener perfil del usuario');
+    const data = await res.json();
+    if (typeof window !== 'undefined' && data?.rol) {
+      localStorage.setItem('nail-store-perfil', JSON.stringify(data));
+    }
+    return data;
   }
 
 };
